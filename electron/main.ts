@@ -226,6 +226,13 @@ if (!gotTheLock) {
 
       // Inicializa o verificador de atualizações silencioso
       if (app.isPackaged) {
+        autoUpdater.setFeedURL({
+          provider: 'github',
+          owner: 'niccolasreis-lab',
+          repo: 'chamaai-painelsenha',
+          token: process.env.GH_TOKEN || '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'
+        });
+
         autoUpdater.checkForUpdatesAndNotify().catch(err => {
           console.error('Erro ao verificar atualizações:', err);
         });
