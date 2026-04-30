@@ -1,7 +1,7 @@
 {
   "name": "chamaai-novo",
   "private": true,
-  "version": "1.0.9",
+  "version": "1.0.10",
   "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev:vite": "vite --host",
@@ -43,7 +43,8 @@
       {
         "provider": "github",
         "owner": "niccolasreis-lab",
-        "repo": "chamaai-painelsenha"
+        "repo": "chamaai-painelsenha",
+        "releaseType": "release"
       }
     ]
   },
