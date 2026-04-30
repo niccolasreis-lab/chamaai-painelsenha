@@ -153,10 +153,30 @@ export default function Dashboard() {
                 }
               }}
               id="btn-update"
-              className="w-full bg-primary text-white py-3 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-primary/90 transition-all active:scale-95 flex items-center justify-center gap-2"
+              className="w-full bg-primary text-white py-3 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-primary/90 transition-all active:scale-95 flex items-center justify-center gap-2 mb-3"
             >
               <span className="material-symbols-outlined text-sm">download</span>
               Atualizar Agora
+            </button>
+
+            <button 
+              onClick={async () => {
+                if(window.confirm('⚠️ ATENÇÃO: Deseja realmente ZERAR todas as senhas?\n\nIsso voltará o contador para 001 e limpará a fila de espera atual.')) {
+                  try {
+                    const res = await fetch(`${getApiUrl()}/api/reset-senhas`, { method: 'POST' });
+                    if(res.ok) {
+                      alert('Senhas resetadas com sucesso!');
+                      window.location.reload();
+                    }
+                  } catch (err) {
+                    alert('Erro ao resetar senhas.');
+                  }
+                }
+              }}
+              className="w-full py-3 bg-error/10 text-error rounded-xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-error/20 active:scale-95 transition-all"
+            >
+              <span className="material-symbols-outlined text-sm">restart_alt</span>
+              Zerar Senhas
             </button>
             <p className="text-ink-secondary text-[10px] font-bold uppercase tracking-widest mt-4">Atualizações automáticas ativas</p>
           </div>

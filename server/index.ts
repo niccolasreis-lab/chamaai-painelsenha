@@ -58,9 +58,8 @@ export function startServer() {
         console.log('[CRON] Iniciando reset diário automático das senhas...');
         db.prepare("UPDATE balcoes SET contador_atual = 0").run();
         
-        // Opcional: Se quiser limpar o histórico de senhas antigas (manter apenas o dia atual)
-        // db.prepare("DELETE FROM senhas").run();
-        // db.prepare("DELETE FROM chamadas").run();
+        // Limpa a fila de espera para o novo dia
+        db.prepare("DELETE FROM senhas WHERE status = 'aguardando'").run();
         
         console.log('[CRON] Senhas resetadas para zero com sucesso.');
       }
@@ -628,6 +627,25 @@ export function startServer() {
       res.sendFile(path.join(frontendPath, 'index.html'));
     });
   }
+
+  // Rota para resetar as senhas manualmente
+  app.post('/api/reset-senhas', (req, res) => {
+    try {
+      const db = getDb();
+      // 1. Reseta os contadores de todos os balcões
+      db.prepare("UPDATE balcoes SET contador_atual = 0").run();
+      
+      // 2. Opcional: Limpar senhas antigas para um reset total
+      // Para ser menos destrutivo, vamos apenas marcar as 'aguardando' como 'canceladas'
+      // ou realmente limpar tudo. O usuário pediu "zerar a senha", vamos limpar a fila.
+      db.prepare("DELETE FROM senhas WHERE status = 'aguardando'").run();
+      
+      broadcastEvent('CONFIG_ATUALIZADA', { reset: true });
+      res.json({ success: true, message: 'Senhas resetadas com sucesso!' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   const server = app.listen(PORT, () => {
     console.log('========================================');
