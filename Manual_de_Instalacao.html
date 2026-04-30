@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChamaAí - Manual de Instalação</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --surface: #ffffff;
+            --background: #f8fafc;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        body {
+            background-color: var(--background);
+            color: var(--text-main);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .logo-icon {
+            font-size: 64px;
+            margin-bottom: 10px;
+            display: inline-block;
+            background: linear-gradient(135deg, #863BFF, #47BFFF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            color: var(--text-main);
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--background);
+        }
+
+        .step-number {
+            background: var(--primary);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .step-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            margin: 20px 0 10px 0;
+            color: var(--text-main);
+        }
+
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 20px;
+            color: var(--text-muted);
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        .highlight-box {
+            background: #eff6ff;
+            border-left: 4px solid var(--primary);
+            padding: 15px;
+            border-radius: 0 8px 8px 0;
+            margin: 15px 0;
+            font-size: 0.95rem;
+            color: #1e3a8a;
+        }
+
+        .warning-box {
+            background: #fffbeb;
+            border-left: 4px solid var(--warning);
+            padding: 15px;
+            border-radius: 0 8px 8px 0;
+            margin: 15px 0;
+            font-size: 0.95rem;
+            color: #92400e;
+        }
+
+        code {
+            background: #f1f5f9;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #ef4444;
+            border: 1px solid #e2e8f0;
+        }
+
+        .browser-bar {
+            background: #e2e8f0;
+            padding: 10px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .browser-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #cbd5e1;
+        }
+
+        .browser-dot:nth-child(1) { background: #ef4444; }
+        .browser-dot:nth-child(2) { background: #f59e0b; }
+        .browser-dot:nth-child(3) { background: #10b981; }
+
+        .browser-url {
+            background: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            flex-grow: 1;
+            margin-left: 10px;
+            font-family: monospace;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .browser-content {
+            border: 2px solid #e2e8f0;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            padding: 20px;
+            background: white;
+            text-align: center;
+        }
+
+        .btn-fake {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <div class="logo-icon">⚡</div>
+            <h1>ChamaAí</h1>
+            <p class="subtitle">Guia de Instalação Rápida e Implantação em Rede</p>
+        </header>
+
+        <div class="card">
+            <h2>Como o sistema funciona?</h2>
+            <p style="margin-top: 10px; color: var(--text-muted);">
+                O ChamaAí foi desenhado para ser rápido e independente de internet externa. Ele funciona com o conceito de <strong>Servidor Central</strong>. Você fará a instalação do sistema completo em apenas UM computador principal, e todos os outros equipamentos (Totens, Celulares, Guichês) acessarão o sistema via rede local pelo navegador (Google Chrome).
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="step-header">
+                <div class="step-number">1</div>
+                <div class="step-title">Instalação no Computador Principal (Telão / Servidor)</div>
+            </div>
+            
+            <p>Este computador será o cérebro da operação. Geralmente é o PC ligado à TV (Telão) ou o computador da Recepção.</p>
+
+            <h3>Passo a passo:</h3>
+            <ol>
+                <li>Copie o arquivo <code>ChamaAí Setup 1.0.0.exe</code> para este computador.</li>
+                <li>Execute o instalador e avance até o final.</li>
+                <li>Após instalar, o sistema abrirá a <strong>Tela Inicial</strong> preta com os botões.</li>
+                <li>Clique no botão azul <strong>Telão</strong> para iniciar a tela de exibição para os clientes.</li>
+            </ol>
+
+            <div class="warning-box">
+                <strong>Muito Importante:</strong> Para que os outros computadores consigam acessar o sistema, você precisa descobrir o <strong>IP deste computador</strong> na rede (Exemplo: <code>192.168.1.100</code>). É altamente recomendado configurar o roteador para fornecer um IP Fixo para esta máquina.
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="step-header">
+                <div class="step-number">2</div>
+                <div class="step-title">Instalação no Totem de Senhas (com Impressora)</div>
+            </div>
+            
+            <p>Se o seu Totem utilizar uma impressora térmica USB (Não-rede), você precisará instalar o programa nele para liberar o acesso físico à impressora.</p>
+
+            <h3>Passo a passo:</h3>
+            <ol>
+                <li>Instale o mesmo <code>ChamaAí Setup 1.0.0.exe</code> no computador do Totem.</li>
+                <li>Abra o sistema. Na tela inicial, olhe na parte inferior e clique no botão: <br><strong>"Modo: Servidor Local (Standalone)"</strong></li>
+                <li>Uma janela vai abrir pedindo um IP. Digite o IP do Computador Principal (Telão) que você descobriu no Passo 1 (Ex: <code>192.168.1.100</code>).</li>
+                <li>O sistema vai recarregar e o botão inferior mudará para <strong>"Conectado ao Servidor: 192.168.1.100"</strong>.</li>
+                <li>Agora é só clicar no botão vermelho <strong>Totem</strong>. Ele irá se conectar ao Telão, mas imprimirá localmente!</li>
+            </ol>
+            
+            <div class="highlight-box">
+                A impressora deve estar previamente instalada no Windows (com o driver do fabricante) e configurada nas opções de <strong>Admin</strong> do sistema.
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="step-header">
+                <div class="step-number">3</div>
+                <div class="step-title">Acesso dos Operadores (Guichês e Celulares)</div>
+            </div>
+            
+            <p>Para quem vai chamar as senhas, o processo é o mais fácil de todos: <strong>Não precisa instalar nada.</strong></p>
+
+            <h3>Passo a passo:</h3>
+            <ol>
+                <li>No computador ou celular do operador, abra o <strong>Google Chrome</strong>.</li>
+                <li>Na barra de endereços, digite o IP do Servidor seguido de <code>:3000/#/operador</code></li>
+            </ol>
+
+            <div style="margin: 20px 0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                <div class="browser-bar">
+                    <div class="browser-dot"></div>
+                    <div class="browser-dot"></div>
+                    <div class="browser-dot"></div>
+                    <div class="browser-url">http://192.168.1.100:3000/#/operador</div>
+                </div>
+                <div class="browser-content">
+                    <div style="font-size: 40px; color: var(--primary); margin-bottom: 10px;">👤</div>
+                    <h2 style="font-family: 'Oswald', sans-serif; text-transform: uppercase;">Guichê 1</h2>
+                    <a href="#" class="btn-fake">PRÓXIMO</a>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <strong>Dica:</strong> Salve esse endereço nos "Favoritos" do navegador de cada operador. Se for usar em monitores Touch Screen Horizontais, use o endereço final <code>:3000/#/operador-touch</code> para abrir o modo TV.
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="step-header">
+                <div class="step-number">4</div>
+                <div class="step-title">Painel de Administração</div>
+            </div>
+            
+            <p>O painel administrativo também é acessado pelo navegador de qualquer máquina na rede.</p>
+            <ul>
+                <li><strong>Endereço:</strong> <code>http://IP_DO_SERVIDOR:3000/#/admin</code></li>
+                <li><strong>Usuário padrão:</strong> <code>admin</code></li>
+                <li><strong>Senha padrão:</strong> <code>admin</code></li>
+            </ul>
+            <p style="color: var(--text-muted); font-size: 0.95rem;">No painel você poderá configurar o nome da loja, trocar os vídeos do Telão, cadastrar a impressora, ajustar as filas e monitorar relatórios.</p>
+        </div>
+
+        <div style="text-align: center; margin-top: 50px; color: var(--text-muted); font-size: 0.9rem;">
+            <p><strong>Segurança dos Dados:</strong> O sistema realiza um backup diário automático (sempre à meia-noite) na pasta <code>Documentos/ChamaAi_Backups</code> do Computador Principal.</p>
+            <p style="margin-top: 10px;">ChamaAí - Fila Digital © 2024</p>
+        </div>
+
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,128 @@
+{
+  "balcoes": [
+    {
+      "id": 1,
+      "nome": "Balcão Geral",
+      "prefixo_senha": "N",
+      "preferencial_ativo": 1,
+      "contador_atual": 8,
+      "ativo": 1
+    }
+  ],
+  "senhas": [
+    {
+      "id": 1777173905909,
+      "balcao_id": 1,
+      "numero": 1,
+      "preferencial": 0,
+      "status": "chamada",
+      "criado_em": "2026-04-26T03:25:05.909Z",
+      "chamada_em": "2026-04-27T00:33:08.283Z"
+    },
+    {
+      "id": 1777173908786,
+      "balcao_id": 1,
+      "numero": 2,
+      "preferencial": 0,
+      "status": "chamada",
+      "criado_em": "2026-04-26T03:25:08.786Z",
+      "chamada_em": "2026-04-27T00:36:08.212Z"
+    },
+    {
+      "id": 1777173912159,
+      "balcao_id": 1,
+      "numero": 3,
+      "preferencial": 0,
+      "status": "chamada",
+      "criado_em": "2026-04-26T03:25:12.159Z",
+      "chamada_em": "2026-04-27T00:36:22.430Z"
+    },
+    {
+      "id": 1777173919662,
+      "balcao_id": 1,
+      "numero": 4,
+      "preferencial": 1,
+      "status": "aguardando",
+      "criado_em": "2026-04-26T03:25:19.662Z",
+      "chamada_em": null
+    },
+    {
+      "id": 1777204335561,
+      "balcao_id": 1,
+      "numero": 5,
+      "preferencial": 0,
+      "status": "aguardando",
+      "criado_em": "2026-04-26T11:52:15.561Z",
+      "chamada_em": null
+    },
+    {
+      "id": 1777204339469,
+      "balcao_id": 1,
+      "numero": 6,
+      "preferencial": 1,
+      "status": "aguardando",
+      "criado_em": "2026-04-26T11:52:19.469Z",
+      "chamada_em": null
+    },
+    {
+      "id": 1777220092163,
+      "balcao_id": 1,
+      "numero": 7,
+      "preferencial": 0,
+      "status": "aguardando",
+      "criado_em": "2026-04-26T16:14:52.163Z",
+      "chamada_em": null
+    },
+    {
+      "id": 1777227441410,
+      "balcao_id": 1,
+      "numero": 8,
+      "preferencial": 0,
+      "status": "aguardando",
+      "criado_em": "2026-04-26T18:17:21.410Z",
+      "chamada_em": null
+    }
+  ],
+  "chamadas": [
+    {
+      "id": 1777249988283,
+      "senha_id": 1777173905909,
+      "operador_id": 1,
+      "guiche": "Guichê 03",
+      "criado_em": "2026-04-27T00:33:08.283Z"
+    },
+    {
+      "id": 1777250168212,
+      "senha_id": 1777173908786,
+      "operador_id": 1,
+      "guiche": "Guichê 03",
+      "criado_em": "2026-04-27T00:36:08.212Z"
+    },
+    {
+      "id": 1777250182430,
+      "senha_id": 1777173912159,
+      "operador_id": 1,
+      "guiche": "Guichê 03",
+      "criado_em": "2026-04-27T00:36:22.430Z"
+    }
+  ],
+  "operadores": [
+    {
+      "id": 1,
+      "nome": "Administrador",
+      "login": "admin",
+      "perfil": "admin"
+    }
+  ],
+  "configuracoes": {
+    "nome_estabelecimento": "Supermercado",
+    "tempo_destaque_senha": "5",
+    "volume_audio": "80",
+    "intervalo_midia_seg": "10",
+    "reset_diario_automatico": "1",
+    "hora_reset": "06:00",
+    "prefixo_normal": "N",
+    "prefixo_preferencial": "P",
+    "fila_preferencial_ativa": "1"
+  }
+}
