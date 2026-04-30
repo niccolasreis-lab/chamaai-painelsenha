@@ -13,6 +13,19 @@ app.on('web-contents-created', (event, contents) => {
   });
 });
 
+// Otimizações de performance exclusivas para o Totem (Hardwares limitados)
+const isTotemEarly = process.argv.some(arg => arg.includes('--totem'));
+if (isTotemEarly) {
+  // Desativa isolamento de segurança que consome muita RAM
+  app.commandLine.appendSwitch('disable-site-isolation-trials');
+  // Desativa scroll suave para melhorar resposta da tela de toque
+  app.commandLine.appendSwitch('disable-smooth-scrolling');
+  // Limita o coletor de lixo de RAM para 512MB
+  app.commandLine.appendSwitch('js-flags', '--max-old-space-size=512');
+  // Evita cálculos desnecessários de oclusão de janela do Windows
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+}
+
 let mainWindow: BrowserWindow | null = null;
 let printerService: PrinterService;
 
@@ -59,6 +72,11 @@ function createWindow() {
     },
     autoHideMenuBar: true,
   });
+
+  // Aplica o Modo Quioque (Tela Exclusiva sem Barra de Tarefas) se for Totem
+  if (isTotemEarly) {
+    mainWindow.setKiosk(true);
+  }
 
   // Detect route from command line arguments (e.g. --telao, --totem)
   // We use .slice(1) because the first arg is the executable path
