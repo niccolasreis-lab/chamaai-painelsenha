@@ -258,6 +258,56 @@ export function startServer() {
     }
   });
 
+  // NOVA ROTA: O servidor decide atomicamente quem é o próximo da fila
+  app.post('/api/chamar-proxima', (req: express.Request, res: express.Response) => {
+    try {
+      const { operador_id, guiche } = req.body;
+      const db = getDb();
+      
+      console.log(`[ChamarProxima] operador=${operador_id} guiche=${guiche}`);
+
+      // 1. Busca a próxima senha DIRETO DO BANCO (preferencial primeiro, depois por ordem de chegada)
+      const proxima = db.prepare(
+        `SELECT s.*, b.nome as balcao_nome 
+         FROM senhas s 
+         JOIN balcoes b ON s.balcao_id = b.id 
+         WHERE s.status = 'aguardando' 
+         ORDER BY s.preferencial DESC, s.id ASC 
+         LIMIT 1`
+      ).get() as any;
+
+      if (!proxima) {
+        return res.status(404).json({ error: 'Nenhuma senha aguardando na fila.' });
+      }
+
+      console.log(`[ChamarProxima] Próxima senha encontrada: id=${proxima.id} numero=${proxima.numero}`);
+
+      // 2. Marca como chamada
+      db.prepare("UPDATE senhas SET status = 'chamada', chamada_em = datetime('now') WHERE id = ?").run(proxima.id);
+
+      // 3. Registra a chamada
+      db.prepare('INSERT INTO chamadas (senha_id, operador_id, guiche) VALUES (?, ?, ?)').run(proxima.id, operador_id, guiche);
+
+      // 4. Conta aguardando
+      const aguardandoCount = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando'").get() as any;
+
+      const payload = {
+        ...proxima,
+        status: 'chamada',
+        guiche,
+        aguardando_count: aguardandoCount.count
+      };
+
+      broadcastEvent('NOVA_SENHA_CHAMADA', payload);
+      console.log(`[ChamarProxima] Senha ${proxima.numero} chamada com sucesso para ${guiche}`);
+      res.json({ success: true, data: payload });
+    } catch (err: any) {
+      console.error('[ChamarProxima] ERRO:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Rota existente mantida para REPETIR chamada (quando já se sabe o ID da senha)
   app.post('/api/chamadas', (req: express.Request, res: express.Response) => {
     try {
       const { senha_id, operador_id, guiche } = req.body;

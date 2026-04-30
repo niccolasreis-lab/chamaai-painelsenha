@@ -29,23 +29,21 @@ export default function ControleTouch() {
   }, []);
 
   const chamarProxima = async () => {
-    if (fila.length === 0) return;
     try {
-      const prioritarias = fila.filter(s => s.preferencial === 1);
-      const proxima = prioritarias.length > 0 ? prioritarias[0] : fila[0];
-
-      const res = await fetch(`${API_URL}/api/chamadas`, {
+      const res = await fetch(`${API_URL}/api/chamar-proxima`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          senha_id: proxima.id,
           operador_id: 1, 
-          guiche: `Guichê ${guiche.padStart(2, '0')}`
+          guiche: guiche
         })
       });
       if (res.ok) {
-        setSenhaAtual(proxima);
+        const result = await res.json();
+        setSenhaAtual(result.data);
         refreshData();
+      } else if (res.status === 404) {
+        // Fila vazia, nada a fazer
       }
     } catch (err) {}
   };
@@ -59,7 +57,7 @@ export default function ControleTouch() {
         body: JSON.stringify({
           senha_id: senhaAtual.id,
           operador_id: 1,
-          guiche: `Guichê ${guiche.padStart(2, '0')}`
+          guiche: guiche
         })
       });
     } catch (err) {}
