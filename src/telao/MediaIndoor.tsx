@@ -160,11 +160,11 @@ export default function MediaIndoor() {
           )}
         </div>
         <div className="flex items-center gap-12">
-          <div className="flex items-center gap-4 bg-blue-500/5 px-6 py-2 rounded-full border border-blue-500/10">
-            <span className="material-symbols-outlined text-blue-500 text-3xl">groups</span>
+          <div className="flex items-center gap-6 bg-blue-500/10 px-8 py-4 rounded-[2rem] border border-blue-500/20 shadow-lg shadow-blue-500/5">
+            <span className="material-symbols-outlined text-blue-500 text-[3rem]">groups</span>
             <div className="flex flex-col leading-none">
-              <span className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest mb-1">Aguardando</span>
-              <span className="text-3xl font-black text-blue-600">{pessoasAguardando}</span>
+              <span className="text-sm font-bold text-ink-secondary uppercase tracking-widest mb-1">Aguardando</span>
+              <span className="text-5xl font-black text-blue-600">{pessoasAguardando}</span>
             </div>
           </div>
           <div className="flex items-center gap-4 text-ink-secondary">
