@@ -131,10 +131,34 @@ export default function Dashboard() {
           <div className="bg-surface rounded-[32px] p-8 border border-outline-variant/50 shadow-sm flex flex-col items-center justify-center text-center group">
             <span className="material-symbols-outlined text-5xl text-primary mb-4">new_releases</span>
             <h3 className="font-oswald text-2xl font-bold text-ink uppercase tracking-widest mb-2">Versão do Sistema</h3>
-            <div className="bg-primary/10 text-primary px-6 py-2 rounded-full font-black text-xl tracking-[0.3em] border border-primary/20">
+            <div className="bg-primary/10 text-primary px-6 py-2 rounded-full font-black text-xl tracking-[0.3em] border border-primary/20 mb-6">
               v{appVersion}
             </div>
-            <p className="text-ink-secondary text-xs font-bold uppercase tracking-widest mt-6">Atualizações automáticas ativas</p>
+            
+            <button 
+              onClick={async () => {
+                const api = (window as any).api;
+                if (api?.checkForUpdates) {
+                  try {
+                    const btn = document.getElementById('btn-update');
+                    if(btn) { btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">refresh</span> Verificando...'; btn.setAttribute('disabled', 'true'); }
+                    const res = await api.checkForUpdates();
+                    alert(res.message);
+                    if(btn) { btn.innerHTML = '<span class="material-symbols-outlined text-sm">download</span> Atualizar Agora'; btn.removeAttribute('disabled'); }
+                  } catch (err) {
+                    alert('Erro ao buscar atualização.');
+                  }
+                } else {
+                  alert('O sistema de atualização só funciona no aplicativo final (.exe)');
+                }
+              }}
+              id="btn-update"
+              className="w-full bg-primary text-white py-3 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-primary/90 transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">download</span>
+              Atualizar Agora
+            </button>
+            <p className="text-ink-secondary text-[10px] font-bold uppercase tracking-widest mt-4">Atualizações automáticas ativas</p>
           </div>
         </div>
       </div>

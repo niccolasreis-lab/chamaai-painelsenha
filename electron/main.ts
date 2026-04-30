@@ -163,6 +163,22 @@ ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
 
+ipcMain.handle('check-for-updates', async () => {
+  if (!app.isPackaged) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
+  try {
+    const result = await autoUpdater.checkForUpdatesAndNotify();
+    if (result && result.updateInfo) {
+      if (result.updateInfo.version === app.getVersion()) {
+         return { success: true, message: 'Você já está usando a versão mais recente!' };
+      }
+      return { success: true, message: `Uma nova versão (${result.updateInfo.version}) foi encontrada e está sendo baixada. O aplicativo será atualizado na próxima vez que for aberto.` };
+    }
+    return { success: true, message: 'O sistema já está atualizado.' };
+  } catch (err: any) {
+    return { success: false, message: `Erro ao verificar atualizações: ${err.message}` };
+  }
+});
+
 ipcMain.handle('test-printer', async () => {
   return await printerService.printTicket({
     numero: '000',
