@@ -73,9 +73,15 @@ function createWindow() {
     autoHideMenuBar: true,
   });
 
-  // Aplica o Modo Quioque (Tela Exclusiva sem Barra de Tarefas) se for Totem
-  if (isTotemEarly) {
+  // Detecta se é Telão ou Totem para modo tela cheia
+  const argsEarly = process.argv.slice(1);
+  const isTelao = argsEarly.some(arg => arg.includes('--telao'));
+  const isTotem = argsEarly.some(arg => arg.includes('--totem'));
+
+  if (isTotem) {
     mainWindow.setKiosk(true);
+  } else if (isTelao) {
+    mainWindow.setFullScreen(true);
   }
 
   // Detect route from command line arguments (e.g. --telao, --totem)
