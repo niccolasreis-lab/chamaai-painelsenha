@@ -30,6 +30,14 @@ export default function Dashboard() {
   useEffect(() => {
     fetchStats();
     const interval = setInterval(fetchStats, 10000);
+    
+    // Fetch app version
+    if ((window as any).api?.getAppVersion) {
+      (window as any).api.getAppVersion().then((ver: string) => {
+        setAppVersion(ver);
+      }).catch(console.error);
+    }
+    
     return () => clearInterval(interval);
   }, []);
 
