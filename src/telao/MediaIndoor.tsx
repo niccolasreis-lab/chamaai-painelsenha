@@ -57,10 +57,7 @@ export default function MediaIndoor() {
     };
   }, []);
 
-  const { data: configUpdate } = useSSE(`${API_URL}/events`, 'CONFIG_ATUALIZADA');
-  const { data: sseEvent } = useSSE(`${API_URL}/events`, 'NOVA_SENHA_CHAMADA');
-  const { data: novaSenhaEmitida } = useSSE(`${API_URL}/events`, 'NOVA_SENHA_EMITIDA');
-  const { data: senhaEstornada } = useSSE(`${API_URL}/events`, 'SENHA_ESTORNADA');
+  const { data: sseEvent } = useSSE(`${API_URL}/events`);
 
   const playBell = () => {
     try {
@@ -73,28 +70,29 @@ export default function MediaIndoor() {
   };
 
   useEffect(() => {
-    if (sseEvent) {
+    if (!sseEvent) return;
+
+    if (sseEvent.event === 'NOVA_SENHA_CHAMADA') {
+      const payload = sseEvent.data;
+      setUltimaSenha(payload);
+      setHistorico(prev => [payload, ...prev].slice(0, 5));
       playBell();
+      fetchAguardando();
+    } else if (sseEvent.event === 'NOVA_SENHA_EMITIDA') {
+      fetchAguardando();
+    } else if (sseEvent.event === 'SENHA_ESTORNADA') {
+      setShowMedia(true);
+      fetchAguardando();
+      // sseEvent.data contém o ID da senha estornada
+      setHistorico(prev => prev.filter(s => s.id !== sseEvent.data?.id));
+    } else if (sseEvent.event === 'CONFIG_ATUALIZADA') {
+      fetchConfig();
+    } else if (sseEvent.event === 'SISTEMA_RESETADO') {
+      setUltimaSenha(null);
+      setHistorico([]);
+      fetchAguardando();
     }
   }, [sseEvent]);
-
-  useEffect(() => {
-    if (configUpdate) {
-      setConfig((prev: any) => ({ ...prev, ...configUpdate }));
-    }
-  }, [configUpdate]);
-
-  useEffect(() => {
-    if (senhaEstornada) {
-      setShowMedia(true);
-      setHistorico(prev => prev.filter(s => s.id !== senhaEstornada.id));
-      if (senhaEstornada.aguardando_count !== undefined) {
-        setPessoasAguardando(senhaEstornada.aguardando_count);
-      } else {
-        fetchAguardando();
-      }
-    }
-  }, [senhaEstornada]);
 
   const nextMedia = () => {
     if (midias.length > 0) {

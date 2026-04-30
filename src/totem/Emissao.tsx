@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiUrl } from '../shared/apiConfig';
+import { useSSE } from '../shared/useSSE';
 
 export default function Emissao() {
   const navigate = useNavigate();
@@ -38,9 +39,20 @@ export default function Emissao() {
     fetchConfig();
     fetchFila();
     
-    const interval = setInterval(fetchFila, 10000);
+    const interval = setInterval(fetchFila, 15000);
     return () => clearInterval(interval);
   }, [API_URL]);
+
+  // Sincronização em tempo real via SSE
+  const { data: sseEvent } = useSSE(`${API_URL}/events`);
+
+  useEffect(() => {
+    if (!sseEvent) return;
+
+    if (sseEvent.event === 'NOVA_SENHA_EMITIDA' || sseEvent.event === 'NOVA_SENHA_CHAMADA' || sseEvent.event === 'SISTEMA_RESETADO') {
+      fetchFila();
+    }
+  }, [sseEvent]);
 
   // Função para salvar o IP
   const handleSaveIp = () => {

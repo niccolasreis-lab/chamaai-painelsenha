@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getApiUrl } from '../shared/apiConfig';
+import { useSSE } from '../shared/useSSE';
 
 export default function ControleTouch() {
   const [fila, setFila] = useState<any[]>([]);
@@ -24,9 +25,24 @@ export default function ControleTouch() {
     } catch (e) {}
 
     refreshData();
-    const interval = setInterval(refreshData, 3000);
+    const interval = setInterval(refreshData, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // Sincronização em tempo real via SSE
+  const { data: sseEvent } = useSSE(`${API_URL}/events`);
+
+  useEffect(() => {
+    if (!sseEvent) return;
+
+    if (sseEvent.event === 'NOVA_SENHA_EMITIDA' || sseEvent.event === 'NOVA_SENHA_CHAMADA') {
+      refreshData();
+    } else if (sseEvent.event === 'SISTEMA_RESETADO') {
+      setSenhaAtual(null);
+      setFila([]);
+      refreshData();
+    }
+  }, [sseEvent]);
 
   const chamarProxima = async () => {
     try {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getApiUrl, setServerIp } from '../shared/apiConfig';
+import { useSSE } from '../shared/useSSE';
 
 
 
@@ -58,9 +59,24 @@ export default function Controle() {
     refreshData();
     
     // Polling de segurança (caso o SSE falhe)
-    const interval = setInterval(refreshData, 5000);
+    const interval = setInterval(refreshData, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // Sincronização em tempo real via SSE
+  const { data: sseEvent } = useSSE(`${API_URL}/events`);
+
+  useEffect(() => {
+    if (!sseEvent) return;
+
+    if (sseEvent.event === 'NOVA_SENHA_EMITIDA' || sseEvent.event === 'NOVA_SENHA_CHAMADA') {
+      refreshData();
+    } else if (sseEvent.event === 'SISTEMA_RESETADO') {
+      setSenhaAtual(null);
+      setFila([]);
+      refreshData();
+    }
+  }, [sseEvent]);
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';

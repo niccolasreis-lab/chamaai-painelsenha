@@ -635,13 +635,15 @@ export function startServer() {
       // 1. Reseta os contadores de todos os balcões
       db.prepare("UPDATE balcoes SET contador_atual = 0").run();
       
-      // 2. Opcional: Limpar senhas antigas para um reset total
-      // Para ser menos destrutivo, vamos apenas marcar as 'aguardando' como 'canceladas'
-      // ou realmente limpar tudo. O usuário pediu "zerar a senha", vamos limpar a fila.
-      db.prepare("DELETE FROM senhas WHERE status = 'aguardando'").run();
+      // 2. Limpeza total de senhas e chamadas para um reinício do zero
+      db.prepare("DELETE FROM chamadas").run();
+      db.prepare("DELETE FROM senhas").run();
       
+      // Notifica todos os terminais para resetarem seu estado local IMEDIATAMENTE
+      broadcastEvent('SISTEMA_RESETADO', { success: true });
       broadcastEvent('CONFIG_ATUALIZADA', { reset: true });
-      res.json({ success: true, message: 'Senhas resetadas com sucesso!' });
+      
+      res.json({ success: true, message: 'Sistema resetado com sucesso!' });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
