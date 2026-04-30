@@ -84,6 +84,7 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    app.quit(); // Garante que todos os processos ocultos (ex: impressora) sejam finalizados
   });
 }
 
@@ -138,6 +139,10 @@ ipcMain.handle('create-shortcut', async (_event, { route, title }) => {
 ipcMain.handle('get-printers', async () => {
   if (!mainWindow) return [];
   return await mainWindow.webContents.getPrintersAsync();
+});
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
 });
 
 ipcMain.handle('test-printer', async () => {

@@ -8,5 +8,6 @@ contextBridge.exposeInMainWorld('api', {
   getPrinters: () => ipcRenderer.invoke('get-printers'),
   setAutoLaunch: (enable: boolean, route: string) => ipcRenderer.invoke('set-auto-launch', { enable, route }),
   createShortcut: (route: string, title: string) => ipcRenderer.invoke('create-shortcut', { route, title }),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   ping: () => 'pong'
 });

@@ -9,6 +9,7 @@ export default function Dashboard() {
     atendidos: 0,
     cancelados: 0
   });
+  const [appVersion, setAppVersion] = useState('...');
 
   const API_URL = getApiUrl();
 
@@ -106,14 +107,26 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Charts Section Placeholder */}
-        <div className="bg-surface rounded-[32px] p-10 border border-outline-variant/50 shadow-sm h-80 flex flex-col items-center justify-center gap-4 group">
-          <div className="w-16 h-16 rounded-full bg-surface-variant flex items-center justify-center text-outline-variant group-hover:scale-110 group-hover:bg-primary/5 group-hover:text-primary transition-all duration-500">
-            <span className="material-symbols-outlined text-4xl">insights</span>
+        {/* Bottom Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="md:col-span-2 bg-surface rounded-[32px] p-10 border border-outline-variant/50 shadow-sm h-80 flex flex-col items-center justify-center gap-4 group">
+            <div className="w-16 h-16 rounded-full bg-surface-variant flex items-center justify-center text-outline-variant group-hover:scale-110 group-hover:bg-primary/5 group-hover:text-primary transition-all duration-500">
+              <span className="material-symbols-outlined text-4xl">insights</span>
+            </div>
+            <div className="text-center">
+              <h3 className="font-oswald text-xl font-bold text-ink uppercase tracking-widest">Análise de Desempenho</h3>
+              <p className="text-ink-secondary text-sm font-bold uppercase tracking-[0.2em] mt-1">Os gráficos serão gerados após o primeiro dia de operação.</p>
+            </div>
           </div>
-          <div className="text-center">
-            <h3 className="font-oswald text-xl font-bold text-ink uppercase tracking-widest">Análise de Desempenho</h3>
-            <p className="text-ink-secondary text-sm font-bold uppercase tracking-[0.2em] mt-1">Os gráficos serão gerados após o primeiro dia de operação.</p>
+          
+          {/* Version Card */}
+          <div className="bg-surface rounded-[32px] p-8 border border-outline-variant/50 shadow-sm flex flex-col items-center justify-center text-center group">
+            <span className="material-symbols-outlined text-5xl text-primary mb-4">new_releases</span>
+            <h3 className="font-oswald text-2xl font-bold text-ink uppercase tracking-widest mb-2">Versão do Sistema</h3>
+            <div className="bg-primary/10 text-primary px-6 py-2 rounded-full font-black text-xl tracking-[0.3em] border border-primary/20">
+              v{appVersion}
+            </div>
+            <p className="text-ink-secondary text-xs font-bold uppercase tracking-widest mt-6">Atualizações automáticas ativas</p>
           </div>
         </div>
       </div>
