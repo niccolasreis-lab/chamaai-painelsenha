@@ -75,21 +75,39 @@ export default function MediaIndoor() {
     if (sseEvent.event === 'NOVA_SENHA_CHAMADA') {
       const payload = sseEvent.data;
       setUltimaSenha(payload);
-      setHistorico(prev => [payload, ...prev].slice(0, 5));
+      
+      // Atualiza histórico (remove se já existe para não duplicar, e coloca no topo)
+      setHistorico(prev => {
+        const filtered = prev.filter(s => s.id !== payload.id);
+        return [payload, ...filtered].slice(0, 5);
+      });
+      
       playBell();
       fetchAguardando();
-    } else if (sseEvent.event === 'NOVA_SENHA_EMITIDA') {
+      
+      // DESTAQUE VISUAL: Esconde a mídia e mostra a senha em tela cheia
+      setShowMedia(false);
+      
+      // Limpa timer anterior se houver (para repetições rápidas)
+      const existingTimer = (window as any)._mediaTimer;
+      if (existingTimer) clearTimeout(existingTimer);
+      
+      // Volta para a mídia após 6 segundos
+      (window as any)._mediaTimer = setTimeout(() => {
+        setShowMedia(true);
+      }, 6000);
+
+    } else if (sseEvent.event === 'NOVA_SENHA_EMITIDA' || sseEvent.event === 'SENHA_ESTORNADA') {
       fetchAguardando();
-    } else if (sseEvent.event === 'SENHA_ESTORNADA') {
-      setShowMedia(true);
-      fetchAguardando();
-      // sseEvent.data contém o ID da senha estornada
-      setHistorico(prev => prev.filter(s => s.id !== sseEvent.data?.id));
+      if (sseEvent.event === 'SENHA_ESTORNADA') {
+        setHistorico(prev => prev.filter(s => s.id !== sseEvent.data?.id));
+      }
     } else if (sseEvent.event === 'CONFIG_ATUALIZADA') {
       fetchConfig();
     } else if (sseEvent.event === 'SISTEMA_RESETADO') {
       setUltimaSenha(null);
       setHistorico([]);
+      setShowMedia(true);
       fetchAguardando();
     }
   }, [sseEvent]);
