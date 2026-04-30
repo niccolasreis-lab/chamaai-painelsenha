@@ -112,29 +112,11 @@ export default function MediaIndoor() {
   }, [activeMidiaIndex, midias, showMedia]);
 
   useEffect(() => {
-    // Atualiza o contador de aguardando imediatamente se vier no evento
+    // Atualiza o contador de aguardando se vier no evento consolidado
     if (sseEvent?.aguardando_count !== undefined) {
       setPessoasAguardando(sseEvent.aguardando_count);
-    } else if (novaSenhaEmitida?.aguardando_count !== undefined) {
-      setPessoasAguardando(novaSenhaEmitida.aguardando_count);
-    } else if (sseEvent || novaSenhaEmitida) {
-      fetchAguardando();
     }
-    
-    if (sseEvent) {
-      setUltimaSenha(sseEvent);
-      setHistorico((prev) => {
-        // Se já existe no histórico, move para o topo (repetição)
-        const filtered = prev.filter(s => s.id !== sseEvent.id);
-        return [sseEvent, ...filtered].slice(0, 5);
-      });
-      setShowMedia(false);
-      
-      // Return to media after 6 seconds (dá mais tempo para o cliente ver)
-      const timer = setTimeout(() => setShowMedia(true), 6000);
-      return () => clearTimeout(timer);
-    }
-  }, [sseEvent, novaSenhaEmitida]);
+  }, [sseEvent]);
 
   const activeMidia = midias[activeMidiaIndex];
 
