@@ -12,8 +12,21 @@ import Devices from './admin/Devices';
 import Queue from './admin/Queue';
 import Operators from './admin/Operators';
 import Relatorios from './admin/Relatorios';
+import MobileOperador from './operador/MobileOperador';
 
 function Home() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Se for mobile/tablet (tamanho de tela ou user agent), redireciona para o painel mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isSmallScreen = window.innerWidth < 1024;
+    
+    if (isMobile || isSmallScreen) {
+      navigate('/mobile');
+    }
+  }, [navigate]);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-background text-ink font-rajdhani">
       <div className="mb-12 flex flex-col items-center">
@@ -52,6 +65,10 @@ function Home() {
           <Link to="/operador-touch" className="group p-4 bg-surface rounded-[24px] shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex items-center justify-center gap-3">
             <span className="material-symbols-outlined text-primary">tablet_landscape</span>
             <span className="font-oswald text-sm font-bold text-ink uppercase tracking-wider">Painel Touch (TV)</span>
+          </Link>
+          <Link to="/mobile" className="group p-4 bg-blue-600 rounded-[24px] shadow-lg shadow-blue-900/20 hover:bg-blue-500 transition-all flex items-center justify-center gap-3 text-white">
+            <span className="material-symbols-outlined">smartphone</span>
+            <span className="font-oswald text-sm font-bold uppercase tracking-wider">Acesso Mobile (APK)</span>
           </Link>
         </div>
         
@@ -123,6 +140,7 @@ export default function App() {
         
         <Route path="/operador" element={<Controle />} />
         <Route path="/operador-touch" element={<ControleTouch />} />
+        <Route path="/mobile" element={<MobileOperador />} />
         
         <Route path="/admin" element={<Dashboard />} />
         <Route path="/admin/settings" element={<Configuracoes />} />
