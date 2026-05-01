@@ -26,6 +26,11 @@ if (isTotemEarly) {
   app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 }
 
+// Configurações globais de mídia e performance para evitar pausas
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+
 let mainWindow: BrowserWindow | null = null;
 let printerService: PrinterService;
 

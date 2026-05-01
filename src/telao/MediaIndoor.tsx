@@ -104,6 +104,8 @@ export default function MediaIndoor() {
       }
     } else if (sseEvent.event === 'CONFIG_ATUALIZADA') {
       fetchConfig();
+    } else if (sseEvent.event === 'MIDIAS_ATUALIZADAS') {
+      fetchMidias();
     } else if (sseEvent.event === 'SISTEMA_RESETADO') {
       setUltimaSenha(null);
       setHistorico([]);
@@ -184,12 +186,15 @@ export default function MediaIndoor() {
               <div className="h-full w-full animate-fade-in relative">
                 {activeMidia.tipo === 'video' ? (
                   <video 
-                    key={activeMidia.id}
+                    key={`${activeMidia.id}-${activeMidiaIndex}`}
                     src={`${API_URL}${activeMidia.caminho}`} 
                     className="w-full h-full object-contain"
                     autoPlay
                     muted
+                    loop={midias.length === 1}
                     onEnded={nextMedia}
+                    playsInline
+                    preload="auto"
                   />
                 ) : (
                   <img 

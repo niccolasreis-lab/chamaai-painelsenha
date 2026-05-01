@@ -391,6 +391,8 @@ export function startServer() {
       const stmt = db.prepare('INSERT INTO midias (nome, caminho, tipo, ordem, ativo) VALUES (?, ?, ?, ?, 1)');
       const result = stmt.run(nome || req.file.originalname, caminho, tipo || (req.file.mimetype.startsWith('video') ? 'video' : 'imagem'), ordem || 0);
 
+      broadcastEvent('MIDIAS_ATUALIZADAS', { action: 'upload' });
+
       res.status(201).json({ 
         id: result.lastInsertRowid,
         nome: nome || req.file.originalname,
@@ -422,6 +424,7 @@ export function startServer() {
       }
 
       db.prepare('DELETE FROM midias WHERE id = ?').run(id);
+      broadcastEvent('MIDIAS_ATUALIZADAS', { action: 'delete' });
       res.json({ success: true });
     } catch (err: any) {
       console.error('Error in DELETE /api/midias:', err);
