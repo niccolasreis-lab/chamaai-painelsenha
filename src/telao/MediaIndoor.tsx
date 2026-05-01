@@ -106,6 +106,8 @@ export default function MediaIndoor() {
       fetchConfig();
     } else if (sseEvent.event === 'MIDIAS_ATUALIZADAS') {
       fetchMidias();
+    } else if (sseEvent.event === 'RECARREGAR_PAGINA') {
+      window.location.reload();
     } else if (sseEvent.event === 'SISTEMA_RESETADO') {
       setUltimaSenha(null);
       setHistorico([]);

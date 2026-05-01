@@ -51,6 +51,8 @@ export default function Emissao() {
 
     if (sseEvent.event === 'NOVA_SENHA_EMITIDA' || sseEvent.event === 'NOVA_SENHA_CHAMADA' || sseEvent.event === 'SISTEMA_RESETADO') {
       fetchFila();
+    } else if (sseEvent.event === 'RECARREGAR_PAGINA') {
+      window.location.reload();
     }
   }, [sseEvent]);
 

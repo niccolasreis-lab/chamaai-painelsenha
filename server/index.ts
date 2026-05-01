@@ -61,7 +61,14 @@ export function startServer() {
         // Limpa a fila de espera para o novo dia
         db.prepare("DELETE FROM senhas WHERE status = 'aguardando'").run();
         
-        console.log('[CRON] Senhas resetadas para zero com sucesso.');
+        // Otimização do banco de dados
+        console.log('[CRON] Otimizando banco de dados (VACUUM)...');
+        db.exec("VACUUM");
+        
+        // Notifica todos os terminais para recarregarem a página e limparem memória
+        broadcastEvent('RECARREGAR_PAGINA', { reason: 'daily_maintenance' });
+        
+        console.log('[CRON] Manutenção diária concluída com sucesso.');
       }
     } catch (err) {
       console.error('[CRON] Erro ao resetar senhas:', err);
