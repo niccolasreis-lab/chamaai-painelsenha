@@ -15,6 +15,7 @@ import Operators from './admin/Operators';
 import Relatorios from './admin/Relatorios';
 import MobileOperador from './operador/MobileOperador';
 import Login from './Login';
+import LicenseGate from './shared/LicenseGate';
 
 function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) {
   const session = localStorage.getItem('user_session');
@@ -150,30 +151,32 @@ function Home() {
 
 export default function App() {
   return (
-    <HashRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        
-        <Route path="/totem" element={<Emissao />} />
-        <Route path="/totem/confirmacao" element={<Confirmacao />} />
-        
-        <Route path="/telao" element={<MediaIndoor />} />
-        <Route path="/telao/chamada" element={<SenhaChamada />} />
-        
-        <Route path="/login" element={<Login />} />
-        
-        <Route path="/operador" element={<ProtectedRoute><Controle /></ProtectedRoute>} />
-        <Route path="/operador-touch" element={<ProtectedRoute><ControleTouch /></ProtectedRoute>} />
-        <Route path="/mobile" element={<ProtectedRoute><MobileOperador /></ProtectedRoute>} />
-        
-        <Route path="/admin" element={<ProtectedRoute requireAdmin><Dashboard /></ProtectedRoute>} />
-        <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><Configuracoes /></ProtectedRoute>} />
-        <Route path="/admin/midias" element={<ProtectedRoute requireAdmin><GerenciarMidias /></ProtectedRoute>} />
-        <Route path="/admin/devices" element={<ProtectedRoute requireAdmin><Devices /></ProtectedRoute>} />
-        <Route path="/admin/queue" element={<ProtectedRoute requireAdmin><Queue /></ProtectedRoute>} />
-        <Route path="/admin/operators" element={<ProtectedRoute requireAdmin><Operators /></ProtectedRoute>} />
-        <Route path="/admin/relatorios" element={<ProtectedRoute requireAdmin><Relatorios /></ProtectedRoute>} />
-      </Routes>
-    </HashRouter>
+    <LicenseGate>
+      <HashRouter>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          
+          <Route path="/totem" element={<Emissao />} />
+          <Route path="/totem/confirmacao" element={<Confirmacao />} />
+          
+          <Route path="/telao" element={<MediaIndoor />} />
+          <Route path="/telao/chamada" element={<SenhaChamada />} />
+          
+          <Route path="/login" element={<Login />} />
+          
+          <Route path="/operador" element={<ProtectedRoute><Controle /></ProtectedRoute>} />
+          <Route path="/operador-touch" element={<ProtectedRoute><ControleTouch /></ProtectedRoute>} />
+          <Route path="/mobile" element={<ProtectedRoute><MobileOperador /></ProtectedRoute>} />
+          
+          <Route path="/admin" element={<ProtectedRoute requireAdmin><Dashboard /></ProtectedRoute>} />
+          <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><Configuracoes /></ProtectedRoute>} />
+          <Route path="/admin/midias" element={<ProtectedRoute requireAdmin><GerenciarMidias /></ProtectedRoute>} />
+          <Route path="/admin/devices" element={<ProtectedRoute requireAdmin><Devices /></ProtectedRoute>} />
+          <Route path="/admin/queue" element={<ProtectedRoute requireAdmin><Queue /></ProtectedRoute>} />
+          <Route path="/admin/operators" element={<ProtectedRoute requireAdmin><Operators /></ProtectedRoute>} />
+          <Route path="/admin/relatorios" element={<ProtectedRoute requireAdmin><Relatorios /></ProtectedRoute>} />
+        </Routes>
+      </HashRouter>
+    </LicenseGate>
   );
 }
