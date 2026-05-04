@@ -37,10 +37,9 @@ export default function MediaIndoor() {
 
   const fetchAguardando = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/senhas`);
+      const res = await fetch(`${API_URL}/api/fila`);
       const data = await res.json();
-      const aguardando = data.filter((s: any) => s.status === 'aguardando').length;
-      setPessoasAguardando(aguardando);
+      setPessoasAguardando(Array.isArray(data) ? data.length : 0);
     } catch (err) {}
   };
 

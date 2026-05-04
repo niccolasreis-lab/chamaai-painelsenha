@@ -28,10 +28,9 @@ export default function Emissao() {
 
   const fetchFila = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/senhas`);
+      const res = await fetch(`${API_URL}/api/fila`);
       const data = await res.json();
-      const aguardando = data.filter((s: any) => s.status === 'aguardando').length;
-      setPessoasAguardando(aguardando);
+      setPessoasAguardando(Array.isArray(data) ? data.length : 0);
     } catch (err) {}
   };
 
@@ -203,16 +202,16 @@ export default function Emissao() {
               {config.fila_normal_ativa !== '0' && (
                 <button 
                   onClick={() => emitirSenha(false)}
-                  className="w-full bg-surface border-2 border-outline-variant rounded-[40px] py-10 flex flex-col items-center justify-center gap-4 shadow-[0_20px_40px_rgba(0,0,0,0.05)] hover:border-primary hover:shadow-[0_20px_50px_rgba(37,99,235,0.15)] active:scale-95 transition-all duration-200 outline-none group"
+                  className="w-full bg-surface border-[6px] border-primary/40 rounded-[40px] py-12 flex flex-col items-center justify-center gap-4 shadow-[0_0_40px_rgba(37,99,235,0.3)] hover:border-primary hover:bg-primary/5 active:scale-95 transition-all duration-300 outline-none group animate-[pulse_3s_ease-in-out_infinite]"
                 >
-                  <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary transition-colors">
-                    <span className="material-symbols-outlined text-[5rem] text-primary group-hover:text-white transition-colors">
-                      person
+                  <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-primary/40">
+                    <span className="material-symbols-outlined text-[5rem] text-white">
+                      touch_app
                     </span>
                   </div>
                   <div className="text-center">
-                    <span className="font-oswald text-3xl font-bold text-ink block uppercase">Atendimento</span>
-                    <span className="font-oswald text-5xl font-black text-primary block uppercase">{config.rotulo_atendimento_geral || 'Geral'}</span>
+                    <span className="font-oswald text-3xl font-bold text-ink block uppercase tracking-widest">Atendimento {config.rotulo_atendimento_geral || 'Geral'}</span>
+                    <span className="font-oswald text-5xl font-black text-primary block uppercase mt-3">TOQUE AQUI</span>
                   </div>
                 </button>
               )}
@@ -221,18 +220,18 @@ export default function Emissao() {
               {config.fila_preferencial_ativa !== '0' && (
                 <button 
                   onClick={() => emitirSenha(true)}
-                  className="w-full bg-surface border-2 border-outline-variant rounded-[40px] py-10 flex flex-col items-center justify-center gap-4 shadow-[0_20px_40px_rgba(0,0,0,0.05)] hover:border-warning hover:shadow-[0_20px_50_rgba(217,119,6,0.15)] active:scale-95 transition-all duration-200 outline-none group"
+                  className="w-full bg-surface border-[6px] border-warning/40 rounded-[40px] py-12 flex flex-col items-center justify-center gap-4 shadow-[0_0_40px_rgba(245,158,11,0.3)] hover:border-warning hover:bg-warning/5 active:scale-95 transition-all duration-300 outline-none group animate-[pulse_3s_ease-in-out_infinite]"
                 >
-                  <div className="w-24 h-24 rounded-full bg-warning/10 flex items-center justify-center group-hover:bg-warning transition-colors">
-                    <span className="material-symbols-outlined text-[5rem] text-warning group-hover:text-white transition-colors">
-                      elderly
+                  <div className="w-24 h-24 rounded-full bg-warning flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-warning/40">
+                    <span className="material-symbols-outlined text-[5rem] text-white">
+                      touch_app
                     </span>
                   </div>
                   <div className="text-center">
-                    <span className="font-oswald text-3xl font-bold text-ink block uppercase">Atendimento</span>
-                    <span className="font-oswald text-5xl font-black text-warning block uppercase">{config.rotulo_atendimento_prioritario || 'Prioritário'}</span>
+                    <span className="font-oswald text-3xl font-bold text-ink block uppercase tracking-widest">Atendimento {config.rotulo_atendimento_prioritario || 'Prioritário'}</span>
+                    <span className="font-oswald text-5xl font-black text-warning block uppercase mt-3">TOQUE AQUI</span>
                   </div>
-                  <div className="text-ink-secondary text-base font-medium px-8">
+                  <div className="text-ink-secondary text-base font-medium px-8 mt-2">
                     Pessoas com deficiência, idosos, gestantes e lactantes.
                   </div>
                 </button>
