@@ -124,7 +124,12 @@ export default function LicenseGate({ children }: LicenseGateProps) {
         </form>
         
         <div className="mt-8 text-center text-slate-500 text-xs font-bold uppercase tracking-widest">
-          <p>Dúvidas? Entre em contato com o suporte.</p>
+          <p>
+            Dúvidas?{' '}
+            <a href="https://chamaai-nine.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-400 underline decoration-blue-500/30 underline-offset-4 transition-colors">
+              Acesse nosso suporte
+            </a>
+          </p>
         </div>
       </div>
     </div>
