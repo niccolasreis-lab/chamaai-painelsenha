@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import * as path from 'path';
 import { initDatabase, getDb } from './services/database';
 import { startServer } from '../server/index';
@@ -85,6 +85,22 @@ function createWindow() {
 
   if (isTotem) {
     mainWindow.setKiosk(true);
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+
+    // Blindagem de teclas (Kiosk Mode Restrito)
+    globalShortcut.register('CommandOrControl+W', () => { console.log('[BLINDAGEM] Bloqueado: Ctrl+W'); });
+    globalShortcut.register('CommandOrControl+Q', () => { console.log('[BLINDAGEM] Bloqueado: Ctrl+Q'); });
+    globalShortcut.register('CommandOrControl+Shift+I', () => { console.log('[BLINDAGEM] Bloqueado: DevTools'); });
+    globalShortcut.register('Alt+F4', () => { console.log('[BLINDAGEM] Bloqueado: Alt+F4'); });
+    
+    // Força o foco de volta se o usuário tentar abrir o menu iniciar ou alt+tab
+    mainWindow.on('blur', () => {
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isFocused()) {
+          mainWindow.focus();
+        }
+      }, 100);
+    });
   } else if (isTelao) {
     mainWindow.setFullScreen(true);
   }
@@ -270,4 +286,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });

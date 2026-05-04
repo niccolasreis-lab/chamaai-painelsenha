@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ChamaAí Operador</string>
+    <string name="title_activity_main">ChamaAí Operador</string>
+    <string name="package_name">com.chamaai.app</string>
+    <string name="custom_url_scheme">com.chamaai.app</string>
+</resources>

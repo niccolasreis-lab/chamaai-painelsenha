@@ -195,6 +195,25 @@ export function startServer() {
   });
 
   // OPERADORES ROUTES
+  app.post('/api/login', (req, res) => {
+    try {
+      const { login, senha } = req.body;
+      const db = getDb();
+      const user = db.prepare('SELECT id, nome, perfil, login FROM operadores WHERE login = ? AND senha_hash = ? AND ativo = 1').get(login, senha) as any;
+      
+      if (!user) {
+        return res.status(401).json({ error: 'Login ou senha incorretos' });
+      }
+      
+      // Token simples para uso local
+      const token = Buffer.from(`${user.id}:${Date.now()}`).toString('base64');
+      
+      res.json({ token, user });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get('/api/operadores', (req, res) => {
     try {
       const db = getDb();

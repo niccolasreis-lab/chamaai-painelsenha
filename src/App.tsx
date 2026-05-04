@@ -1,4 +1,5 @@
-import { HashRouter, Routes, Route, Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { HashRouter, Routes, Route, Link, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import Emissao from './totem/Emissao';
 import Confirmacao from './totem/Confirmacao';
 import Controle from './operador/Controle';
@@ -13,6 +14,27 @@ import Queue from './admin/Queue';
 import Operators from './admin/Operators';
 import Relatorios from './admin/Relatorios';
 import MobileOperador from './operador/MobileOperador';
+import Login from './Login';
+
+function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) {
+  const session = localStorage.getItem('user_session');
+  const location = useLocation();
+
+  if (!session) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  try {
+    const data = JSON.parse(session);
+    if (requireAdmin && data.user.perfil !== 'admin') {
+      return <Navigate to="/operador" replace />;
+    }
+    return <>{children}</>;
+  } catch (e) {
+    localStorage.removeItem('user_session');
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+}
 
 function Home() {
   const navigate = useNavigate();
@@ -138,17 +160,19 @@ export default function App() {
         <Route path="/telao" element={<MediaIndoor />} />
         <Route path="/telao/chamada" element={<SenhaChamada />} />
         
-        <Route path="/operador" element={<Controle />} />
-        <Route path="/operador-touch" element={<ControleTouch />} />
-        <Route path="/mobile" element={<MobileOperador />} />
+        <Route path="/login" element={<Login />} />
         
-        <Route path="/admin" element={<Dashboard />} />
-        <Route path="/admin/settings" element={<Configuracoes />} />
-        <Route path="/admin/midias" element={<GerenciarMidias />} />
-        <Route path="/admin/devices" element={<Devices />} />
-        <Route path="/admin/queue" element={<Queue />} />
-        <Route path="/admin/operators" element={<Operators />} />
-        <Route path="/admin/relatorios" element={<Relatorios />} />
+        <Route path="/operador" element={<ProtectedRoute><Controle /></ProtectedRoute>} />
+        <Route path="/operador-touch" element={<ProtectedRoute><ControleTouch /></ProtectedRoute>} />
+        <Route path="/mobile" element={<ProtectedRoute><MobileOperador /></ProtectedRoute>} />
+        
+        <Route path="/admin" element={<ProtectedRoute requireAdmin><Dashboard /></ProtectedRoute>} />
+        <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><Configuracoes /></ProtectedRoute>} />
+        <Route path="/admin/midias" element={<ProtectedRoute requireAdmin><GerenciarMidias /></ProtectedRoute>} />
+        <Route path="/admin/devices" element={<ProtectedRoute requireAdmin><Devices /></ProtectedRoute>} />
+        <Route path="/admin/queue" element={<ProtectedRoute requireAdmin><Queue /></ProtectedRoute>} />
+        <Route path="/admin/operators" element={<ProtectedRoute requireAdmin><Operators /></ProtectedRoute>} />
+        <Route path="/admin/relatorios" element={<ProtectedRoute requireAdmin><Relatorios /></ProtectedRoute>} />
       </Routes>
     </HashRouter>
   );
