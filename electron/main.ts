@@ -206,6 +206,16 @@ ipcMain.handle('check-for-updates', async () => {
   }
 });
 
+ipcMain.handle('install-update', async () => {
+  if (!app.isPackaged) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
+  try {
+    autoUpdater.quitAndInstall(false, true);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, message: `Erro ao instalar atualização: ${err.message}` };
+  }
+});
+
 ipcMain.handle('test-printer', async () => {
   return await printerService.printTicket({
     numero: '000',

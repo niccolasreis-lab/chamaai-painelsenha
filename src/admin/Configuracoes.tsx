@@ -433,6 +433,54 @@ export default function Configuracoes() {
               </div>
             </div>
 
+            {/* Atualização de Sistema */}
+            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+              <h2 className="font-oswald text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-primary">update</span>
+                Atualização do Sistema
+              </h2>
+              <div className="grid grid-cols-1 gap-4">
+                <button 
+                  onClick={async () => {
+                    const api = (window as any).api;
+                    if (api?.checkForUpdates) {
+                      const res = await api.checkForUpdates();
+                      alert(res.message);
+                    } else {
+                      alert('⚠️ Use o App Desktop (.exe) para buscar atualizações.');
+                    }
+                  }}
+                  className="w-full flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30 hover:border-primary/50 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-primary">search</span>
+                    <span className="font-bold text-ink text-xs uppercase tracking-widest">Buscar Atualizações</span>
+                  </div>
+                  <span className="material-symbols-outlined text-ink-secondary opacity-20 group-hover:opacity-100 transition-opacity">chevron_right</span>
+                </button>
+
+                <button 
+                  onClick={async () => {
+                    if (!confirm('O sistema será fechado imediatamente para aplicar a atualização. Deseja continuar?')) return;
+                    const api = (window as any).api;
+                    if (api?.installUpdate) {
+                      const res = await api.installUpdate();
+                      if (!res.success) alert(res.message);
+                    } else {
+                      alert('⚠️ Use o App Desktop (.exe) para instalar atualizações.');
+                    }
+                  }}
+                  className="w-full flex items-center justify-between p-4 bg-primary/10 rounded-xl border border-primary/20 hover:bg-primary hover:text-white transition-all group cursor-pointer text-primary"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined">install_desktop</span>
+                    <span className="font-bold text-xs uppercase tracking-widest">Instalar Atualização Agora</span>
+                  </div>
+                  <span className="material-symbols-outlined opacity-50 group-hover:opacity-100 transition-opacity">system_update_alt</span>
+                </button>
+              </div>
+            </div>
+
             {/* Backup & Restore */}
             <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
               <h2 className="font-oswald text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">

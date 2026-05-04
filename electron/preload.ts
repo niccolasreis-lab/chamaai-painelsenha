@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld('api', {
   createShortcut: (route: string, title: string) => ipcRenderer.invoke('create-shortcut', { route, title }),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
   ping: () => 'pong'
 });
