@@ -43,11 +43,11 @@ export default function Dashboard() {
 
   return (
     <AdminLayout>
-      <div className="max-w-7xl mx-auto space-y-8 font-rajdhani">
+      <div className="max-w-7xl mx-auto space-y-8 font-sans">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
           <div>
-            <h1 className="font-oswald text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Dashboard</h1>
+            <h1 className="font-sans text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Dashboard</h1>
             <p className="text-ink-secondary mt-2 text-lg font-semibold text-primary uppercase tracking-widest">Métricas em tempo real da fila</p>
           </div>
           <button 
@@ -68,7 +68,7 @@ export default function Dashboard() {
               <span className="material-symbols-outlined text-sm text-primary">confirmation_number</span>
               Total Emitidas
             </p>
-            <span className="font-oswald text-[56px] font-black text-ink leading-none">{stats.total}</span>
+            <span className="font-sans text-[56px] font-black text-ink leading-none">{stats.total}</span>
             <div className="mt-4 flex items-center text-success font-bold text-[10px] uppercase tracking-widest">
               <span className="material-symbols-outlined text-sm mr-1">trending_up</span>
               Fluxo Normal
@@ -81,7 +81,7 @@ export default function Dashboard() {
               <span className="material-symbols-outlined text-sm">hourglass_empty</span>
               Em Espera
             </p>
-            <span className="font-oswald text-[56px] font-black text-primary leading-none">{stats.aguardando}</span>
+            <span className="font-sans text-[56px] font-black text-primary leading-none">{stats.aguardando}</span>
             <div className="mt-4 flex items-center text-primary font-bold text-[10px] uppercase tracking-widest">
               <span className="material-symbols-outlined text-sm mr-1">group</span>
               Pessoas na fila
@@ -94,7 +94,7 @@ export default function Dashboard() {
               <span className="material-symbols-outlined text-sm">check_circle</span>
               Atendidas
             </p>
-            <span className="font-oswald text-[56px] font-black text-ink leading-none">{stats.atendidos}</span>
+            <span className="font-sans text-[56px] font-black text-ink leading-none">{stats.atendidos}</span>
             <div className="mt-4 flex items-center text-success font-bold text-[10px] uppercase tracking-widest">
               <span className="material-symbols-outlined text-sm mr-1">speed</span>
               Alta Eficiência
@@ -107,7 +107,7 @@ export default function Dashboard() {
               <span className="material-symbols-outlined text-sm">cancel</span>
               Canceladas
             </p>
-            <span className="font-oswald text-[56px] font-black text-ink leading-none">{stats.cancelados}</span>
+            <span className="font-sans text-[56px] font-black text-ink leading-none">{stats.cancelados}</span>
             <div className="mt-4 flex items-center text-error font-bold text-[10px] uppercase tracking-widest">
               <span className="material-symbols-outlined text-sm mr-1">block</span>
               No-shows
@@ -122,7 +122,7 @@ export default function Dashboard() {
               <span className="material-symbols-outlined text-4xl">insights</span>
             </div>
             <div className="text-center">
-              <h3 className="font-oswald text-xl font-bold text-ink uppercase tracking-widest">Análise de Desempenho</h3>
+              <h3 className="font-sans text-xl font-bold text-ink uppercase tracking-widest">Análise de Desempenho</h3>
               <p className="text-ink-secondary text-sm font-bold uppercase tracking-[0.2em] mt-1">Os gráficos serão gerados após o primeiro dia de operação.</p>
             </div>
           </div>
@@ -130,7 +130,7 @@ export default function Dashboard() {
           {/* Version Card */}
           <div className="bg-surface rounded-[32px] p-8 border border-outline-variant/50 shadow-sm flex flex-col items-center justify-center text-center group">
             <span className="material-symbols-outlined text-5xl text-primary mb-4">new_releases</span>
-            <h3 className="font-oswald text-2xl font-bold text-ink uppercase tracking-widest mb-2">Versão do Sistema</h3>
+            <h3 className="font-sans text-2xl font-bold text-ink uppercase tracking-widest mb-2">Versão do Sistema</h3>
             <div className="bg-primary/10 text-primary px-6 py-2 rounded-full font-black text-xl tracking-[0.3em] border border-primary/20 mb-6">
               v{appVersion}
             </div>

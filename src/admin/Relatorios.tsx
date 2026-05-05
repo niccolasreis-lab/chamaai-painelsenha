@@ -74,10 +74,10 @@ export default function Relatorios() {
 
   return (
     <AdminLayout>
-      <div className="max-w-6xl mx-auto space-y-8 font-rajdhani">
+      <div className="max-w-6xl mx-auto space-y-8 font-sans">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
           <div>
-            <h1 className="font-oswald text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Relatórios & Histórico</h1>
+            <h1 className="font-sans text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Relatórios & Histórico</h1>
             <p className="text-ink-secondary mt-2 text-lg font-semibold text-primary uppercase tracking-widest">Analise o desempenho por período</p>
           </div>
           
@@ -135,7 +135,7 @@ export default function Relatorios() {
               <FileText size={24} />
             </div>
             <p className="text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2">Total de Senhas</p>
-            <h3 className="text-4xl font-black text-ink font-oswald">{stats.total}</h3>
+            <h3 className="text-4xl font-black text-ink font-sans">{stats.total}</h3>
           </div>
 
           <div className="bg-surface p-8 rounded-[24px] shadow-sm border border-success/20 border-b-8 border-b-success">
@@ -143,7 +143,7 @@ export default function Relatorios() {
               <Users size={24} />
             </div>
             <p className="text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2">Atendidas</p>
-            <h3 className="text-4xl font-black text-ink font-oswald">{stats.atendidas}</h3>
+            <h3 className="text-4xl font-black text-ink font-sans">{stats.atendidas}</h3>
           </div>
 
           <div className="bg-surface p-8 rounded-[24px] shadow-sm border border-error/20 border-b-8 border-b-error">
@@ -151,7 +151,7 @@ export default function Relatorios() {
               <Users size={24} />
             </div>
             <p className="text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2">Canceladas</p>
-            <h3 className="text-4xl font-black text-ink font-oswald">{stats.canceladas}</h3>
+            <h3 className="text-4xl font-black text-ink font-sans">{stats.canceladas}</h3>
           </div>
 
           <div className="bg-surface p-8 rounded-[24px] shadow-sm border border-primary/20 border-b-8 border-b-primary">
@@ -159,7 +159,7 @@ export default function Relatorios() {
               <Clock size={24} />
             </div>
             <p className="text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2">Espera Média</p>
-            <h3 className="text-4xl font-black text-ink font-oswald">{stats.tempoMedioEspera.toFixed(1)} <span className="text-sm">min</span></h3>
+            <h3 className="text-4xl font-black text-ink font-sans">{stats.tempoMedioEspera.toFixed(1)} <span className="text-sm">min</span></h3>
           </div>
         </div>
 
@@ -169,7 +169,7 @@ export default function Relatorios() {
               <TrendingUp size={28} />
               <span className="font-black tracking-[0.3em] uppercase text-xs">Análise de Performance</span>
             </div>
-            <h2 className="text-3xl font-bold font-oswald leading-tight max-w-2xl uppercase tracking-wider">
+            <h2 className="text-3xl font-bold font-sans leading-tight max-w-2xl uppercase tracking-wider">
               {stats.atendidas > 0 
                 ? `Sua taxa de eficiência é de ${((stats.atendidas / stats.total) * 100).toFixed(1)}%. Ótimo desempenho!`
                 : 'Selecione um período para ver os insights de atendimento.'}

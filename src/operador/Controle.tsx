@@ -139,7 +139,7 @@ export default function Controle() {
   const priorityCount = fila.filter(s => s.preferencial === 1).length;
 
   return (
-    <div className={`min-h-screen w-full font-rajdhani flex justify-center transition-colors duration-300
+    <div className={`min-h-screen w-full font-sans flex justify-center transition-colors duration-300
       ${theme === 'dark' ? 'bg-[#020617] text-white' : 'bg-[#f8fafc] text-slate-900'}`}>
       
       <div className="w-full max-w-[500px] h-screen flex flex-col p-4 gap-4 overflow-hidden">
@@ -149,7 +149,7 @@ export default function Controle() {
           ${theme === 'dark' ? 'bg-slate-800/50 border-white/10' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center gap-3">
             <span className={`material-symbols-outlined text-xl ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>storefront</span>
-            <span className="font-oswald text-lg font-bold uppercase tracking-wide">{guiche}</span>
+            <span className="font-sans text-lg font-bold uppercase tracking-wide">{guiche}</span>
           </div>
           <div className="flex gap-2">
             <button onClick={() => {
@@ -168,7 +168,7 @@ export default function Controle() {
         {showIpConfig && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-fade-in">
             <div className={`w-full max-w-sm rounded-[32px] p-8 shadow-2xl animate-scale-in ${theme === 'dark' ? 'bg-slate-900 border border-white/10' : 'bg-white'}`}>
-              <h3 className="font-oswald text-2xl font-bold uppercase mb-2">Conectar ao Servidor</h3>
+              <h3 className="font-sans text-2xl font-bold uppercase mb-2">Conectar ao Servidor</h3>
               <p className="text-sm text-slate-500 font-semibold mb-6 uppercase tracking-wider">Digite o IP do computador principal</p>
               
               <div className="space-y-4">
@@ -206,7 +206,7 @@ export default function Controle() {
           <div className="absolute top-0 left-0 w-full h-1 bg-blue-500/20"></div>
           <span className="text-[11px] font-bold tracking-[5px] uppercase opacity-40 mb-2">Senha em Atendimento</span>
           
-          <div className={`font-oswald text-[120px] font-bold leading-none tracking-tighter drop-shadow-2xl transition-all
+          <div className={`font-sans text-[120px] font-bold leading-none tracking-tighter drop-shadow-2xl transition-all
             ${senhaAtual ? 'text-blue-500 scale-110' : 'opacity-10'}`}>
             {senhaAtual ? String(senhaAtual.numero).padStart(3, '0') : '---'}
           </div>
@@ -219,15 +219,15 @@ export default function Controle() {
         {/* Status da Fila */}
         <div className="grid grid-cols-3 gap-3">
           <div className={`p-4 rounded-3xl border text-center transition-all ${theme === 'dark' ? 'bg-slate-800/50 border-white/10' : 'bg-white border-slate-200'}`}>
-            <div className="text-2xl font-oswald font-bold text-blue-500">{normalCount}</div>
+            <div className="text-2xl font-sans font-bold text-blue-500">{normalCount}</div>
             <div className="text-[10px] font-bold uppercase opacity-50">Geral</div>
           </div>
           <div className={`p-4 rounded-3xl border text-center border-t-4 border-t-amber-500 transition-all ${theme === 'dark' ? 'bg-slate-800/50 border-white/10' : 'bg-white border-slate-200'}`}>
-            <div className="text-2xl font-oswald font-bold text-amber-500">{priorityCount}</div>
+            <div className="text-2xl font-sans font-bold text-amber-500">{priorityCount}</div>
             <div className="text-[10px] font-bold uppercase opacity-50">Prioritário</div>
           </div>
           <div className={`p-4 rounded-3xl border text-center transition-all ${theme === 'dark' ? 'bg-slate-800/50 border-white/10' : 'bg-white border-slate-200'}`}>
-            <div className="text-2xl font-oswald font-bold">{fila.length}</div>
+            <div className="text-2xl font-sans font-bold">{fila.length}</div>
             <div className="text-[10px] font-bold uppercase opacity-50">Total</div>
           </div>
         </div>

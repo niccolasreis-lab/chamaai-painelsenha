@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-background text-ink font-rajdhani antialiased;
+    @apply bg-background text-ink font-sans antialiased;
   }
 }
 

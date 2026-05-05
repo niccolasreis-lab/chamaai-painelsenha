@@ -39,9 +39,9 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
 function Home() {
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-background text-ink font-rajdhani">
+    <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-background text-ink font-sans">
       <div className="mb-12 flex flex-col items-center">
-        <h1 className="font-oswald text-[64px] font-bold text-primary tracking-widest uppercase">ChamaAí</h1>
+        <h1 className="font-sans text-[64px] font-bold text-primary tracking-widest uppercase">ChamaAí</h1>
         <p className="text-ink-secondary font-bold uppercase tracking-widest">Sistema de Gestão de Atendimento</p>
       </div>
       
@@ -51,7 +51,7 @@ function Home() {
           <div className="w-20 h-20 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
             <span className="material-symbols-outlined text-[40px]">confirmation_number</span>
           </div>
-          <h2 className="font-oswald text-2xl font-bold text-ink mb-2 uppercase tracking-wide">Totem</h2>
+          <h2 className="font-sans text-2xl font-bold text-ink mb-2 uppercase tracking-wide">Totem</h2>
           <p className="text-sm text-ink-secondary font-semibold uppercase tracking-widest">Emissão de senhas para clientes.</p>
         </Link>
         
@@ -60,7 +60,7 @@ function Home() {
           <div className="w-20 h-20 rounded-full bg-success/10 text-success flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
             <span className="material-symbols-outlined text-[40px]">desktop_windows</span>
           </div>
-          <h2 className="font-oswald text-2xl font-bold text-ink mb-2 uppercase tracking-wide">Telão</h2>
+          <h2 className="font-sans text-2xl font-bold text-ink mb-2 uppercase tracking-wide">Telão</h2>
           <p className="text-sm text-ink-secondary font-semibold uppercase tracking-widest">Mídia indoor e chamadas.</p>
         </Link>
         
@@ -70,16 +70,16 @@ function Home() {
             <div className="w-20 h-20 rounded-full bg-ink/5 text-ink flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <span className="material-symbols-outlined text-[40px]">person</span>
             </div>
-            <h2 className="font-oswald text-2xl font-bold text-ink mb-2 uppercase tracking-wide">Operador</h2>
+            <h2 className="font-sans text-2xl font-bold text-ink mb-2 uppercase tracking-wide">Operador</h2>
             <p className="text-sm text-ink-secondary font-semibold uppercase tracking-widest">Painel Padrão (Vertical)</p>
           </Link>
           <Link to="/operador-touch" className="group p-4 bg-surface rounded-[24px] shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex items-center justify-center gap-3">
             <span className="material-symbols-outlined text-primary">tablet_landscape</span>
-            <span className="font-oswald text-sm font-bold text-ink uppercase tracking-wider">Painel Touch (TV)</span>
+            <span className="font-sans text-sm font-bold text-ink uppercase tracking-wider">Painel Touch (TV)</span>
           </Link>
           <Link to="/mobile" className="group p-4 bg-blue-600 rounded-[24px] shadow-lg shadow-blue-900/20 hover:bg-blue-500 transition-all flex items-center justify-center gap-3 text-white">
             <span className="material-symbols-outlined">smartphone</span>
-            <span className="font-oswald text-sm font-bold uppercase tracking-wider">Acesso Mobile (APK)</span>
+            <span className="font-sans text-sm font-bold uppercase tracking-wider">Acesso Mobile (APK)</span>
           </Link>
         </div>
         
@@ -88,7 +88,7 @@ function Home() {
           <div className="w-20 h-20 rounded-full bg-primary text-white flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-primary/20">
             <span className="material-symbols-outlined text-[40px]">admin_panel_settings</span>
           </div>
-          <h2 className="font-oswald text-2xl font-bold text-ink mb-2 uppercase tracking-wide">Admin</h2>
+          <h2 className="font-sans text-2xl font-bold text-ink mb-2 uppercase tracking-wide">Admin</h2>
           <p className="text-sm text-ink-secondary font-semibold uppercase tracking-widest">Gestão e configurações.</p>
         </Link>
       </div>
@@ -112,7 +112,7 @@ function Home() {
         >
           <div className="flex items-center gap-3 text-primary">
             <span className="material-symbols-outlined font-bold">hub</span>
-            <span className="font-oswald text-sm font-bold uppercase tracking-[0.2em]">Configuração de Conexão</span>
+            <span className="font-sans text-sm font-bold uppercase tracking-[0.2em]">Configuração de Conexão</span>
           </div>
           
           <div className="text-center">

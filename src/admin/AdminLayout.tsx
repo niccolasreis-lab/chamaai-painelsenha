@@ -15,17 +15,17 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <div className="bg-background text-ink min-h-screen flex font-rajdhani">
+    <div className="bg-background text-ink min-h-screen flex font-sans">
       {/* SideNavBar */}
       <nav className="h-screen w-72 bg-surface border-r border-outline-variant/30 flex flex-col py-8 shadow-sm flex-shrink-0 z-10 sticky top-0">
         <div className="px-6 mb-8 flex items-center space-x-3">
           <span className="material-symbols-outlined text-4xl text-primary" data-weight="fill">storefront</span>
-          <div className="text-2xl font-bold font-oswald text-ink tracking-widest uppercase">ChamaAí</div>
+          <div className="text-2xl font-bold font-sans text-ink tracking-widest uppercase">ChamaAí</div>
         </div>
         
         <div className="px-6 mb-8">
           <div className="flex items-center space-x-3 bg-surface-variant p-3 rounded-xl border border-outline-variant/50">
-            <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-primary text-white flex items-center justify-center font-bold font-oswald">
+            <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-primary text-white flex items-center justify-center font-bold font-sans">
               AD
             </div>
             <div>
@@ -68,7 +68,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         {/* TopAppBar */}
         <header className="flex justify-between items-center w-full px-8 py-5 bg-surface border-b border-outline-variant/30 z-20 sticky top-0 shadow-sm">
           <div className="flex items-center">
-            <h1 className="font-oswald text-2xl font-bold text-ink uppercase tracking-widest">Painel Administrativo</h1>
+            <h1 className="font-sans text-2xl font-bold text-ink uppercase tracking-widest">Painel Administrativo</h1>
           </div>
           <div className="flex items-center space-x-4">
             <div className="hidden md:flex items-center bg-surface-variant rounded-full px-4 py-2 border border-outline-variant/50 focus-within:border-primary/50 transition-colors">

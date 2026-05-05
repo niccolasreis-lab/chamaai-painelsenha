@@ -77,7 +77,7 @@ export default function LicenseGate({ children }: LicenseGateProps) {
 
   if (isValidating) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center font-rajdhani">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center font-sans">
         <div className="w-16 h-16 border-4 border-blue-600/30 border-t-blue-500 rounded-full animate-spin mb-4"></div>
         <p className="text-slate-400 font-bold tracking-widest uppercase animate-pulse">Verificando Licença...</p>
       </div>
@@ -89,7 +89,7 @@ export default function LicenseGate({ children }: LicenseGateProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center font-rajdhani relative overflow-hidden p-4">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center font-sans relative overflow-hidden p-4">
       {/* Background Decorativo */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none"></div>
@@ -99,7 +99,7 @@ export default function LicenseGate({ children }: LicenseGateProps) {
           <span className="material-symbols-outlined text-rose-500 text-5xl">lock</span>
         </div>
         
-        <h1 className="font-oswald text-4xl font-bold text-white uppercase tracking-widest text-center mb-2">Sistema Bloqueado</h1>
+        <h1 className="font-sans text-4xl font-bold text-white uppercase tracking-widest text-center mb-2">Sistema Bloqueado</h1>
         <p className="text-slate-400 font-medium text-center mb-8">
           Por favor, insira uma chave de licença válida para liberar o uso do aplicativo.
         </p>
@@ -131,7 +131,7 @@ export default function LicenseGate({ children }: LicenseGateProps) {
           <button
             type="submit"
             disabled={loading || !serialCode.trim()}
-            className="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-oswald text-xl font-bold uppercase tracking-widest py-4 rounded-xl mt-2 transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 flex justify-center items-center gap-2"
+            className="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-sans text-xl font-bold uppercase tracking-widest py-4 rounded-xl mt-2 transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 flex justify-center items-center gap-2"
           >
             {loading ? (
               <span className="material-symbols-outlined animate-spin">refresh</span>

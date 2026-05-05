@@ -67,10 +67,10 @@ export default function Operators() {
 
   return (
     <AdminLayout>
-      <div className="max-w-6xl mx-auto space-y-8 font-rajdhani">
+      <div className="max-w-6xl mx-auto space-y-8 font-sans">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h1 className="font-oswald text-[48px] font-bold text-ink leading-tight uppercase tracking-widest">Operadores</h1>
+            <h1 className="font-sans text-[48px] font-bold text-ink leading-tight uppercase tracking-widest">Operadores</h1>
             <p className="text-ink-secondary mt-2 text-lg font-semibold uppercase tracking-wider">Gestão de acesso e perfis do sistema</p>
           </div>
           <button 
@@ -119,7 +119,7 @@ export default function Operators() {
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-surface w-full max-w-md rounded-[32px] p-8 shadow-2xl border border-outline-variant/50 animate-fade-in">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="font-oswald text-2xl font-bold text-ink uppercase tracking-wider">Novo Operador</h2>
+                <h2 className="font-sans text-2xl font-bold text-ink uppercase tracking-wider">Novo Operador</h2>
                 <button onClick={() => setShowModal(false)} className="text-ink-secondary hover:text-ink"><span className="material-symbols-outlined">close</span></button>
               </div>
               <form onSubmit={handleAdd} className="space-y-4">

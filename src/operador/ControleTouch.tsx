@@ -96,7 +96,7 @@ export default function ControleTouch() {
   const prefCount = fila.filter(s => s.preferencial === 1).length;
 
   return (
-    <div className="h-screen w-screen bg-slate-50 flex text-slate-900 p-6 gap-6 font-rajdhani select-none overflow-hidden">
+    <div className="h-screen w-screen bg-slate-50 flex text-slate-900 p-6 gap-6 font-sans select-none overflow-hidden">
        {/* Left side: Current Ticket & Stats */}
        <div className="flex-1 flex flex-col gap-6">
           {/* Header */}
@@ -104,7 +104,7 @@ export default function ControleTouch() {
              <div className="flex items-center gap-4">
                 <span className="material-symbols-outlined text-blue-600 text-5xl">storefront</span>
                 <div>
-                   <h1 className="font-oswald text-3xl font-bold uppercase tracking-widest">{guiche}</h1>
+                   <h1 className="font-sans text-3xl font-bold uppercase tracking-widest">{guiche}</h1>
                    <p className="text-slate-500 font-bold tracking-widest text-sm mt-1 uppercase">Painel Touch Horizontal</p>
                 </div>
              </div>
@@ -118,7 +118,7 @@ export default function ControleTouch() {
              {senhaAtual ? (
                 <>
                    <span className="text-slate-400 font-bold uppercase tracking-[0.3em] mb-4 text-xl">Em Atendimento</span>
-                   <span className="font-oswald text-[14rem] font-black text-blue-600 leading-none drop-shadow-md">
+                   <span className="font-sans text-[14rem] font-black text-blue-600 leading-none drop-shadow-md">
                      {String(senhaAtual.numero).padStart(3, '0')}
                    </span>
                    <span className={`mt-8 px-8 py-3 rounded-full font-bold uppercase tracking-widest text-2xl ${senhaAtual.preferencial ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
@@ -128,7 +128,7 @@ export default function ControleTouch() {
              ) : (
                 <div className="flex flex-col items-center opacity-30 text-slate-500">
                   <span className="material-symbols-outlined text-[8rem] mb-6">chair</span>
-                  <span className="font-oswald text-4xl uppercase tracking-widest">Nenhum atendimento</span>
+                  <span className="font-sans text-4xl uppercase tracking-widest">Nenhum atendimento</span>
                 </div>
              )}
           </div>
@@ -153,7 +153,7 @@ export default function ControleTouch() {
              className="flex-[2] bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white active:scale-[0.98] rounded-[40px] flex flex-col items-center justify-center gap-6 transition-all shadow-xl"
           >
              <span className="material-symbols-outlined text-[8rem]">campaign</span>
-             <span className="font-oswald text-7xl font-black uppercase tracking-widest">Próximo</span>
+             <span className="font-sans text-7xl font-black uppercase tracking-widest">Próximo</span>
           </button>
           
           <button 
@@ -161,7 +161,7 @@ export default function ControleTouch() {
              className="flex-1 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white active:scale-[0.98] rounded-[40px] flex items-center justify-center gap-6 transition-all shadow-md"
           >
              <span className="material-symbols-outlined text-6xl">refresh</span>
-             <span className="font-oswald text-5xl font-bold uppercase tracking-widest">Repetir</span>
+             <span className="font-sans text-5xl font-bold uppercase tracking-widest">Repetir</span>
           </button>
 
           <button 
@@ -169,7 +169,7 @@ export default function ControleTouch() {
              className="flex-[0.6] bg-white hover:bg-slate-50 active:bg-slate-100 active:scale-[0.98] rounded-[40px] flex items-center justify-center gap-6 transition-all border-2 border-amber-500/30 text-amber-600 shadow-sm"
           >
              <span className="material-symbols-outlined text-5xl">undo</span>
-             <span className="font-oswald text-3xl font-bold uppercase tracking-widest">Devolver à Fila</span>
+             <span className="font-sans text-3xl font-bold uppercase tracking-widest">Devolver à Fila</span>
           </button>
        </div>
     </div>

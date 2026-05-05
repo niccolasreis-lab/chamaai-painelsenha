@@ -158,7 +158,7 @@ export default function Configuracoes() {
   if (loading) {
     return (
       <AdminLayout>
-        <div className="p-8 font-rajdhani font-bold text-xl uppercase tracking-widest text-ink-secondary">
+        <div className="p-8 font-sans font-bold text-xl uppercase tracking-widest text-ink-secondary">
           Carregando...
         </div>
       </AdminLayout>
@@ -167,12 +167,12 @@ export default function Configuracoes() {
 
   return (
     <AdminLayout>
-      <div className="max-w-6xl mx-auto font-rajdhani space-y-8">
+      <div className="max-w-6xl mx-auto font-sans space-y-8">
         
         {/* Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h1 className="font-oswald text-[48px] font-bold text-ink leading-tight uppercase tracking-widest">Configurações</h1>
+            <h1 className="font-sans text-[48px] font-bold text-ink leading-tight uppercase tracking-widest">Configurações</h1>
             <p className="text-ink-secondary mt-2 text-lg font-semibold uppercase tracking-wider">Gestão do Sistema ChamaAí</p>
           </div>
           <button
@@ -189,7 +189,7 @@ export default function Configuracoes() {
           {/* Coluna Esquerda: Estabelecimento */}
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
-              <h2 className="font-oswald text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+              <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">storefront</span>
                 Estabelecimento
               </h2>
@@ -224,7 +224,7 @@ export default function Configuracoes() {
             </div>
             {/* Telão & Personalização */}
             <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
-              <h2 className="font-oswald text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+              <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">tv</span>
                 Telão & Interface
               </h2>
@@ -290,7 +290,7 @@ export default function Configuracoes() {
             </div>
             {/* Impressora */}
             <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
-              <h2 className="font-oswald text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+              <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">print</span>
                 Impressora Térmica
               </h2>
@@ -346,7 +346,7 @@ export default function Configuracoes() {
           {/* Coluna Direita: Sistema e Backup */}
           <div className="space-y-8">
             <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
-              <h2 className="font-oswald text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+              <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">settings_applications</span>
                 Sistema
               </h2>
@@ -435,7 +435,7 @@ export default function Configuracoes() {
 
             {/* Atualização de Sistema */}
             <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
-              <h2 className="font-oswald text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+              <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">update</span>
                 Atualização do Sistema
               </h2>
@@ -483,7 +483,7 @@ export default function Configuracoes() {
 
             {/* Backup & Restore */}
             <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
-              <h2 className="font-oswald text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+              <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">cloud_sync</span>
                 Backup & Dados
               </h2>
@@ -516,7 +516,7 @@ export default function Configuracoes() {
             </div>
 
             <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
-              <h2 className="font-oswald text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+              <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">image</span>
                 Logo
               </h2>

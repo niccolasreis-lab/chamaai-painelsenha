@@ -21,9 +21,8 @@ module.exports = {
         'outline-variant': '#cbd5e1'
       },
       fontFamily: {
-        oswald: ['Oswald', 'sans-serif'],
-        barlow: ['"Barlow Condensed"', 'sans-serif'],
-        rajdhani: ['Rajdhani', 'sans-serif']
+        sans: ['Inter', 'sans-serif'],
+        inter: ['Inter', 'sans-serif']
       },
       animation: {
         'pulse-call': 'pulse-call 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',

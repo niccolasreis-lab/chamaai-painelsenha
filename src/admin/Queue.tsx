@@ -21,8 +21,8 @@ export default function Queue() {
 
   return (
     <AdminLayout>
-      <div className="max-w-7xl mx-auto space-y-8 font-rajdhani">
-        <h1 className="font-oswald text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Fila de Atendimento</h1>
+      <div className="max-w-7xl mx-auto space-y-8 font-sans">
+        <h1 className="font-sans text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Fila de Atendimento</h1>
         <div className="bg-surface rounded-3xl border border-outline-variant p-6">
           {fila.length === 0 ? (
             <p className="text-ink-secondary text-lg font-semibold text-center py-20 uppercase">

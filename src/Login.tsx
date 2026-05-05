@@ -54,7 +54,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center font-rajdhani relative overflow-hidden p-4">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center font-sans relative overflow-hidden p-4">
       {/* Background Decorativo */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none"></div>
@@ -64,7 +64,7 @@ export default function Login() {
           <div className="w-20 h-20 bg-blue-600/20 rounded-2xl flex items-center justify-center mb-6">
             <span className="material-symbols-outlined text-blue-500 text-4xl">admin_panel_settings</span>
           </div>
-          <h1 className="font-oswald text-4xl font-bold text-white uppercase tracking-widest text-center">ChamaAí</h1>
+          <h1 className="font-sans text-4xl font-bold text-white uppercase tracking-widest text-center">ChamaAí</h1>
           <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-xs mt-2 text-center">Controle de Acesso</p>
         </div>
 
@@ -109,7 +109,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-oswald text-xl font-bold uppercase tracking-widest py-4 rounded-xl mt-4 transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 flex justify-center items-center gap-2"
+            className="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-sans text-xl font-bold uppercase tracking-widest py-4 rounded-xl mt-4 transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 flex justify-center items-center gap-2"
           >
             {loading ? (
               <span className="material-symbols-outlined animate-spin">refresh</span>

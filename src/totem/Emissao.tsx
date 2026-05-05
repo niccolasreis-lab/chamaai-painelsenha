@@ -72,8 +72,8 @@ export default function Emissao() {
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-surface rounded-3xl p-8 max-w-md w-full shadow-2xl border border-outline-variant/30 flex flex-col gap-6">
           <div>
-            <h3 className="font-oswald text-2xl font-bold text-ink uppercase mb-2">Configuração de Rede</h3>
-            <p className="text-sm font-rajdhani text-ink-secondary font-medium">Digite o IP ou o Nome do computador principal (Telão) para conectar este totem.</p>
+            <h3 className="font-sans text-2xl font-bold text-ink uppercase mb-2">Configuração de Rede</h3>
+            <p className="text-sm font-sans text-ink-secondary font-medium">Digite o IP ou o Nome do computador principal (Telão) para conectar este totem.</p>
           </div>
           <div>
             <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">ENDEREÇO DO SERVIDOR</label>
@@ -107,10 +107,10 @@ export default function Emissao() {
 
   if (error) {
     return (
-      <div className="h-screen w-screen bg-background flex flex-col items-center justify-center p-8 text-center font-rajdhani">
+      <div className="h-screen w-screen bg-background flex flex-col items-center justify-center p-8 text-center font-sans">
         <ConfigModal />
         <span className="material-symbols-outlined text-[6rem] text-error mb-4">wifi_off</span>
-        <h2 className="text-4xl font-oswald font-bold text-ink uppercase mb-2">Servidor não encontrado</h2>
+        <h2 className="text-4xl font-sans font-bold text-ink uppercase mb-2">Servidor não encontrado</h2>
         <p className="text-xl text-ink-secondary mb-8 max-w-md">Não conseguimos conectar ao PC principal ({API_URL}). Verifique se o Telão está aberto e se o IP está correto.</p>
         
         <button 
@@ -153,10 +153,10 @@ export default function Emissao() {
   };
 
   return (
-    <div className="h-screen w-screen bg-background flex flex-col font-rajdhani select-none overflow-hidden fixed inset-0">
+    <div className="h-screen w-screen bg-background flex flex-col font-sans select-none overflow-hidden fixed inset-0">
       {/* Header */}
       <header className="bg-primary text-on-primary py-10 shadow-md flex justify-center items-center border-b-[6px] border-primary-hover shrink-0">
-        <h1 className="font-oswald text-5xl font-bold uppercase tracking-widest flex items-center gap-4">
+        <h1 className="font-sans text-5xl font-bold uppercase tracking-widest flex items-center gap-4">
           <span className="material-symbols-outlined text-[4rem]">storefront</span>
           {config.nome_estabelecimento || 'ChamaAí'}
         </h1>
@@ -165,7 +165,7 @@ export default function Emissao() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center p-6 gap-10 overflow-hidden">
         <div className="text-center shrink-0">
-          <h2 className="font-oswald text-4xl font-semibold text-ink mb-2 uppercase">
+          <h2 className="font-sans text-4xl font-semibold text-ink mb-2 uppercase">
             Bem-vindo(a)
           </h2>
           <p className="text-2xl text-ink-secondary font-medium">
@@ -175,8 +175,8 @@ export default function Emissao() {
           <div className="mt-8 inline-flex items-center gap-4 bg-surface-variant/20 px-8 py-4 rounded-full border border-outline-variant/30">
             <span className="material-symbols-outlined text-primary text-[2.5rem]">group</span>
             <div className="flex flex-col items-start leading-tight">
-              <span className="font-rajdhani text-sm font-bold uppercase tracking-widest text-ink-secondary">Pessoas Aguardando</span>
-              <span className="font-oswald text-5xl font-black text-primary">{pessoasAguardando}</span>
+              <span className="font-sans text-sm font-bold uppercase tracking-widest text-ink-secondary">Pessoas Aguardando</span>
+              <span className="font-sans text-5xl font-black text-primary">{pessoasAguardando}</span>
             </div>
           </div>
         </div>
@@ -193,7 +193,7 @@ export default function Emissao() {
                 </span>
               </div>
               <div className="text-center">
-                <span className="font-oswald text-6xl font-black text-primary block uppercase">Emitir Senha</span>
+                <span className="font-sans text-6xl font-black text-primary block uppercase">Emitir Senha</span>
               </div>
             </button>
           ) : (
@@ -210,8 +210,8 @@ export default function Emissao() {
                     </span>
                   </div>
                   <div className="text-center">
-                    <span className="font-oswald text-3xl font-bold text-ink block uppercase tracking-widest">Atendimento {config.rotulo_atendimento_geral || 'Geral'}</span>
-                    <span className="font-oswald text-5xl font-black text-primary block uppercase mt-3">TOQUE AQUI</span>
+                    <span className="font-sans text-3xl font-bold text-ink block uppercase tracking-widest">Atendimento {config.rotulo_atendimento_geral || 'Geral'}</span>
+                    <span className="font-sans text-5xl font-black text-primary block uppercase mt-3">TOQUE AQUI</span>
                   </div>
                 </button>
               )}
@@ -228,8 +228,8 @@ export default function Emissao() {
                     </span>
                   </div>
                   <div className="text-center">
-                    <span className="font-oswald text-3xl font-bold text-ink block uppercase tracking-widest">Atendimento {config.rotulo_atendimento_prioritario || 'Prioritário'}</span>
-                    <span className="font-oswald text-5xl font-black text-warning block uppercase mt-3">TOQUE AQUI</span>
+                    <span className="font-sans text-3xl font-bold text-ink block uppercase tracking-widest">Atendimento {config.rotulo_atendimento_prioritario || 'Prioritário'}</span>
+                    <span className="font-sans text-5xl font-black text-warning block uppercase mt-3">TOQUE AQUI</span>
                   </div>
                   <div className="text-ink-secondary text-base font-medium px-8 mt-2">
                     Pessoas com deficiência, idosos, gestantes e lactantes.

@@ -142,7 +142,7 @@ export default function MediaIndoor() {
   const activeMidia = midias[activeMidiaIndex];
 
   return (
-    <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-rajdhani text-ink">
+    <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-sans text-ink">
       {/* Top Header Area */}
       <header className="h-20 bg-white border-b border-outline-variant/30 flex items-center justify-between px-8 shrink-0">
         <div className="flex items-center gap-4">
@@ -150,13 +150,13 @@ export default function MediaIndoor() {
             <img src={`${API_URL}${config.logo_cliente}`} className="h-12 object-contain" alt="Logo" />
           ) : (
             <div className="flex flex-col">
-              <h1 className="font-oswald text-3xl font-bold text-primary leading-none uppercase tracking-tighter">ChamaAí</h1>
-              <p className="font-rajdhani text-sm font-bold text-ink-secondary uppercase">Sistema de Gestão de Atendimento</p>
+              <h1 className="font-sans text-3xl font-bold text-primary leading-none uppercase tracking-tighter">ChamaAí</h1>
+              <p className="font-sans text-sm font-bold text-ink-secondary uppercase">Sistema de Gestão de Atendimento</p>
             </div>
           )}
           {config.logo_cliente && (
             <div className="border-l border-outline-variant/30 pl-4">
-              <h1 className="font-oswald text-2xl font-bold text-ink-secondary leading-none uppercase tracking-tight">{config.nome_estabelecimento || 'ChamaAí'}</h1>
+              <h1 className="font-sans text-2xl font-bold text-ink-secondary leading-none uppercase tracking-tight">{config.nome_estabelecimento || 'ChamaAí'}</h1>
             </div>
           )}
         </div>
@@ -175,7 +175,7 @@ export default function MediaIndoor() {
             <span className="material-symbols-outlined text-blue-500 text-[3.5rem]">groups</span>
             <div className="flex flex-col items-center">
               <span className="text-sm font-bold text-ink-secondary uppercase tracking-[0.2em] mb-1">Aguardando</span>
-              <span className="font-oswald text-[4.5rem] font-bold text-blue-600 leading-none">{pessoasAguardando}</span>
+              <span className="font-sans text-[4.5rem] font-black tracking-tighter text-blue-600 leading-none">{pessoasAguardando}</span>
             </div>
           </div>
         </div>
@@ -218,11 +218,11 @@ export default function MediaIndoor() {
                   {config.logo_cliente ? (
                     <img src={`${API_URL}${config.logo_cliente}`} className="h-40 object-contain mb-8 drop-shadow-2xl" alt="Logo" />
                   ) : (
-                    <h2 className="font-oswald text-6xl font-bold text-white mb-6 uppercase tracking-widest drop-shadow-lg">
+                    <h2 className="font-sans text-6xl font-bold text-white mb-6 uppercase tracking-widest drop-shadow-lg">
                       {config.nome_estabelecimento || 'ChamaAí'}
                     </h2>
                   )}
-                  <p className="font-rajdhani text-3xl font-medium text-white/70 uppercase tracking-widest">
+                  <p className="font-sans text-3xl font-medium text-white/70 uppercase tracking-widest">
                     {config.logo_cliente ? (config.nome_estabelecimento || 'ChamaAí') : 'Sua Fila Digital'}
                   </p>
                 </div>
@@ -239,7 +239,7 @@ export default function MediaIndoor() {
           <div className="p-8 flex-1 overflow-hidden">
             <div className="flex items-center gap-3 mb-8 border-b border-outline-variant/30 pb-4">
               <span className="material-symbols-outlined text-primary text-3xl font-bold">history</span>
-              <h2 className="font-oswald text-2xl font-bold text-ink uppercase tracking-widest">Histórico</h2>
+              <h2 className="font-sans text-2xl font-bold text-ink uppercase tracking-widest">Histórico</h2>
             </div>
             
             <div className="space-y-5">
@@ -247,7 +247,7 @@ export default function MediaIndoor() {
                 historico.slice(0, 5).map((senha, idx) => (
                   <div key={senha.id} className={`flex items-center gap-6 px-8 py-5 bg-white rounded-[2rem] border shadow-sm transition-all ${idx === 0 ? 'border-primary ring-4 ring-primary/10 bg-primary/5 scale-[1.03] mb-6' : 'border-outline-variant/50 opacity-60'}`}>
                     {/* Número da senha */}
-                    <span className={`font-oswald text-[5rem] font-bold leading-none tracking-tight ${idx === 0 ? 'text-primary' : 'text-ink'}`}>
+                    <span className={`font-sans text-[5.5rem] font-black leading-none tracking-tighter ${idx === 0 ? 'text-primary' : 'text-ink'}`}>
                       {String(senha.numero).padStart(3, '0')}
                     </span>
                     
@@ -256,10 +256,10 @@ export default function MediaIndoor() {
 
                     {/* Nome do setor */}
                     <div className="flex flex-col leading-tight">
-                      <span className="font-oswald text-[1.3rem] font-bold text-ink-secondary uppercase tracking-widest">
+                      <span className="font-sans text-[1.3rem] font-bold text-ink-secondary uppercase tracking-widest">
                         {config.rotulo_local || 'Balcão'}
                       </span>
-                      <span className="font-oswald text-[2.5rem] font-bold text-ink uppercase leading-none">
+                      <span className="font-sans text-[2.5rem] font-bold text-ink uppercase leading-none">
                         {senha.guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
                       </span>
                     </div>
@@ -281,7 +281,7 @@ export default function MediaIndoor() {
                    {showMedia ? 'confirmation_number' : 'campaign'}
                 </span>
              </div>
-             <p className={`font-oswald text-2xl font-bold uppercase tracking-widest ${showMedia ? 'text-ink-secondary/40' : 'text-primary animate-pulse'}`}>
+             <p className={`font-sans text-2xl font-bold uppercase tracking-widest ${showMedia ? 'text-ink-secondary/40' : 'text-primary animate-pulse'}`}>
                 {showMedia ? 'Aguardando chamada...' : 'Senha Chamada!'}
              </p>
           </div>
@@ -292,12 +292,12 @@ export default function MediaIndoor() {
       {config.mostrar_rodape !== '0' && (
         <footer className="h-14 bg-white border-t border-outline-variant/30 flex items-center justify-between px-8 shrink-0">
           <div className="flex items-center gap-4">
-            <p className="font-rajdhani text-sm font-bold text-ink-secondary/60 uppercase tracking-widest">
+            <p className="font-sans text-sm font-bold text-ink-secondary/60 uppercase tracking-widest">
               {config.texto_rodape || 'ChamaAí - Atendimento de Segunda a Sexta, 8h às 18h'}
             </p>
           </div>
-          <div className="font-oswald text-lg font-bold text-ink-secondary flex items-center gap-2">
-            <span className="lowercase font-rajdhani">{currentTime.toLocaleDateString('pt-BR', { weekday: 'short' })}.</span>
+          <div className="font-sans text-lg font-bold text-ink-secondary flex items-center gap-2">
+            <span className="lowercase font-sans">{currentTime.toLocaleDateString('pt-BR', { weekday: 'short' })}.</span>
             {currentTime.toLocaleDateString('pt-BR')} · {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </div>
         </footer>

@@ -102,13 +102,13 @@ export default function MobileOperador() {
 
   if (error || showConfig) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white p-8 flex flex-col items-center justify-center font-rajdhani">
+      <div className="min-h-screen bg-slate-900 text-white p-8 flex flex-col items-center justify-center font-sans">
         <div className="w-full max-w-sm space-y-8 animate-fade-in">
           <div className="text-center">
             <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
               <span className="material-symbols-outlined text-blue-500 text-4xl">settings_remote</span>
             </div>
-            <h2 className="text-3xl font-oswald font-bold uppercase tracking-widest">Configuração Mobile</h2>
+            <h2 className="text-3xl font-sans font-bold uppercase tracking-widest">Configuração Mobile</h2>
             <p className="text-slate-400 mt-2">Conecte seu dispositivo ao servidor principal.</p>
           </div>
 
@@ -156,7 +156,7 @@ export default function MobileOperador() {
   const prefCount = fila.filter(s => s.preferencial === 1).length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-rajdhani select-none overflow-hidden touch-none">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none overflow-hidden touch-none">
       {/* Header Mobile/Tablet */}
       <header className="px-6 py-8 md:px-12 md:py-10 flex items-center justify-between bg-slate-900/50 border-b border-slate-800 shrink-0">
         <div className="flex items-center gap-3 md:gap-6">
@@ -164,7 +164,7 @@ export default function MobileOperador() {
             <span className="material-symbols-outlined text-white text-2xl md:text-4xl">sensors</span>
           </div>
           <div>
-            <h1 className="font-oswald text-xl md:text-3xl font-bold uppercase tracking-wider leading-none">Balcão {guiche}</h1>
+            <h1 className="font-sans text-xl md:text-3xl font-bold uppercase tracking-wider leading-none">Balcão {guiche}</h1>
             <div className="flex items-center gap-1.5 md:gap-2 mt-1 md:mt-2">
               <span className="w-2 h-2 md:w-3 md:h-3 bg-emerald-500 rounded-full animate-pulse"></span>
               <span className="text-[10px] md:text-sm font-bold text-emerald-500 uppercase tracking-widest">Online</span>
@@ -198,7 +198,7 @@ export default function MobileOperador() {
           {senhaAtual ? (
             <>
               <span className="text-xs md:text-2xl font-bold text-slate-500 uppercase tracking-[0.4em] mb-6 md:mb-10">Chamada Atual</span>
-              <span className="font-oswald text-[10rem] md:text-[18rem] font-black text-blue-500 leading-none">
+              <span className="font-sans text-[10rem] md:text-[18rem] font-black text-blue-500 leading-none">
                 {String(senhaAtual.numero).padStart(3, '0')}
               </span>
               <div className={`mt-8 md:mt-12 px-5 py-2 md:px-8 md:py-4 rounded-full text-[10px] md:text-base font-bold uppercase tracking-widest ${senhaAtual.preferencial ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'}`}>
@@ -208,7 +208,7 @@ export default function MobileOperador() {
           ) : (
             <div className="flex flex-col items-center opacity-20">
               <span className="material-symbols-outlined text-[6rem] md:text-[10rem] mb-4 md:mb-8">touch_app</span>
-              <span className="font-oswald text-2xl md:text-5xl uppercase tracking-widest">Toque para chamar</span>
+              <span className="font-sans text-2xl md:text-5xl uppercase tracking-widest">Toque para chamar</span>
             </div>
           )}
         </div>
@@ -222,7 +222,7 @@ export default function MobileOperador() {
           className={`w-full max-w-4xl mx-auto py-8 md:py-14 rounded-[2.5rem] md:rounded-[4rem] flex md:flex-row flex-col items-center justify-center gap-2 md:gap-6 transition-all active:scale-95 shadow-2xl ${aguardandoCount > 0 ? 'bg-blue-600 text-white shadow-blue-600/20 md:hover:bg-blue-500' : 'bg-slate-800 text-slate-600 grayscale'}`}
         >
           <span className="material-symbols-outlined text-5xl md:text-[5rem]">campaign</span>
-          <span className="font-oswald text-4xl md:text-7xl font-bold uppercase tracking-[0.1em]">Chamar Próximo</span>
+          <span className="font-sans text-4xl md:text-7xl font-bold uppercase tracking-[0.1em]">Chamar Próximo</span>
         </button>
 
         <div className="flex gap-4 md:gap-8 max-w-4xl mx-auto w-full">
@@ -232,7 +232,7 @@ export default function MobileOperador() {
             className="flex-1 bg-slate-800 hover:bg-slate-700 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all border border-slate-700 disabled:opacity-20"
           >
             <span className="material-symbols-outlined text-2xl md:text-5xl">refresh</span>
-            <span className="font-oswald text-xl md:text-4xl font-bold uppercase tracking-wider">Repetir</span>
+            <span className="font-sans text-xl md:text-4xl font-bold uppercase tracking-wider">Repetir</span>
           </button>
           
           <button 
@@ -241,7 +241,7 @@ export default function MobileOperador() {
             className="flex-1 bg-amber-600/20 hover:bg-amber-600/40 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all border-2 border-amber-500/50 text-amber-500 disabled:opacity-20"
           >
             <span className="material-symbols-outlined text-2xl md:text-5xl">undo</span>
-            <span className="font-oswald text-xl md:text-4xl font-bold uppercase tracking-wider">Devolver</span>
+            <span className="font-sans text-xl md:text-4xl font-bold uppercase tracking-wider">Devolver</span>
           </button>
 
           <button 

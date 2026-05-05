@@ -82,11 +82,11 @@ export default function GerenciarMidias() {
 
   return (
     <AdminLayout>
-      <div className="max-w-7xl mx-auto space-y-8 font-rajdhani">
+      <div className="max-w-7xl mx-auto space-y-8 font-sans">
         {/* Action Bar */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
           <div>
-            <h1 className="font-oswald text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Mídias do Telão</h1>
+            <h1 className="font-sans text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Mídias do Telão</h1>
             <p className="text-ink-secondary mt-2 text-lg font-semibold">Configure os vídeos e imagens que serão exibidos no Telão em carrossel.</p>
             <div className="flex space-x-3 mt-4">
               <span className="bg-primary/10 px-4 py-1 rounded-full text-xs font-bold tracking-widest text-primary flex items-center space-x-2 border border-primary/20 uppercase">
@@ -153,7 +153,7 @@ export default function GerenciarMidias() {
 
               <div className="flex justify-between items-start">
                 <div className="overflow-hidden">
-                  <h3 className="font-bold text-lg text-ink truncate pr-2 uppercase font-oswald tracking-wide" title={midia.nome}>
+                  <h3 className="font-bold text-lg text-ink truncate pr-2 uppercase font-sans tracking-wide" title={midia.nome}>
                     {midia.nome}
                   </h3>
                   <p className="text-[10px] font-bold tracking-widest text-ink-secondary mt-1 uppercase">
@@ -181,7 +181,7 @@ export default function GerenciarMidias() {
                   {uploading ? 'sync' : 'upload_file'}
                 </span>
               </div>
-              <p className="font-bold text-lg text-ink uppercase tracking-wider font-oswald">
+              <p className="font-bold text-lg text-ink uppercase tracking-wider font-sans">
                 {uploading ? 'Enviando...' : 'Nova Mídia'}
               </p>
               <p className="text-[10px] font-bold tracking-widest text-ink-secondary mt-1 uppercase text-center px-4">
@@ -194,7 +194,7 @@ export default function GerenciarMidias() {
         {midias.length === 0 && !uploading && (
           <div className="text-center py-20 bg-surface rounded-3xl border border-dashed border-outline-variant">
             <span className="material-symbols-outlined text-6xl text-outline-variant mb-4">cloud_off</span>
-            <p className="text-xl font-bold text-ink-secondary uppercase tracking-widest font-oswald">Nenhuma mídia cadastrada</p>
+            <p className="text-xl font-bold text-ink-secondary uppercase tracking-widest font-sans">Nenhuma mídia cadastrada</p>
             <p className="text-ink-secondary/60 mt-2">As mídias aparecerão no carrossel do Telão quando a fila estiver vazia.</p>
           </div>
         )}

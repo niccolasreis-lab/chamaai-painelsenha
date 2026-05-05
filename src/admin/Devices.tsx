@@ -26,10 +26,10 @@ export default function Devices() {
 
   return (
     <AdminLayout>
-      <div className="max-w-7xl mx-auto space-y-8 font-rajdhani">
+      <div className="max-w-7xl mx-auto space-y-8 font-sans">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
           <div>
-            <h1 className="font-oswald text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Dispositivos</h1>
+            <h1 className="font-sans text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Dispositivos</h1>
             <p className="text-ink-secondary mt-2 text-lg font-semibold">Monitore e gerencie os terminais conectados ao sistema local.</p>
           </div>
           <button 
@@ -62,7 +62,7 @@ export default function Devices() {
                 </div>
               </div>
 
-              <h3 className="font-oswald text-xl font-bold text-ink uppercase tracking-wide">{device.name}</h3>
+              <h3 className="font-sans text-xl font-bold text-ink uppercase tracking-wide">{device.name}</h3>
               <p className="text-ink-secondary font-bold text-sm uppercase tracking-widest mb-4">{device.type}</p>
 
               <div className="space-y-2 border-t border-outline-variant/30 pt-4">
