@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import { HashRouter, Routes, Route, Link, useNavigate, Navigate, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import Emissao from './totem/Emissao';
 import Confirmacao from './totem/Confirmacao';
 import Controle from './operador/Controle';
@@ -38,17 +37,6 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
 }
 
 function Home() {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // Se for mobile/tablet (tamanho de tela ou user agent), redireciona para o painel mobile
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const isSmallScreen = window.innerWidth < 1024;
-    
-    if (isMobile || isSmallScreen) {
-      navigate('/mobile');
-    }
-  }, [navigate]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-background text-ink font-rajdhani">

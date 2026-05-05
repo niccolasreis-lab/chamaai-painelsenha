@@ -35,3 +35,39 @@
   50% { transform: scale(1.05); }
   100% { transform: scale(1); }
 }
+
+@keyframes totemGlow {
+  0% { 
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.3);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 60px rgba(59, 130, 246, 0.6), 0 0 100px rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.9);
+    transform: scale(1.02);
+  }
+  100% { 
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.3);
+    transform: scale(1);
+  }
+}
+
+@keyframes totemGlowWarning {
+  0% { 
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.3);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 60px rgba(245, 158, 11, 0.6), 0 0 100px rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.9);
+    transform: scale(1.02);
+  }
+  100% { 
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.3);
+    transform: scale(1);
+  }
+}

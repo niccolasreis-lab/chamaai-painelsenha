@@ -86,6 +86,20 @@ export default function MobileOperador() {
     } catch (err) {}
   };
 
+  const estornar = async () => {
+    if (!senhaAtual) return;
+    try {
+      await fetch(`${API_URL}/api/senhas/estornar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha_id: senhaAtual.id })
+      });
+      setSenhaAtual(null);
+      fetchFila();
+      if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+    } catch (err) {}
+  };
+
   if (error || showConfig) {
     return (
       <div className="min-h-screen bg-slate-900 text-white p-8 flex flex-col items-center justify-center font-rajdhani">
@@ -222,8 +236,17 @@ export default function MobileOperador() {
           </button>
           
           <button 
+            onClick={estornar}
+            disabled={!senhaAtual}
+            className="flex-1 bg-amber-600/20 hover:bg-amber-600/40 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all border-2 border-amber-500/50 text-amber-500 disabled:opacity-20"
+          >
+            <span className="material-symbols-outlined text-2xl md:text-5xl">undo</span>
+            <span className="font-oswald text-xl md:text-4xl font-bold uppercase tracking-wider">Devolver</span>
+          </button>
+
+          <button 
             onClick={() => window.location.reload()}
-            className="w-20 md:w-40 bg-slate-800 hover:bg-slate-700 rounded-3xl md:rounded-[3rem] flex items-center justify-center active:scale-95 transition-all border border-slate-700"
+            className="w-20 md:w-28 bg-slate-800 hover:bg-slate-700 rounded-3xl md:rounded-[3rem] flex items-center justify-center active:scale-95 transition-all border border-slate-700"
           >
             <span className="material-symbols-outlined md:text-[3rem]">sync</span>
           </button>

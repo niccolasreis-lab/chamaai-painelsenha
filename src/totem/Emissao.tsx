@@ -202,7 +202,7 @@ export default function Emissao() {
               {config.fila_normal_ativa !== '0' && (
                 <button 
                   onClick={() => emitirSenha(false)}
-                  className="w-full bg-surface border-[6px] border-primary/40 rounded-[40px] py-12 flex flex-col items-center justify-center gap-4 shadow-[0_0_40px_rgba(37,99,235,0.3)] hover:border-primary hover:bg-primary/5 active:scale-95 transition-all duration-300 outline-none group animate-[pulse_3s_ease-in-out_infinite]"
+                  className="w-full bg-surface border-[6px] border-primary/40 rounded-[40px] py-12 flex flex-col items-center justify-center gap-4 hover:border-primary hover:bg-primary/5 active:scale-95 transition-all duration-300 outline-none group" style={{animation: 'totemGlow 1.5s ease-in-out infinite'}}
                 >
                   <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-primary/40">
                     <span className="material-symbols-outlined text-[5rem] text-white">
@@ -220,7 +220,7 @@ export default function Emissao() {
               {config.fila_preferencial_ativa !== '0' && (
                 <button 
                   onClick={() => emitirSenha(true)}
-                  className="w-full bg-surface border-[6px] border-warning/40 rounded-[40px] py-12 flex flex-col items-center justify-center gap-4 shadow-[0_0_40px_rgba(245,158,11,0.3)] hover:border-warning hover:bg-warning/5 active:scale-95 transition-all duration-300 outline-none group animate-[pulse_3s_ease-in-out_infinite]"
+                  className="w-full bg-surface border-[6px] border-warning/40 rounded-[40px] py-12 flex flex-col items-center justify-center gap-4 hover:border-warning hover:bg-warning/5 active:scale-95 transition-all duration-300 outline-none group" style={{animation: 'totemGlowWarning 1.5s ease-in-out infinite'}}
                 >
                   <div className="w-24 h-24 rounded-full bg-warning flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-warning/40">
                     <span className="material-symbols-outlined text-[5rem] text-white">

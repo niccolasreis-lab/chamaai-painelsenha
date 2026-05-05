@@ -244,11 +244,11 @@ export default function MediaIndoor() {
                 historico.slice(0, 5).map((senha, idx) => (
                   <div key={senha.id} className={`flex items-center justify-between p-6 bg-white rounded-[32px] border shadow-sm transition-all ${idx === 0 ? 'border-primary ring-4 ring-primary/10 bg-primary/5 scale-105 mb-10' : 'border-outline-variant opacity-70'}`}>
                     <div className="flex flex-col">
-                      <span className="font-oswald text-[1.2rem] font-bold text-primary uppercase tracking-[0.2em] leading-none mb-2">
-                        {config.rotulo_local ? `${config.rotulo_local} ` : 'LOCAL '}
+                      <span className="font-oswald text-[1.5rem] font-bold text-primary uppercase tracking-[0.2em] leading-none mb-2">
+                        {config.rotulo_local ? `${config.rotulo_local} ` : 'BALCÃO '}
                         {senha.guiche.replace(/guichê[:\s]*/gi, '').trim()}
                       </span>
-                      <span className="font-barlow text-[5rem] font-black text-ink leading-none tracking-tighter">
+                      <span className="font-oswald text-[7rem] font-black text-ink leading-none tracking-tighter">
                          {String(senha.numero).padStart(3, '0')}
                       </span>
                     </div>

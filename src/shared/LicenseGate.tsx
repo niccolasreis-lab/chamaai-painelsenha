@@ -6,13 +6,19 @@ interface LicenseGateProps {
 }
 
 export default function LicenseGate({ children }: LicenseGateProps) {
-  const [isLocked, setIsLocked] = useState(true);
-  const [isValidating, setIsValidating] = useState(true);
+  // Se NÃO está rodando no Electron (browser puro), libera direto sem verificar licença
+  const isElectron = !!(window as any).api;
+
+  const [isLocked, setIsLocked] = useState(isElectron); // browser = false (desbloqueado)
+  const [isValidating, setIsValidating] = useState(isElectron); // browser = false (pronto)
   const [serialCode, setSerialCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // Se for browser, não precisa verificar licença
+    if (!isElectron) return;
+
     async function checkSavedLicense() {
       const savedKey = localStorage.getItem('app_license_key');
       
@@ -21,13 +27,27 @@ export default function LicenseGate({ children }: LicenseGateProps) {
         return;
       }
 
+      // Cache diário: se já validou hoje, liberar sem consultar o Supabase
+      const today = new Date().toISOString().split('T')[0]; // "2026-05-05"
+      const lastCheck = localStorage.getItem('license_last_check');
+
+      if (lastCheck === today) {
+        // Já validou hoje, liberar direto
+        setIsLocked(false);
+        setIsValidating(false);
+        return;
+      }
+
+      // Validar no Supabase (1x por dia)
       const result = await validateLicense(savedKey);
       
       if (result.isValid) {
         setIsLocked(false);
+        localStorage.setItem('license_last_check', today);
       } else {
         setError(result.message || 'Licença inválida.');
         localStorage.removeItem('app_license_key');
+        localStorage.removeItem('license_last_check');
       }
       setIsValidating(false);
     }
@@ -46,6 +66,7 @@ export default function LicenseGate({ children }: LicenseGateProps) {
 
     if (result.isValid) {
       localStorage.setItem('app_license_key', serialCode.trim());
+      localStorage.setItem('license_last_check', new Date().toISOString().split('T')[0]);
       setIsLocked(false);
     } else {
       setError(result.message || 'Falha na ativação da licença.');
