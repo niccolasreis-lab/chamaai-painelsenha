@@ -160,20 +160,23 @@ export default function MediaIndoor() {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-12">
-          <div className="flex items-center gap-6 bg-blue-500/10 px-8 py-4 rounded-[2rem] border border-blue-500/20 shadow-lg shadow-blue-500/5">
-            <span className="material-symbols-outlined text-blue-500 text-[3rem]">groups</span>
-            <div className="flex flex-col leading-none">
-              <span className="text-sm font-bold text-ink-secondary uppercase tracking-widest mb-1">Aguardando</span>
-              <span className="text-5xl font-black text-blue-600">{pessoasAguardando}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 text-ink-secondary">
+        <div className="flex items-center gap-8">
+          {/* Online Badge */}
+          <div className="flex items-center gap-3 text-ink-secondary pr-6 border-r border-outline-variant/30">
              <span className="material-symbols-outlined text-3xl">cloud_done</span>
-             <div className="bg-success/10 text-success px-4 py-1 rounded-full text-xs font-bold uppercase border border-success/20 flex items-center gap-2">
+             <div className="bg-success/10 text-success px-4 py-1.5 rounded-full text-xs font-bold uppercase border border-success/20 flex items-center gap-2">
                <span className="w-2 h-2 bg-success rounded-full animate-pulse"></span>
                ONLINE
              </div>
+          </div>
+
+          {/* Aguardando Badge */}
+          <div className="flex items-center gap-6 bg-blue-500/5 px-8 py-3 rounded-3xl">
+            <span className="material-symbols-outlined text-blue-500 text-[3.5rem]">groups</span>
+            <div className="flex flex-col items-center">
+              <span className="text-sm font-bold text-ink-secondary uppercase tracking-[0.2em] mb-1">Aguardando</span>
+              <span className="font-oswald text-[4.5rem] font-bold text-blue-600 leading-none">{pessoasAguardando}</span>
+            </div>
           </div>
         </div>
       </header>
@@ -239,21 +242,27 @@ export default function MediaIndoor() {
               <h2 className="font-oswald text-2xl font-bold text-ink uppercase tracking-widest">Histórico</h2>
             </div>
             
-            <div className="space-y-6">
+            <div className="space-y-5">
               {historico.length > 0 ? (
                 historico.slice(0, 5).map((senha, idx) => (
-                  <div key={senha.id} className={`flex items-center justify-between p-6 bg-white rounded-[32px] border shadow-sm transition-all ${idx === 0 ? 'border-primary ring-4 ring-primary/10 bg-primary/5 scale-105 mb-10' : 'border-outline-variant opacity-70'}`}>
-                    <div className="flex flex-col">
-                      <span className="font-oswald text-[1.5rem] font-bold text-primary uppercase tracking-[0.2em] leading-none mb-2">
-                        {config.rotulo_local ? `${config.rotulo_local} ` : 'BALCÃO '}
-                        {senha.guiche.replace(/guichê[:\s]*/gi, '').trim()}
+                  <div key={senha.id} className={`flex items-center gap-6 px-8 py-5 bg-white rounded-[2rem] border shadow-sm transition-all ${idx === 0 ? 'border-primary ring-4 ring-primary/10 bg-primary/5 scale-[1.03] mb-6' : 'border-outline-variant/50 opacity-60'}`}>
+                    {/* Número da senha */}
+                    <span className={`font-oswald text-[5rem] font-bold leading-none tracking-tight ${idx === 0 ? 'text-primary' : 'text-ink'}`}>
+                      {String(senha.numero).padStart(3, '0')}
+                    </span>
+                    
+                    {/* Separador */}
+                    <div className="w-[4px] h-16 bg-primary/20 rounded-full shrink-0"></div>
+
+                    {/* Nome do setor */}
+                    <div className="flex flex-col leading-tight">
+                      <span className="font-oswald text-[1.3rem] font-bold text-ink-secondary uppercase tracking-widest">
+                        {config.rotulo_local || 'Balcão'}
                       </span>
-                      <span className="font-oswald text-[7rem] font-black text-ink leading-none tracking-tighter">
-                         {String(senha.numero).padStart(3, '0')}
+                      <span className="font-oswald text-[2.5rem] font-bold text-ink uppercase leading-none">
+                        {senha.guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
                       </span>
                     </div>
-                    
-                    <div className="w-2 h-20 bg-primary/20 rounded-full"></div>
                   </div>
                 ))
               ) : (

@@ -35,7 +35,7 @@ public class MainActivity extends BridgeActivity {
             WebView webView = this.getBridge().getWebView();
             WebSettings settings = webView.getSettings();
             
-            // Força comportamento de navegador mobile (importante para os botões aparecerem)
+            // Força comportamento de navegador mobile (Browser Mode)
             settings.setUseWideViewPort(true);
             settings.setLoadWithOverviewMode(true);
             settings.setDomStorageEnabled(true);
@@ -47,37 +47,31 @@ public class MainActivity extends BridgeActivity {
             webView.setHorizontalScrollBarEnabled(false);
             webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
             
-            // Trava o movimento de "arrastar" (scroll), mas mantém o clique funcional
-            webView.setOnTouchListener(new View.OnTouchListener() {
-                @Override
-                public boolean onTouch(View v, MotionEvent event) {
-                    if (event.getAction() == MotionEvent.ACTION_MOVE) {
-                        return true; // Bloqueia o scroll
-                    }
-                    if (event.getAction() == MotionEvent.ACTION_UP) {
-                        v.performClick(); // Garante que o clique seja registrado
-                    }
-                    return false;
+            // Trava o movimento de "arrastar" (scroll), mas permite o clique (tap) funcional
+            webView.setOnTouchListener((v, event) -> {
+                if (event.getAction() == MotionEvent.ACTION_MOVE) {
+                    return true; // Bloqueia o scroll
                 }
+                return false;
             });
 
-            // Ajuste de CSS via JS para forçar o layout a caber na tela fixa
+            // Injeta CSS para garantir que o layout se force a caber na tela fixa
             webView.postDelayed(() -> {
                 webView.evaluateJavascript(
                     "(function() {" +
                     "  var style = document.createElement('style');" +
                     "  style.innerHTML = 'html, body { overflow: hidden !important; height: 100vh !important; position: fixed !important; width: 100vw !important; margin: 0 !important; padding: 0 !important; }';" +
                     "  document.head.appendChild(style);" +
-                    "  window.dispatchEvent(new Event(\"resize\"));" + // Força o app a se reajustar
+                    "  window.dispatchEvent(new Event(\"resize\"));" +
                     "})();", 
                     null
                 );
-            }, 1500);
+            }, 1000);
 
             webView.setBackgroundColor(Color.TRANSPARENT);
         });
 
-        // 3. Esconde as barras de sistema para ganhar espaço máximo
+        // 3. Ativa o Modo Imersivo (Esconde as barras de sistema)
         WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(window, window.getDecorView());
         controller.hide(WindowInsetsCompat.Type.systemBars());
         controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
