@@ -209,7 +209,19 @@ ipcMain.handle('check-for-updates', async () => {
 ipcMain.handle('install-update', async () => {
   if (!app.isPackaged) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
   try {
-    autoUpdater.quitAndInstall(false, true);
+    // Força o encerramento imediato de todas as janelas para liberar as travas de arquivo no Windows
+    app.removeAllListeners('window-all-closed');
+    BrowserWindow.getAllWindows().forEach(win => {
+      win.removeAllListeners('close');
+      win.destroy();
+    });
+
+    // isSilent = true (instala por baixo dos panos sem o assistente visual)
+    // isForceRunAfter = true (reabre o app logo em seguida)
+    setTimeout(() => {
+      autoUpdater.quitAndInstall(true, true);
+    }, 100);
+    
     return { success: true };
   } catch (err: any) {
     return { success: false, message: `Erro ao instalar atualização: ${err.message}` };
