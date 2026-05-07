@@ -1,7 +1,7 @@
 {
   "name": "chamaai-novo",
   "private": true,
-  "version": "1.0.18",
+  "version": "1.0.19",
   "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev:vite": "vite --host",
@@ -11,8 +11,9 @@
     "dev": "concurrently \"npm run dev:vite\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
     "build:electron": "tsc -p tsconfig.electron.json",
     "build": "tsc -b && vite build && npm run build:electron",
-    "build:dist": "npm run build && electron-builder",
-    "publish:update": "npm run build && electron-builder -p always",
+    "rebuild:native": "npx @electron/rebuild -f -w better-sqlite3",
+    "build:dist": "npm run rebuild:native && npm run build && electron-builder",
+    "publish:update": "npm run rebuild:native && npm run build && electron-builder -p always",
     "lint": "eslint .",
     "preview": "vite preview"
   },
