@@ -209,18 +209,23 @@ ipcMain.handle('check-for-updates', async () => {
 ipcMain.handle('install-update', async () => {
   if (!app.isPackaged) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
   try {
-    // Força o encerramento imediato de todas as janelas para liberar as travas de arquivo no Windows
+    // 1. Mata todos os processos do ChamaAí que possam estar travando arquivos
+    const { execSync } = require('child_process');
+    try { execSync('taskkill /f /im "ChamaAí.exe" /t', { windowsHide: true }); } catch {}
+
+    // 2. Força o encerramento imediato de todas as janelas Electron
     app.removeAllListeners('window-all-closed');
     BrowserWindow.getAllWindows().forEach(win => {
       win.removeAllListeners('close');
       win.destroy();
     });
 
-    // isSilent = true (instala por baixo dos panos sem o assistente visual)
-    // isForceRunAfter = true (reabre o app logo em seguida)
+    // 3. Aguarda o Windows liberar as travas de arquivo e então instala
     setTimeout(() => {
+      // isSilent = true (sem assistente visual)
+      // isForceRunAfter = true (reabre o app após instalar)
       autoUpdater.quitAndInstall(true, true);
-    }, 100);
+    }, 500);
     
     return { success: true };
   } catch (err: any) {

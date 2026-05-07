@@ -1,7 +1,7 @@
 {
   "name": "chamaai-novo",
   "private": true,
-  "version": "1.0.19",
+  "version": "1.0.20",
   "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev:vite": "vite --host",
@@ -35,8 +35,10 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "runAfterFinish": true
+      "runAfterFinish": true,
+      "include": "build/installer.nsh"
     },
+    "npmRebuild": false,
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**/*"
     ],
