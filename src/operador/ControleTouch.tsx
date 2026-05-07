@@ -6,7 +6,17 @@ export default function ControleTouch() {
   const [fila, setFila] = useState<any[]>([]);
   const [senhaAtual, setSenhaAtual] = useState<any>(null);
   const [guiche, setGuiche] = useState('Guichê 1');
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const API_URL = getApiUrl();
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
 
   const refreshData = async () => {
     try {
@@ -92,11 +102,21 @@ export default function ControleTouch() {
     } catch (err) {}
   };
 
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    }
+  };
+
   const normalCount = fila.filter(s => s.preferencial === 0).length;
   const prefCount = fila.filter(s => s.preferencial === 1).length;
 
   return (
-    <div className="h-screen w-screen bg-slate-50 flex text-slate-900 p-6 gap-6 font-sans select-none overflow-hidden">
+    <div className="fixed inset-0 w-full h-[100dvh] bg-slate-50 flex text-slate-900 p-6 gap-6 font-sans select-none overflow-hidden touch-none overscroll-none">
        {/* Left side: Current Ticket & Stats */}
        <div className="flex-1 flex flex-col gap-6">
           {/* Header */}
@@ -108,9 +128,20 @@ export default function ControleTouch() {
                    <p className="text-slate-500 font-bold tracking-widest text-sm mt-1 uppercase">Painel Touch Horizontal</p>
                 </div>
              </div>
-             <button onClick={() => window.location.href = '#/'} className="w-14 h-14 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full flex items-center justify-center transition-colors">
-                <span className="material-symbols-outlined">close</span>
-             </button>
+             <div className="flex items-center gap-2">
+                 {deferredPrompt && (
+                   <button 
+                     onClick={handleInstallClick}
+                     className="w-14 h-14 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center hover:bg-blue-200 transition-colors"
+                     title="Instalar App"
+                   >
+                     <span className="material-symbols-outlined">download</span>
+                   </button>
+                 )}
+                 <button onClick={() => window.location.href = '#/'} className="w-14 h-14 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full flex items-center justify-center transition-colors">
+                    <span className="material-symbols-outlined">close</span>
+                 </button>
+              </div>
           </div>
 
           {/* Current Ticket */}

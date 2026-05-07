@@ -9,7 +9,17 @@ export default function MobileOperador() {
   const [showConfig, setShowConfig] = useState(false);
   const [tempIp, setTempIp] = useState(localStorage.getItem('server_ip_override') || '');
   const [error, setError] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const API_URL = getApiUrl();
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
 
   const fetchFila = async () => {
     try {
@@ -100,6 +110,16 @@ export default function MobileOperador() {
     } catch (err) {}
   };
 
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    }
+  };
+
   if (error || showConfig) {
     return (
       <div className="min-h-screen bg-slate-900 text-white p-8 flex flex-col items-center justify-center font-sans">
@@ -171,12 +191,23 @@ export default function MobileOperador() {
             </div>
           </div>
         </div>
-        <button 
-          onClick={() => setShowConfig(true)}
-          className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center text-slate-400 active:bg-slate-700"
-        >
-          <span className="material-symbols-outlined">settings</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {deferredPrompt && (
+            <button 
+              onClick={handleInstallClick}
+              className="w-12 h-12 bg-blue-600/20 text-blue-500 rounded-2xl flex items-center justify-center active:bg-blue-600/30"
+              title="Instalar App"
+            >
+              <span className="material-symbols-outlined">download</span>
+            </button>
+          )}
+          <button 
+            onClick={() => setShowConfig(true)}
+            className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center text-slate-400 active:bg-slate-700"
+          >
+            <span className="material-symbols-outlined">settings</span>
+          </button>
+        </div>
       </header>
 
       {/* Stats Cards */}
