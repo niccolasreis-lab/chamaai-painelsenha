@@ -99,10 +99,7 @@ export function startServer() {
           fs.copyFileSync(dbPath, path.join(tempDir, 'database.sqlite'));
         }
         
-        // Copia a pasta de Uploads (Mídias, Logos, etc)
-        if (fs.existsSync(UPLOADS_DIR)) {
-          fs.cpSync(UPLOADS_DIR, path.join(tempDir, 'uploads'), { recursive: true });
-        }
+        // Mídias ignoradas no backup diário para não pesar a rede
         
         // Compacta em ZIP usando PowerShell nativo do Windows
         try {
