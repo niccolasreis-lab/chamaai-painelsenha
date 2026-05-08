@@ -3,15 +3,19 @@ export const getApiUrl = () => {
   const savedIp = localStorage.getItem('server_ip_override');
   if (savedIp) return `http://${savedIp}:3000`;
 
-  // Em modo web, se estivermos no mesmo host, usamos caminhos relativos
-  // Isso resolve problemas de HTTPS/Mixed Content e simplifica o proxy
   if (typeof window !== 'undefined') {
-    // Se acessarmos via IP (ex: no celular), o hostname já é o servidor
+    const protocol = window.location.protocol;
+    // Se estiver rodando dentro do Electron (protocolo file:), o servidor local é o localhost
+    if (protocol === 'file:') {
+      return `http://localhost:3000`;
+    }
+
     const hostname = window.location.hostname;
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1' && !savedIp) {
+    // Se acessarmos via IP (ex: no celular), o hostname já é o servidor
+    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
       return `http://${hostname}:3000`;
     }
-    return ''; // Fallback para relativo
+    return ''; // Fallback para relativo na web
   }
 
   return `http://localhost:3000`;

@@ -752,15 +752,7 @@ export function startServer() {
     }
   });
 
-  // Fallback para SPA (Single Page Application) - serve o index.html para qualquer rota não encontrada
-  app.get('*', (req, res) => {
-    const indexPath = path.join(__dirname, '../../dist/index.html');
-    if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath);
-    } else {
-      res.status(404).send('Frontend não encontrado. Certifique-se de rodar o build.');
-    }
-  });
+
 
   const server = app.listen(PORT, () => {
     console.log('========================================');
