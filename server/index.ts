@@ -633,13 +633,18 @@ export function startServer() {
       const transaction = db.transaction((data: any) => {
         for (const table of tables) {
           if (data[table]) {
+            // Sempre limpa a tabela antes de restaurar
             db.prepare(`DELETE FROM ${table}`).run();
-            const columns = Object.keys(data[table][0]);
-            const placeholders = columns.map(() => '?').join(',');
-            const stmt = db.prepare(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${placeholders})`);
             
-            for (const row of data[table]) {
-              stmt.run(Object.values(row));
+            // Só tenta inserir se houver dados
+            if (data[table].length > 0) {
+              const columns = Object.keys(data[table][0]);
+              const placeholders = columns.map(() => '?').join(',');
+              const stmt = db.prepare(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${placeholders})`);
+              
+              for (const row of data[table]) {
+                stmt.run(Object.values(row));
+              }
             }
           }
         }
