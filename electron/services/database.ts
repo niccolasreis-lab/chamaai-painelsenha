@@ -99,7 +99,7 @@ export function initDatabase() {
         ativo      INTEGER NOT NULL DEFAULT 1,
         criado_em  TEXT NOT NULL DEFAULT (datetime('now'))
       );
-      INSERT OR IGNORE INTO operadores (id, nome, login, senha_hash, perfil) VALUES (1, 'Administrador', 'admin', 'admin', 'admin');
+      INSERT OR IGNORE INTO operadores (id, nome, login, senha_hash, perfil, ativo) VALUES (1, 'Administrador', 'admin', 'admin', 'admin', 1);
     `);
 
     // Mídias

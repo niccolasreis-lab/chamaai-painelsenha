@@ -191,7 +191,7 @@ export default function Bridge() {
         {/* Footer Info */}
         <div className="mt-12 text-center opacity-40">
           <p className="text-[9px] font-bold uppercase tracking-[0.3em]">
-            CHAMAAÍ V1.0.28 • MOBILE BRIDGE
+            CHAMAAÍ V1.0.29 • MOBILE BRIDGE
           </p>
         </div>
       </div>
