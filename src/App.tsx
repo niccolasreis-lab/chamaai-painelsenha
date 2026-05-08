@@ -40,7 +40,6 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
 }
 
 function Home() {
-  const { API_URL } = useAPI();
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-background text-ink font-sans">

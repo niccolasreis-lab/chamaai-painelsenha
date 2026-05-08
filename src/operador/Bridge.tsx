@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getApiUrl, setServerIp } from '../shared/apiConfig';
+import { setServerIp } from '../shared/apiConfig';
 
 export default function Bridge() {
   const [ip, setIp] = useState(localStorage.getItem('server_ip_override') || '');
@@ -37,8 +37,6 @@ export default function Bridge() {
     setStatus('testing');
     setErrorMessage('');
     
-    const testUrl = `http://${targetIp}:3000/api/health`; // Assuming there's a health endpoint or just try /api/fila
-    
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -67,10 +65,6 @@ export default function Bridge() {
       return;
     }
     setServerIp(ip);
-  };
-
-  const launchOperator = () => {
-    window.location.hash = '/operador-touch';
   };
 
   return (
