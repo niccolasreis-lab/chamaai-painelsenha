@@ -3,9 +3,13 @@ export const getApiUrl = () => {
   const savedIp = localStorage.getItem('server_ip_override');
   if (savedIp) return `http://${savedIp}:3000`;
 
-  const hostname = window.location.hostname;
-  const host = hostname && hostname !== 'localhost' ? hostname : 'localhost';
-  return `http://${host}:3000`;
+  // Em modo web, se estivermos no mesmo host, usamos caminhos relativos
+  // Isso resolve problemas de HTTPS/Mixed Content e simplifica o proxy
+  if (typeof window !== 'undefined') {
+    return ''; // Retorna vazio para usar caminhos relativos como /api/...
+  }
+
+  return `http://localhost:3000`;
 };
 
 export const setServerIp = (ip: string) => {
