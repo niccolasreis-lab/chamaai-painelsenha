@@ -624,36 +624,54 @@ export function startServer() {
 
   // RESTORE
   app.post('/api/admin/restore', (req, res) => {
+    const db = getDb();
     try {
       const backupData = req.body;
-      const db = getDb();
       
       const tables = ['configuracoes', 'balcoes', 'midias', 'operadores'];
       
+      // Desabilita foreign keys temporariamente para evitar erros de integridade durante a limpeza
+      db.prepare('PRAGMA foreign_keys = OFF').run();
+
       const transaction = db.transaction((data: any) => {
+        // Limpa as tabelas de senhas e chamadas para evitar órfãos
+        console.log('[RESTORE] Limpando tabelas de senhas e histórico...');
+        db.prepare('DELETE FROM chamadas').run();
+        db.prepare('DELETE FROM senhas').run();
+
         for (const table of tables) {
           if (data[table]) {
-            // Sempre limpa a tabela antes de restaurar
+            console.log(`[RESTORE] Restaurando tabela: ${table} (${data[table].length} linhas)`);
             db.prepare(`DELETE FROM ${table}`).run();
             
-            // Só tenta inserir se houver dados
             if (data[table].length > 0) {
               const columns = Object.keys(data[table][0]);
               const placeholders = columns.map(() => '?').join(',');
               const stmt = db.prepare(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${placeholders})`);
               
               for (const row of data[table]) {
-                stmt.run(Object.values(row));
+                // Mapeia os valores na ordem correta das colunas
+                const values = columns.map(col => row[col]);
+                stmt.run(values);
               }
             }
+          } else {
+            console.log(`[RESTORE] Tabela ${table} não encontrada no backup, pulando.`);
           }
         }
       });
       
       transaction(backupData);
+      
+      // Reabilita foreign keys
+      db.prepare('PRAGMA foreign_keys = ON').run();
+      
+      console.log('[RESTORE] Backup restaurado com sucesso.');
       res.json({ success: true });
     } catch (err: any) {
-      console.error('Restore error:', err);
+      console.error('[RESTORE ERROR]:', err);
+      // Garante que reabilita as FKs mesmo em caso de erro
+      try { db.prepare('PRAGMA foreign_keys = ON').run(); } catch(e) {}
       res.status(500).json({ error: err.message });
     }
   });
