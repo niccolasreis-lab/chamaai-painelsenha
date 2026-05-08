@@ -209,27 +209,37 @@ ipcMain.handle('check-for-updates', async () => {
 ipcMain.handle('install-update', async () => {
   if (!app.isPackaged) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
   try {
-    // 1. Mata todos os processos do ChamaAí que possam estar travando arquivos
+    console.log('[UPDATE] Iniciando procedimento de limpeza para instalação...');
+    
+    // 1. Mata processos que possam travar arquivos (usando padrões que evitam erros de caracteres especiais)
     const { execSync } = require('child_process');
-    try { execSync('taskkill /f /im "ChamaAí.exe" /t', { windowsHide: true }); } catch {}
+    const commands = [
+      'taskkill /f /im "ChamaA*.exe" /t', // Pega ChamaAí.exe e variações
+      'taskkill /f /im "chamaai-novo.exe" /t',
+      'wmic process where "CommandLine like \'%chamaai%\'" call terminate'
+    ];
 
-    // 2. Força o encerramento imediato de todas as janelas Electron
+    commands.forEach(cmd => {
+      try { execSync(cmd, { windowsHide: true }); } catch (e) { /* Silencioso se não encontrar */ }
+    });
+
+    // 2. Força o encerramento das janelas
     app.removeAllListeners('window-all-closed');
     BrowserWindow.getAllWindows().forEach(win => {
       win.removeAllListeners('close');
       win.destroy();
     });
 
-    // 3. Aguarda o Windows liberar as travas de arquivo e então instala
+    // 3. Pequeno delay para o SO liberar os descritores de arquivo
     setTimeout(() => {
-      // isSilent = true (sem assistente visual)
-      // isForceRunAfter = true (reabre o app após instalar)
+      console.log('[UPDATE] Chamando quitAndInstall...');
       autoUpdater.quitAndInstall(true, true);
-    }, 500);
+    }, 1500);
     
     return { success: true };
   } catch (err: any) {
-    return { success: false, message: `Erro ao instalar atualização: ${err.message}` };
+    console.error('[UPDATE] Erro crítico no install-update:', err);
+    return { success: false, message: `Erro ao preparar instalação: ${err.message}` };
   }
 });
 
@@ -280,20 +290,18 @@ if (!gotTheLock) {
 
       // Inicializa o verificador de atualizações silencioso
       if (app.isPackaged) {
-        autoUpdater.setFeedURL({
-          provider: 'github',
-          owner: 'niccolasreis-lab',
-          repo: 'chamaai-painelsenha',
-          token: process.env.GH_TOKEN || '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'
+        console.log('[AUTO-UPDATE] Iniciando configuração...');
+        
+        autoUpdater.on('checking-for-update', () => console.log('[AUTO-UPDATE] Verificando se há atualizações...'));
+        autoUpdater.on('update-available', (info) => console.log('[AUTO-UPDATE] Atualização disponível:', info.version));
+        autoUpdater.on('update-not-available', () => console.log('[AUTO-UPDATE] Nenhuma atualização encontrada.'));
+        autoUpdater.on('error', (err) => console.error('[AUTO-UPDATE] Erro no autoUpdater:', err));
+        autoUpdater.on('download-progress', (progress) => console.log(`[AUTO-UPDATE] Download: ${progress.percent}%`));
+        autoUpdater.on('update-downloaded', () => {
+          console.log('[AUTO-UPDATE] Atualização baixada e pronta para instalar.');
         });
 
-        autoUpdater.checkForUpdatesAndNotify().catch(err => {
-          console.error('Erro ao verificar atualizações:', err);
-        });
-        
-        autoUpdater.on('update-downloaded', () => {
-          console.log('Atualização baixada. Instalando no fechamento do app.');
-        });
+        autoUpdater.checkForUpdatesAndNotify();
       }
     } catch (err: any) {
       const { dialog } = require('electron');

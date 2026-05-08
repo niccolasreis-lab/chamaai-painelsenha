@@ -74,33 +74,68 @@ export function startServer() {
       console.error('[CRON] Erro ao resetar senhas:', err);
     }
 
-    // --- BACKUP DIÁRIO DE SEGURANÇA ---
+    // --- BACKUP DIÁRIO DE SEGURANÇA (ZIP + Auto-limpeza 5 dias) ---
     try {
-      const os = require('os');
-      const backupDir = path.join(os.homedir(), 'Documents', 'ChamaAi_Backups');
+      const { execSync } = require('child_process');
+      const backupDir = path.join('\\\\serverad\\Santa Paula\\10 - TI', 'ChamaAi_Backups');
       if (!fs.existsSync(backupDir)) {
         fs.mkdirSync(backupDir, { recursive: true });
       }
       
-      // Cria pasta com a data atual ex: backup_2024-05-20
       const dataStr = new Date().toISOString().split('T')[0];
-      const folderBackup = path.join(backupDir, `backup_${dataStr}`);
+      const zipFile = path.join(backupDir, `backup_${dataStr}.zip`);
       
-      if (!fs.existsSync(folderBackup)) {
-        fs.mkdirSync(folderBackup);
+      // Só faz backup se o ZIP do dia ainda não existir
+      if (!fs.existsSync(zipFile)) {
+        // Cria pasta temporária para montar o conteúdo
+        const tempDir = path.join(backupDir, `_temp_${dataStr}`);
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
         
         // Copia o Banco de Dados
         const dbPath = path.join(userDataPath, 'database.sqlite');
         if (fs.existsSync(dbPath)) {
-          fs.copyFileSync(dbPath, path.join(folderBackup, 'database.sqlite'));
+          fs.copyFileSync(dbPath, path.join(tempDir, 'database.sqlite'));
         }
         
         // Copia a pasta de Uploads (Mídias, Logos, etc)
         if (fs.existsSync(UPLOADS_DIR)) {
-          fs.cpSync(UPLOADS_DIR, path.join(folderBackup, 'uploads'), { recursive: true });
+          fs.cpSync(UPLOADS_DIR, path.join(tempDir, 'uploads'), { recursive: true });
         }
         
-        console.log(`[CRON] 📦 Backup diário salvo com sucesso em: ${folderBackup}`);
+        // Compacta em ZIP usando PowerShell nativo do Windows
+        try {
+          execSync(`powershell -NoProfile -Command "Compress-Archive -Path '${tempDir}\\*' -DestinationPath '${zipFile}' -Force"`, { timeout: 60000 });
+          console.log(`[CRON] 📦 Backup diário compactado com sucesso: ${zipFile}`);
+        } catch (zipErr) {
+          console.error('[CRON] ❌ Erro ao compactar backup:', zipErr);
+        }
+        
+        // Remove a pasta temporária
+        try {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        } catch (cleanErr) {
+          console.error('[CRON] ⚠️ Erro ao limpar pasta temporária:', cleanErr);
+        }
+      }
+      
+      // --- AUTO-LIMPEZA: Remove backups com mais de 5 dias ---
+      const DIAS_RETER = 5;
+      const agora = Date.now();
+      const arquivos = fs.readdirSync(backupDir);
+      
+      for (const arquivo of arquivos) {
+        if (!arquivo.startsWith('backup_') || !arquivo.endsWith('.zip')) continue;
+        
+        const filePath = path.join(backupDir, arquivo);
+        const stats = fs.statSync(filePath);
+        const idadeDias = (agora - stats.mtimeMs) / (1000 * 60 * 60 * 24);
+        
+        if (idadeDias > DIAS_RETER) {
+          fs.unlinkSync(filePath);
+          console.log(`[CRON] 🗑️ Backup antigo removido (${Math.floor(idadeDias)} dias): ${arquivo}`);
+        }
       }
     } catch (err) {
       console.error('[CRON] ❌ Erro ao realizar backup diário:', err);
@@ -109,6 +144,22 @@ export function startServer() {
 
   });
   // -----------------
+
+  app.get('/api/network-info', (req, res) => {
+    const { networkInterfaces } = require('os');
+    const nets = networkInterfaces();
+    const results: string[] = [];
+
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
+        if (net.family === 'IPv4' && !net.internal) {
+          results.push(net.address);
+        }
+      }
+    }
+    res.json({ ips: results });
+  });
 
   app.get('/events', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');

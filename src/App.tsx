@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import Emissao from './totem/Emissao';
 import Confirmacao from './totem/Confirmacao';
@@ -13,8 +14,10 @@ import Queue from './admin/Queue';
 import Operators from './admin/Operators';
 import Relatorios from './admin/Relatorios';
 import MobileOperador from './operador/MobileOperador';
+import Bridge from './operador/Bridge';
 import Login from './Login';
 import LicenseGate from './shared/LicenseGate';
+import { useAPI } from './shared/apiConfig';
 
 function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) {
   const session = localStorage.getItem('user_session');
@@ -37,6 +40,7 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
 }
 
 function Home() {
+  const { API_URL } = useAPI();
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-background text-ink font-sans">
@@ -77,9 +81,9 @@ function Home() {
             <span className="material-symbols-outlined text-primary">tablet_landscape</span>
             <span className="font-sans text-sm font-bold text-ink uppercase tracking-wider">Painel Touch (TV)</span>
           </Link>
-          <Link to="/mobile" className="group p-4 bg-blue-600 rounded-[24px] shadow-lg shadow-blue-900/20 hover:bg-blue-500 transition-all flex items-center justify-center gap-3 text-white">
+          <Link to="/bridge" className="group p-4 bg-blue-600 rounded-[24px] shadow-lg shadow-blue-900/20 hover:bg-blue-500 transition-all flex items-center justify-center gap-3 text-white">
             <span className="material-symbols-outlined">smartphone</span>
-            <span className="font-sans text-sm font-bold uppercase tracking-wider">Acesso Mobile (APK)</span>
+            <span className="font-sans text-sm font-bold uppercase tracking-wider">Conectar Celular (PWA)</span>
           </Link>
         </div>
         
@@ -155,6 +159,7 @@ export default function App() {
           <Route path="/operador" element={<ProtectedRoute><Controle /></ProtectedRoute>} />
           <Route path="/operador-touch" element={<ProtectedRoute><ControleTouch /></ProtectedRoute>} />
           <Route path="/mobile" element={<ProtectedRoute><MobileOperador /></ProtectedRoute>} />
+          <Route path="/bridge" element={<Bridge />} />
           
           <Route path="/admin" element={<ProtectedRoute requireAdmin><Dashboard /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><Configuracoes /></ProtectedRoute>} />

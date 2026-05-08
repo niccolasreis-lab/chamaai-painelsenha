@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icon.png', 'icon.ico'],
+      includeAssets: ['favicon.svg', 'icon.png', 'icon.ico', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'ChamaAí - Operador',
         short_name: 'ChamaAí',
@@ -16,8 +16,18 @@ export default defineConfig({
         theme_color: '#2563eb',
         background_color: '#020617',
         display: 'standalone',
-        start_url: '/#/operador',
+        start_url: '/#/bridge',
         icons: [
+          {
+            src: 'icon-192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: 'icon-512.png',
+            sizes: '512x512',
+            type: 'image/png'
+          },
           {
             src: 'icon.png',
             sizes: '512x512',
