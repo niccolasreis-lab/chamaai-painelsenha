@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import Emissao from './totem/Emissao';
 import Confirmacao from './totem/Confirmacao';
@@ -17,7 +16,6 @@ import MobileOperador from './operador/MobileOperador';
 import Bridge from './operador/Bridge';
 import Login from './Login';
 import LicenseGate from './shared/LicenseGate';
-import { useAPI } from './shared/apiConfig';
 
 function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) {
   const session = localStorage.getItem('user_session');
