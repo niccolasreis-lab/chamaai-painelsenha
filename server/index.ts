@@ -16,15 +16,8 @@ let sseClients: express.Response[] = [];
 export function startServer() {
   const PORT = 3000;
   
-  // Resolve o caminho de uploads para a pasta de dados do usuário do Electron (persistente)
-  let userDataPath: string;
-  try {
-    const { app: electronApp } = require('electron');
-    userDataPath = electronApp.getPath('userData');
-  } catch (e) {
-    userDataPath = process.cwd(); // Fallback para ambiente puramente Node
-  }
-  
+  // Resolve o caminho para uma pasta local visível e fácil de gerenciar
+  const userDataPath = 'C:\\ChamaAi';
   const UPLOADS_DIR = path.join(userDataPath, 'uploads');
 
   // Ensure uploads directory exists
@@ -47,6 +40,13 @@ export function startServer() {
 
   // Serve static files from uploads folder
   app.use('/uploads', express.static(UPLOADS_DIR));
+
+  // Serve frontend static files from dist folder
+  const DIST_DIR = path.join(__dirname, '../../dist');
+  if (fs.existsSync(DIST_DIR)) {
+    console.log('[SERVER] Serving frontend from:', DIST_DIR);
+    app.use(express.static(DIST_DIR));
+  }
 
   // --- CRON JOBS ---
   // Roda todos os dias à meia-noite
@@ -749,6 +749,16 @@ export function startServer() {
       res.json({ success: true, message: 'Sistema resetado com sucesso!' });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Fallback para SPA (Single Page Application) - serve o index.html para qualquer rota não encontrada
+  app.get('*', (req, res) => {
+    const indexPath = path.join(__dirname, '../../dist/index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send('Frontend não encontrado. Certifique-se de rodar o build.');
     }
   });
 

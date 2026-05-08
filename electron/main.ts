@@ -46,8 +46,7 @@ function loadPrinterConfig(): Partial<PrinterConfig> {
     }
     // Resolve logo path
     if (cfg.logoPath && !cfg.logoPath.startsWith('/') && !cfg.logoPath.startsWith('C:')) {
-      let userDataPath;
-      try { userDataPath = app.getPath('userData'); } catch { userDataPath = '.'; }
+      const userDataPath = 'C:\\ChamaAi';
       cfg.logoPath = path.join(userDataPath, cfg.logoPath);
     }
     return {

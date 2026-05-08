@@ -1,8 +1,8 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-// Localiza o banco de dados na pasta AppData
-const dbPath = path.join(process.env.APPDATA, 'chamaai-novo', 'database.sqlite');
+// Localiza o banco de dados na nova pasta fixa
+const dbPath = 'C:\\ChamaAi\\database.sqlite';
 
 console.log('--- RESET DE SENHA ADMINISTRADOR ---');
 console.log('Buscando banco em:', dbPath);

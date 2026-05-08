@@ -6,7 +6,12 @@ export const getApiUrl = () => {
   // Em modo web, se estivermos no mesmo host, usamos caminhos relativos
   // Isso resolve problemas de HTTPS/Mixed Content e simplifica o proxy
   if (typeof window !== 'undefined') {
-    return ''; // Retorna vazio para usar caminhos relativos como /api/...
+    // Se acessarmos via IP (ex: no celular), o hostname já é o servidor
+    const hostname = window.location.hostname;
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1' && !savedIp) {
+      return `http://${hostname}:3000`;
+    }
+    return ''; // Fallback para relativo
   }
 
   return `http://localhost:3000`;

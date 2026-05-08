@@ -7,14 +7,12 @@ let db: Database.Database;
 
 export function initDatabase() {
   try {
-    let userDataPath;
-    try {
-      userDataPath = app.getPath('userData');
-    } catch (e) {
-      // Fallback for running outside electron
-      userDataPath = path.resolve('.');
+    const userDataPath = 'C:\\ChamaAi';
+  
+    if (!fs.existsSync(userDataPath)) {
+      fs.mkdirSync(userDataPath, { recursive: true });
     }
-    
+  
     const dbPath = path.join(userDataPath, 'database.sqlite');
     db = new Database(dbPath);
     
