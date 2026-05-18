@@ -31,6 +31,28 @@ export default function ToledoConfig() {
   const [novaCategoria, setNovaCategoria] = useState('Laticínios');
   const API_URL = getApiUrl();
   const [categoriasOrdem, setCategoriasOrdem] = useState<string[]>([]);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    const arr = [...categoriasOrdem];
+    const draggedItem = arr[draggedIndex];
+    arr.splice(draggedIndex, 1);
+    arr.splice(index, 0, draggedItem);
+    setDraggedIndex(index);
+    setCategoriasOrdem(arr);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
 
   const CATEGORIAS_PADRAO = [
     { id: 'Laticínios', icon: '🧀' },
@@ -658,7 +680,7 @@ export default function ToledoConfig() {
               <div className="space-y-6">
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
                   <p className="font-bold text-amber-800 text-sm">Ordem de exibição no Portal do Cliente</p>
-                  <p className="text-xs text-amber-700 mt-1">Defina a ordem em que as categorias aparecem quando o cliente escaneia o QR Code. Use as setas para reordenar.</p>
+                  <p className="text-xs text-amber-700 mt-1">Defina a ordem em que as categorias aparecem no celular do cliente. Clique e **arraste as categorias para cima ou para baixo** para reordenar de forma simples e rápida!</p>
                 </div>
 
                 <div className="bg-surface rounded-2xl border border-outline-variant/50 shadow-sm overflow-hidden">
@@ -684,15 +706,26 @@ export default function ToledoConfig() {
                   </div>
                   <div className="divide-y divide-outline-variant/20">
                     {categoriasOrdem.map((cat, i) => (
-                      <div key={cat} className="px-6 py-3 flex items-center justify-between hover:bg-surface-variant/20 transition-colors">
+                      <div 
+                        key={cat} 
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, i)}
+                        onDragOver={(e) => handleDragOver(e, i)}
+                        onDragEnd={handleDragEnd}
+                        className={`px-6 py-4 flex items-center justify-between hover:bg-surface-variant/20 transition-all duration-150 cursor-grab active:cursor-grabbing border-b border-outline-variant/10 select-none ${
+                          draggedIndex === i ? 'bg-primary/10 border-2 border-dashed border-primary/40 rounded-xl opacity-50 scale-[0.98]' : ''
+                        }`}
+                      >
                         <div className="flex items-center gap-3">
+                          <span className="material-symbols-outlined text-ink-secondary/40">drag_indicator</span>
                           <span className="bg-primary/10 text-primary font-black text-xs w-7 h-7 flex items-center justify-center rounded-lg">{i + 1}</span>
                           <span className="font-bold text-ink">{CATEGORIAS_PADRAO.find(c => c.id === cat)?.icon || '📦'} {cat}</span>
                         </div>
                         <div className="flex gap-1">
                           <button
                             disabled={i === 0}
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               const arr = [...categoriasOrdem];
                               [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]];
                               setCategoriasOrdem(arr);
@@ -701,7 +734,8 @@ export default function ToledoConfig() {
                           >▲</button>
                           <button
                             disabled={i === categoriasOrdem.length - 1}
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               const arr = [...categoriasOrdem];
                               [arr[i], arr[i + 1]] = [arr[i + 1], arr[i]];
                               setCategoriasOrdem(arr);
