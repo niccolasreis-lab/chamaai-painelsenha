@@ -19,10 +19,48 @@ export default function ClientePortal() {
 
   const [ticketStatus, setTicketStatus] = useState<'carregando' | 'aguardando' | 'expirado' | 'erro'>('carregando');
   const [ticketNumero, setTicketNumero] = useState<string>('');
-  
+
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [busca, setBusca] = useState('');
-  
+  const [config, setConfig] = useState<any>({});
+
+  // Carrega configurações da loja
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/configuracoes`);
+        if (res.ok) {
+          const data = await res.json();
+          setConfig(data);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar configurações da loja', err);
+      }
+    };
+    fetchConfig();
+  }, [API_URL]);
+
+  const loadImageToBase64 = (url: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.src = url;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        } else {
+          reject(new Error('Canvas context not available'));
+        }
+      };
+      img.onerror = (err) => reject(err);
+    });
+  };
+
   // Carrinho de pré-seleção: armazena PLU e Quantidade (apenas representativa para a lista)
   const [carrinho, setCarrinho] = useState<Record<string, number>>({});
   const [showCarrinho, setShowCarrinho] = useState(false);
@@ -39,7 +77,7 @@ export default function ClientePortal() {
         const res = await fetch(`${API_URL}/api/senhas/${ticketId}/status`);
         if (!res.ok) throw new Error();
         const data = await res.json();
-        
+
         setTicketNumero(data.numero || '');
         if (data.aguardando) {
           setTicketStatus('aguardando');
@@ -82,7 +120,7 @@ export default function ClientePortal() {
       if (salvo) {
         try {
           setCarrinho(JSON.parse(salvo));
-        } catch (e) {}
+        } catch (e) { }
       }
     }
   }, [ticketId]);
@@ -119,7 +157,7 @@ export default function ClientePortal() {
   };
 
   const totalItens = Object.values(carrinho).reduce((acc, val) => acc + val, 0);
-  
+
   const produtosFiltrados = useMemo(() => {
     if (!busca.trim()) return produtos;
     const term = busca.toLowerCase();
@@ -137,24 +175,47 @@ export default function ClientePortal() {
     return grupos;
   }, [produtosFiltrados]);
 
-  const gerarPDF = () => {
+  const gerarPDF = async () => {
     const doc = new jsPDF();
-    
+    let yPos = 22;
+
+    // Se houver logo do cliente, tenta carregar e desenhar
+    if (config.logo_cliente) {
+      try {
+        const logoUrl = `${API_URL}${config.logo_cliente}`;
+        const base64Logo = await loadImageToBase64(logoUrl);
+        doc.addImage(base64Logo, 'PNG', 14, 14, 30, 15);
+        yPos = 38;
+      } catch (e) {
+        console.error('Erro ao adicionar logotipo ao PDF:', e);
+      }
+    }
+
     // Título
-    doc.setFontSize(18);
-    doc.text('Lista de Pré-Seleção - ChamaAí', 14, 22);
-    
+    doc.setFontSize(config.logo_cliente ? 16 : 18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(config.nome_estabelecimento || 'Lista de Pré-Seleção - ChamaAí', config.logo_cliente ? 48 : 14, config.logo_cliente ? 24 : yPos);
+
+    // Subtítulo se tiver logo
+    if (config.logo_cliente) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(120);
+      doc.text('Lista de Pré-Seleção de Produtos', 48, 29);
+    }
+
     // Data e Senha
     doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
     doc.setTextColor(100);
-    doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 14, 30);
-    doc.text(`Senha associada: ${ticketNumero || 'N/A'}`, 14, 35);
-    
+    doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 14, config.logo_cliente ? 38 : 32);
+    doc.text(`Senha associada: ${ticketNumero || 'N/A'}`, 14, config.logo_cliente ? 44 : 38);
+
     // Aviso Legal
     doc.setFontSize(8);
     doc.setTextColor(220, 38, 38); // Red
-    doc.text('* Valores válidos apenas para a data de hoje.', 14, 42);
-    doc.text('* Preços sujeitos à alteração da balança sem aviso prévio.', 14, 46);
+    doc.text('* Valores válidos apenas para a data de hoje.', 14, config.logo_cliente ? 52 : 46);
+    doc.text('* Preços sujeitos à alteração da balança sem aviso prévio.', 14, config.logo_cliente ? 56 : 50);
 
     // Tabela
     const tableData = Object.entries(carrinho).map(([plu, qtd]) => {
@@ -168,7 +229,7 @@ export default function ClientePortal() {
     });
 
     (doc as any).autoTable({
-      startY: 55,
+      startY: config.logo_cliente ? 62 : 55,
       head: [['Produto', 'Cód.', 'Qtd.', 'Preço Ref. (Kg/Un)']],
       body: tableData,
       theme: 'grid',
@@ -201,10 +262,10 @@ export default function ClientePortal() {
           <h2 className="text-2xl font-bold uppercase tracking-widest mb-1">Sua vez chegou!</h2>
           <p className="text-sm font-medium opacity-90">Dirija-se ao balcão.</p>
         </div>
-        
+
         <div className="p-6 text-center">
           <p className="text-ink-secondary font-medium mb-6">A lista de produtos completa não está mais disponível para esta senha.</p>
-          
+
           {totalItens > 0 ? (
             <div className="bg-surface rounded-2xl shadow-sm border border-outline-variant p-4">
               <h3 className="font-bold text-lg mb-4 text-ink flex items-center justify-center gap-2">
@@ -221,7 +282,7 @@ export default function ClientePortal() {
                   );
                 })}
               </div>
-              <button 
+              <button
                 onClick={gerarPDF}
                 className="w-full bg-primary text-white font-bold rounded-xl py-4 flex items-center justify-center gap-2"
               >
@@ -241,16 +302,28 @@ export default function ClientePortal() {
     <div className="min-h-screen w-full bg-background font-sans pb-24">
       {/* Header Fixo */}
       <div className="sticky top-0 z-40 bg-surface shadow-sm border-b border-outline-variant">
-        <div className="bg-primary text-white px-4 py-2 flex justify-between items-center text-xs font-bold uppercase tracking-widest">
-          <span>Sua Senha: {ticketNumero}</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-success animate-pulse"></span> AO VIVO</span>
+        <div className="bg-surface pt-4 pb-2 px-4 shadow-sm border-b border-outline-variant/30 flex items-center gap-3">
+          {config.logo_cliente ? (
+            <img src={`${API_URL}${config.logo_cliente}`} alt="Logo" className="h-10 w-auto rounded object-contain max-w-[120px]" />
+          ) : (
+            <div className="bg-primary/10 w-10 h-10 rounded flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary font-bold">storefront</span>
+            </div>
+          )}
+          <h1 className="font-sans text-lg font-bold text-ink uppercase tracking-widest leading-none">
+            {config.nome_estabelecimento || 'ChamaAí'}
+          </h1>
         </div>
-        <div className="p-4">
+        <div className="bg-surface text-ink px-4 py-2 flex justify-between items-center text-xs font-bold uppercase tracking-widest">
+          <span>Sua Senha: <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">{ticketNumero}</span></span>
+          <span className="flex items-center gap-1 text-primary"><span className="w-2 h-2 rounded-full bg-success animate-pulse"></span> AO VIVO</span>
+        </div>
+        <div className="p-4 pt-2">
           <div className="relative">
             <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-ink-secondary" />
-            <input 
-              type="text" 
-              placeholder="Pesquisar produto ou código..." 
+            <input
+              type="text"
+              placeholder="Pesquisar produto ou código..."
               value={busca}
               onChange={e => setBusca(e.target.value)}
               className="w-full bg-surface-variant border border-outline-variant rounded-xl py-3 pl-10 pr-4 text-sm font-medium outline-none focus:border-primary transition-colors"
@@ -274,9 +347,9 @@ export default function ClientePortal() {
                       <h3 className="font-bold text-ink leading-tight line-clamp-2 text-sm">{p.descricao}</h3>
                       <p className="text-primary font-black mt-1">R$ {p.preco.toFixed(2).replace('.', ',')}<span className="text-xs font-medium text-ink-secondary">/kg</span></p>
                     </div>
-                    
+
                     {qtd === 0 ? (
-                      <button 
+                      <button
                         onClick={() => handleAdd(p.plu)}
                         className="bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors w-10 h-10 rounded-full flex items-center justify-center shrink-0"
                       >
@@ -334,7 +407,7 @@ export default function ClientePortal() {
                 </div>
               </div>
             ) : (
-              <button 
+              <button
                 onClick={() => setShowCarrinho(true)}
                 className="w-full p-4 flex items-center justify-between text-ink"
               >

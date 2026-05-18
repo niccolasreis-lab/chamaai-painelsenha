@@ -75,6 +75,18 @@ function getWatchedPaths() {
   } else if (format === 'etiqueta_eletronica') {
     fileNameTxt = 'DATA.I1';
     fileNameBak = 'DATA.BAK';
+  } else if (format === 'hiper_csv') {
+    fileNameTxt = 'LISTAGEMDEPRODUTO.CSV';
+    fileNameBak = 'LISTAGEMDEPRODUTO.BAK';
+  } else if (format === 'bedgarline_csv') {
+    fileNameTxt = 'RELATORIOPADRAORETRATO.CSV';
+    fileNameBak = 'RELATORIOPADRAORETRATO.BAK';
+  } else if (format === 'isolidus_csv') {
+    fileNameTxt = 'LISTA DE PRODUTOS.CSV';
+    fileNameBak = 'LISTA DE PRODUTOS.BAK';
+  } else if (format === 'box_csv') {
+    fileNameTxt = 'TABELADEPRECOSEMPORIO.CSV';
+    fileNameBak = 'TABELADEPRECOSEMPORIO.BAK';
   } else if (format.includes('csv')) {
     fileNameTxt = 'PRODUTOS.CSV';
     fileNameBak = 'PRODUTOS.BAK';
@@ -91,23 +103,42 @@ function getWatchedPaths() {
   };
 }
 
-// Load categories mapping
+// Persistent paths for configuration
+const PERSISTENT_DIR = 'C:\\ChamaAi';
+const PERSISTENT_CAT_PATH = path.join(PERSISTENT_DIR, 'categorias.json');
+
+// Ensure persistent directory exists
+if (!fs.existsSync(PERSISTENT_DIR)) {
+  fs.mkdirSync(PERSISTENT_DIR, { recursive: true });
+}
+
+// Load categories mapping with persistent storage and packaged fallback
 let categorias: Record<string, string> = {};
 try {
-  const catPath = path.join(__dirname, '../../server/categorias.json');
-  // Try multiple possible paths (dev vs built)
-  if (fs.existsSync(catPath)) {
-    categorias = JSON.parse(fs.readFileSync(catPath, 'utf-8'));
+  if (fs.existsSync(PERSISTENT_CAT_PATH)) {
+    categorias = JSON.parse(fs.readFileSync(PERSISTENT_CAT_PATH, 'utf-8'));
   } else {
-    const altPath = path.join(__dirname, 'categorias.json');
-    if (fs.existsSync(altPath)) {
-      categorias = JSON.parse(fs.readFileSync(altPath, 'utf-8'));
-    } else {
-      // Try from project root
-      const rootPath = path.join(process.cwd(), 'server', 'categorias.json');
-      if (fs.existsSync(rootPath)) {
-        categorias = JSON.parse(fs.readFileSync(rootPath, 'utf-8'));
+    // If persistent file doesn't exist, search packaged fallback paths
+    const possiblePaths = [
+      path.join(__dirname, '../../server/categorias.json'),
+      path.join(__dirname, 'categorias.json'),
+      path.join(process.cwd(), 'server', 'categorias.json'),
+    ];
+
+    let foundFallback = false;
+    for (const catPath of possiblePaths) {
+      if (fs.existsSync(catPath)) {
+        categorias = JSON.parse(fs.readFileSync(catPath, 'utf-8'));
+        // Copy to persistent path so it stays persistent and editable
+        fs.writeFileSync(PERSISTENT_CAT_PATH, JSON.stringify(categorias, null, 2), 'utf-8');
+        foundFallback = true;
+        console.log(`[TOLEDO] Categorias padrão copiadas para pasta persistente de: ${catPath}`);
+        break;
       }
+    }
+
+    if (!foundFallback) {
+      console.warn('[TOLEDO] Nenhum arquivo de categorias padrão encontrado. Iniciando vazio.');
     }
   }
   console.log(`[TOLEDO] Categorias carregadas: ${Object.keys(categorias).length} mapeamentos`);
@@ -155,22 +186,22 @@ function processToledoItems(items: ToledoItem[]): number {
 
   const insertOrUpdate = db.prepare(`
     INSERT INTO toledo_produtos (plu, descricao, preco, categoria, atualizado_em)
-    VALUES (?, ?, ?, ?, datetime('now'))
+    VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
     ON CONFLICT(plu) DO UPDATE SET
       preco = excluded.preco,
       categoria = excluded.categoria,
-      atualizado_em = datetime('now')
+      atualizado_em = datetime('now', 'localtime')
     WHERE toledo_produtos.preco != excluded.preco
   `);
 
   // For new products, we need a separate insert to also set the descricao
   const insertNew = db.prepare(`
     INSERT OR IGNORE INTO toledo_produtos (plu, descricao, preco, categoria, atualizado_em)
-    VALUES (?, ?, ?, ?, datetime('now'))
+    VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
   `);
 
   // Check which products are new vs existing
-  const existingCheck = db.prepare('SELECT plu, preco, categoria FROM toledo_produtos WHERE plu = ?');
+  const existingCheck = db.prepare('SELECT plu, descricao, preco, categoria FROM toledo_produtos WHERE plu = ?');
 
   const transaction = db.transaction((toledoItems: ToledoItem[]) => {
     for (const item of toledoItems) {
@@ -180,13 +211,17 @@ function processToledoItems(items: ToledoItem[]): number {
         // New product — insert with description
         insertNew.run(item.plu, item.descricao, item.preco, item.categoria);
         updatedCount++;
-      } else if (existing.preco !== item.preco || existing.categoria !== item.categoria) {
-        // Existing product — update if price OR category changed
+      } else if (
+        existing.preco !== item.preco || 
+        existing.categoria !== item.categoria || 
+        existing.descricao !== item.descricao
+      ) {
+        // Existing product — update if price, description OR category changed
         db.prepare(`
           UPDATE toledo_produtos 
-          SET preco = ?, categoria = ?, atualizado_em = datetime('now') 
+          SET preco = ?, descricao = ?, categoria = ?, atualizado_em = datetime('now', 'localtime') 
           WHERE plu = ?
-        `).run(item.preco, item.categoria, item.plu);
+        `).run(item.preco, item.descricao, item.categoria, item.plu);
         updatedCount++;
       }
     }
@@ -223,11 +258,14 @@ async function processFile(filePath: string) {
     const paths = getWatchedPaths();
     const rawItems = parseFileContent(content, paths.format);
     
-    // Map categories
-    const items: ToledoItem[] = rawItems.map(item => ({
-      ...item,
-      categoria: categorias[item.plu] || 'Outros'
-    }));
+    // Map categories (stripping leading zeros from PLU for robust matching)
+    const items: ToledoItem[] = rawItems.map(item => {
+      const cleanPlu = item.plu.replace(/^0+/, '');
+      return {
+        ...item,
+        categoria: categorias[cleanPlu] || categorias[item.plu] || 'Outros'
+      };
+    });
     
     console.log(`[TOLEDO] 📊 ${items.length} itens válidos encontrados usando parser: ${paths.format}`);
 
@@ -245,8 +283,8 @@ async function processFile(filePath: string) {
     try {
       const db = getDb();
       db.prepare(`
-        INSERT INTO toledo_log (itens_processados, precos_atualizados, mensagem)
-        VALUES (?, ?, ?)
+        INSERT INTO toledo_log (itens_processados, precos_atualizados, mensagem, criado_em)
+        VALUES (?, ?, ?, datetime('now', 'localtime'))
       `).run(items.length, updatedCount, `Processamento OK em ${elapsed}ms`);
     } catch (logErr) {
       console.error('[TOLEDO] Erro ao gravar log:', logErr);
@@ -274,8 +312,8 @@ async function processFile(filePath: string) {
     try {
       const db = getDb();
       db.prepare(`
-        INSERT INTO toledo_log (itens_processados, precos_atualizados, mensagem)
-        VALUES (0, 0, ?)
+        INSERT INTO toledo_log (itens_processados, precos_atualizados, mensagem, criado_em)
+        VALUES (0, 0, ?, datetime('now', 'localtime'))
       `).run(`ERRO: ${err.message}`);
     } catch (logErr) {
       // Silent — don't crash the service for a logging failure
@@ -396,6 +434,12 @@ export async function forceToledoRefresh() {
  */
 export function reloadCategorias() {
   try {
+    if (fs.existsSync(PERSISTENT_CAT_PATH)) {
+      categorias = JSON.parse(fs.readFileSync(PERSISTENT_CAT_PATH, 'utf-8'));
+      console.log(`[TOLEDO] Categorias recarregadas da pasta persistente: ${Object.keys(categorias).length} mapeamentos`);
+      return;
+    }
+
     const possiblePaths = [
       path.join(__dirname, '../../server/categorias.json'),
       path.join(__dirname, 'categorias.json'),
@@ -405,7 +449,7 @@ export function reloadCategorias() {
     for (const catPath of possiblePaths) {
       if (fs.existsSync(catPath)) {
         categorias = JSON.parse(fs.readFileSync(catPath, 'utf-8'));
-        console.log(`[TOLEDO] Categorias recarregadas: ${Object.keys(categorias).length} mapeamentos`);
+        console.log(`[TOLEDO] Categorias recarregadas da pasta padrão: ${Object.keys(categorias).length} mapeamentos`);
         return;
       }
     }

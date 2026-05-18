@@ -812,32 +812,38 @@ export function startServer() {
     }
   });
 
+  const PERSISTENT_DIR = 'C:\\ChamaAi';
+  const PERSISTENT_CAT_PATH = path.join(PERSISTENT_DIR, 'categorias.json');
+  const PERSISTENT_ORDEM_PATH = path.join(PERSISTENT_DIR, 'categorias-ordem.json');
+
   // POST update categories mapping
   app.post('/api/toledo/categorias', (req, res) => {
     try {
       const novasCategorias = req.body;
       
-      // Save to categorias.json
-      const possiblePaths = [
+      // Always ensure the persistent directory exists
+      if (!fs.existsSync(PERSISTENT_DIR)) {
+        fs.mkdirSync(PERSISTENT_DIR, { recursive: true });
+      }
+
+      // Write to persistent path (main copy)
+      fs.writeFileSync(PERSISTENT_CAT_PATH, JSON.stringify(novasCategorias, null, 2), 'utf-8');
+      console.log('[TOLEDO] Categorias salvas na pasta persistente:', PERSISTENT_CAT_PATH);
+
+      // Backwards compatibility fallback write
+      const otherPaths = [
         path.join(__dirname, '../../server/categorias.json'),
         path.join(__dirname, 'categorias.json'),
         path.join(process.cwd(), 'server', 'categorias.json'),
       ];
 
-      let saved = false;
-      for (const catPath of possiblePaths) {
+      for (const catPath of otherPaths) {
         try {
           fs.writeFileSync(catPath, JSON.stringify(novasCategorias, null, 2), 'utf-8');
-          saved = true;
-          console.log('[TOLEDO] Categorias salvas em:', catPath);
-          break;
+          console.log('[TOLEDO] Categorias sincronizadas com cópia de fallback:', catPath);
         } catch (e) {
-          // Try next path
+          // Ignore write failure on readonly folder
         }
-      }
-
-      if (!saved) {
-        return res.status(500).json({ error: 'Não foi possível salvar o arquivo de categorias.' });
       }
 
       // Reload in-memory mapping
@@ -868,6 +874,11 @@ export function startServer() {
   // GET categories mapping
   app.get('/api/toledo/categorias', (req, res) => {
     try {
+      if (fs.existsSync(PERSISTENT_CAT_PATH)) {
+        const data = JSON.parse(fs.readFileSync(PERSISTENT_CAT_PATH, 'utf-8'));
+        return res.json(data);
+      }
+
       const possiblePaths = [
         path.join(__dirname, '../../server/categorias.json'),
         path.join(__dirname, 'categorias.json'),
@@ -877,6 +888,13 @@ export function startServer() {
       for (const catPath of possiblePaths) {
         if (fs.existsSync(catPath)) {
           const data = JSON.parse(fs.readFileSync(catPath, 'utf-8'));
+          // Initialize persistent file
+          try {
+            if (!fs.existsSync(PERSISTENT_DIR)) fs.mkdirSync(PERSISTENT_DIR, { recursive: true });
+            fs.writeFileSync(PERSISTENT_CAT_PATH, JSON.stringify(data, null, 2), 'utf-8');
+          } catch (errWrite) {
+            console.error('[TOLEDO] Erro ao inicializar arquivo persistente de categorias:', errWrite);
+          }
           return res.json(data);
         }
       }
@@ -889,14 +907,31 @@ export function startServer() {
 
   // ── Ordem das categorias no portal do cliente ──────────────────────────────
 
-  const ORDEM_CAT_PATH = path.join(process.cwd(), 'server', 'categorias-ordem.json');
-
   app.get('/api/toledo/categorias-ordem', (_req: express.Request, res: express.Response) => {
     try {
-      if (fs.existsSync(ORDEM_CAT_PATH)) {
-        const data = JSON.parse(fs.readFileSync(ORDEM_CAT_PATH, 'utf-8'));
+      if (fs.existsSync(PERSISTENT_ORDEM_PATH)) {
+        const data = JSON.parse(fs.readFileSync(PERSISTENT_ORDEM_PATH, 'utf-8'));
         return res.json(data);
       }
+
+      // Check fallbacks if persistent doesn't exist
+      const possiblePaths = [
+        path.join(__dirname, '../../server/categorias-ordem.json'),
+        path.join(__dirname, 'categorias-ordem.json'),
+        path.join(process.cwd(), 'server', 'categorias-ordem.json'),
+      ];
+
+      for (const orderPath of possiblePaths) {
+        if (fs.existsSync(orderPath)) {
+          const data = JSON.parse(fs.readFileSync(orderPath, 'utf-8'));
+          try {
+            if (!fs.existsSync(PERSISTENT_DIR)) fs.mkdirSync(PERSISTENT_DIR, { recursive: true });
+            fs.writeFileSync(PERSISTENT_ORDEM_PATH, JSON.stringify(data, null, 2), 'utf-8');
+          } catch (e) {}
+          return res.json(data);
+        }
+      }
+
       res.json([]);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -906,7 +941,25 @@ export function startServer() {
   app.post('/api/toledo/categorias-ordem', async (req: express.Request, res: express.Response) => {
     try {
       const ordem: string[] = req.body;
-      fs.writeFileSync(ORDEM_CAT_PATH, JSON.stringify(ordem, null, 2), 'utf-8');
+      
+      if (!fs.existsSync(PERSISTENT_DIR)) {
+        fs.mkdirSync(PERSISTENT_DIR, { recursive: true });
+      }
+
+      // Write to persistent path
+      fs.writeFileSync(PERSISTENT_ORDEM_PATH, JSON.stringify(ordem, null, 2), 'utf-8');
+
+      // Attempt fallbacks
+      const possiblePaths = [
+        path.join(__dirname, '../../server/categorias-ordem.json'),
+        path.join(__dirname, 'categorias-ordem.json'),
+        path.join(process.cwd(), 'server', 'categorias-ordem.json'),
+      ];
+      for (const orderPath of possiblePaths) {
+        try {
+          fs.writeFileSync(orderPath, JSON.stringify(ordem, null, 2), 'utf-8');
+        } catch (e) {}
+      }
 
       // Sync: grava a ordem no Supabase para o portal cliente (Vercel) ler
       try {
@@ -938,7 +991,7 @@ export function startServer() {
       const { descricao } = req.body;
       const db = getDb();
       
-      db.prepare(`UPDATE toledo_produtos SET descricao = ?, atualizado_em = datetime('now') WHERE plu = ?`)
+      db.prepare(`UPDATE toledo_produtos SET descricao = ?, atualizado_em = datetime('now', 'localtime') WHERE plu = ?`)
         .run(descricao, plu);
       
       broadcastEvent('TOLEDO_PRECOS_ATUALIZADOS', { action: 'description_update' });

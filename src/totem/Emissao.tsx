@@ -156,10 +156,20 @@ export default function Emissao() {
   return (
     <div className="h-screen w-screen bg-background flex flex-col font-sans select-none overflow-hidden fixed inset-0">
       {/* Header */}
-      <header className="bg-primary text-on-primary py-10 shadow-md flex justify-center items-center border-b-[6px] border-primary-hover shrink-0">
-        <h1 className="font-sans text-5xl font-bold uppercase tracking-widest flex items-center gap-4">
-          <span className="material-symbols-outlined text-[4rem]">storefront</span>
-          {config.nome_estabelecimento || 'ChamaAí'}
+      <header className="bg-primary text-on-primary py-8 shadow-md flex justify-center items-center border-b-[6px] border-primary-hover shrink-0">
+        <h1 className="font-sans text-5xl font-bold uppercase tracking-widest flex items-center gap-6">
+          {config.logo_cliente ? (
+            <img 
+              src={`${API_URL}${config.logo_cliente}`} 
+              alt="Logo" 
+              className="h-24 w-auto object-contain bg-white/10 rounded-2xl p-2"
+            />
+          ) : (
+            <>
+              <span className="material-symbols-outlined text-[4rem]">storefront</span>
+              {config.nome_estabelecimento || 'ChamaAí'}
+            </>
+          )}
         </h1>
       </header>
 

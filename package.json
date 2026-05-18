@@ -1,7 +1,7 @@
 {
   "name": "chamaai-novo",
   "private": true,
-  "version": "1.0.38",
+  "version": "1.0.39",
   "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev:vite": "vite --host",
@@ -9,7 +9,7 @@
     "dev:server": "tsx start-server.ts",
     "dev:web": "concurrently \"npm run dev:vite\" \"npm run dev:server\"",
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
-    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:electron": "tsc -p tsconfig.electron.json && node -e \"const fs = require('fs'); fs.copyFileSync('server/categorias.json', 'dist-electron/server/categorias.json');\"",
     "build": "tsc -b && vite build && npm run build:electron",
     "rebuild:native": "npx @electron/rebuild -f -w better-sqlite3",
     "build:dist": "npm run rebuild:native && npm run build && electron-builder",
