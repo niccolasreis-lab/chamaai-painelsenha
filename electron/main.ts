@@ -122,7 +122,7 @@ function createWindow() {
     });
   } else {
     const devUrl = process.env.VITE_DEV_SERVER_URL;
-    const base = devUrl || 'http://localhost:5173';
+    const base = devUrl || 'https://localhost:5173';
     mainWindow.loadURL(`${base}#/${route}`);
   }
 
@@ -273,7 +273,7 @@ if (!gotTheLock) {
           const indexPath = require('path').join(__dirname, '../../dist/index.html');
           mainWindow.loadFile(indexPath, { hash: newRoute });
         } else {
-          const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
+          const devUrl = process.env.VITE_DEV_SERVER_URL || 'https://localhost:5173';
           mainWindow.loadURL(`${devUrl}#/${newRoute}`);
         }
       }
@@ -285,7 +285,14 @@ if (!gotTheLock) {
       console.log('Initializing system...');
       initDatabase();
       startServer();
-      createWindow();
+
+      const isServerOnly = process.argv.some(arg => arg.includes('--server'));
+
+      if (isServerOnly) {
+        console.log('[MODO SERVIDOR] Rodando em background silencioso. Nenhuma interface será aberta.');
+      } else {
+        createWindow();
+      }
 
       // Inicializa o verificador de atualizações silencioso
       if (app.isPackaged) {
@@ -317,7 +324,8 @@ if (!gotTheLock) {
 }
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  const isServerOnly = process.argv.some(arg => arg.includes('--server'));
+  if (process.platform !== 'darwin' && !isServerOnly) {
     app.quit();
   }
 });

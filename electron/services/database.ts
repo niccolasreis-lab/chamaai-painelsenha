@@ -125,6 +125,36 @@ export function initDatabase() {
       );
     `);
 
+    // Toledo — Produtos de balança (preços por KG)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS toledo_produtos (
+        plu          TEXT PRIMARY KEY,
+        descricao    TEXT NOT NULL,
+        preco        INTEGER NOT NULL DEFAULT 0,
+        categoria    TEXT NOT NULL DEFAULT 'Outros',
+        atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Toledo — Log de processamento
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS toledo_log (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        itens_processados   INTEGER NOT NULL DEFAULT 0,
+        precos_atualizados  INTEGER NOT NULL DEFAULT 0,
+        mensagem            TEXT,
+        criado_em           TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Configurações padrão do Toledo / Encarte
+    db.exec(`
+      INSERT OR IGNORE INTO configuracoes VALUES ('toledo_encarte_ativo',     '1', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('toledo_encarte_duracao',   '15', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('toledo_encarte_posicao',   '0', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('toledo_itens_por_slide',   '12', datetime('now'));
+    `);
+
     console.log('SQLite Database initialized at', dbPath);
     return db;
   } catch (err) {

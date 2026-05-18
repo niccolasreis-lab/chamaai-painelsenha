@@ -10,6 +10,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     { name: 'Operators', path: '/admin/operators', icon: 'badge' },
     { name: 'Devices', path: '/admin/devices', icon: 'settings_input_component' },
     { name: 'Gerenciar Mídias', path: '/admin/midias', icon: 'perm_media' },
+    { name: 'Toledo / Encarte', path: '/admin/toledo', icon: 'scale' },
     { name: 'Relatórios', path: '/admin/relatorios', icon: 'analytics' },
     { name: 'Settings', path: '/admin/settings', icon: 'settings' },
   ];

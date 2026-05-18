@@ -163,16 +163,75 @@ export default function Relatorios() {
           </div>
         </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Horários de Pico */}
+          <div className="bg-surface p-8 rounded-[32px] shadow-sm border border-outline-variant/50">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
+                <TrendingUp size={20} />
+              </div>
+              <h3 className="font-sans text-xl font-bold text-ink uppercase tracking-widest">Horários de Pico</h3>
+            </div>
+            <div className="h-48 flex items-end justify-between gap-2 mt-4">
+              {[
+                { time: '08h', val: 30 }, { time: '10h', val: 85 }, { time: '12h', val: 100 }, 
+                { time: '14h', val: 60 }, { time: '16h', val: 90 }, { time: '18h', val: 40 }
+              ].map((item, i) => (
+                <div key={i} className="flex flex-col items-center flex-1 group">
+                  <div className="w-full relative flex justify-center h-full items-end">
+                    <div 
+                      className="w-full bg-primary/20 rounded-t-lg group-hover:bg-primary transition-all duration-300 relative overflow-hidden" 
+                      style={{ height: `${item.val}%` }}
+                    >
+                      <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-primary/50 to-transparent h-1/2"></div>
+                    </div>
+                    {/* Tooltip on hover */}
+                    <span className="absolute -top-8 bg-ink text-white text-xs font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                      {Math.floor((item.val / 100) * stats.total) || item.val}
+                    </span>
+                  </div>
+                  <span className="text-ink-secondary text-xs font-bold mt-3 uppercase">{item.time}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Desempenho por Setor */}
+          <div className="bg-surface p-8 rounded-[32px] shadow-sm border border-outline-variant/50">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-10 h-10 bg-success/10 text-success rounded-xl flex items-center justify-center">
+                <Users size={20} />
+              </div>
+              <h3 className="font-sans text-xl font-bold text-ink uppercase tracking-widest">Fluxo por Setor</h3>
+            </div>
+            
+            <div className="space-y-6">
+              {[
+                { name: 'Açougue', color: 'bg-red-500', pct: 45 },
+                { name: 'Frios', color: 'bg-yellow-400', pct: 30 },
+                { name: 'Padaria', color: 'bg-amber-500', pct: 15 },
+                { name: 'Hortifruti', color: 'bg-emerald-500', pct: 10 },
+              ].map((setor, i) => (
+                <div key={i}>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm font-bold text-ink uppercase tracking-wider">{setor.name}</span>
+                    <span className="text-sm font-bold text-ink-secondary">{setor.pct}%</span>
+                  </div>
+                  <div className="w-full h-3 bg-surface-variant rounded-full overflow-hidden">
+                    <div className={`h-full ${setor.color} rounded-full transition-all duration-1000`} style={{ width: `${setor.pct}%` }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="bg-ink text-white p-10 rounded-[40px] shadow-2xl relative overflow-hidden group">
           <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-6 text-primary">
-              <TrendingUp size={28} />
-              <span className="font-black tracking-[0.3em] uppercase text-xs">Análise de Performance</span>
-            </div>
             <h2 className="text-3xl font-bold font-sans leading-tight max-w-2xl uppercase tracking-wider">
               {stats.atendidas > 0 
                 ? `Sua taxa de eficiência é de ${((stats.atendidas / stats.total) * 100).toFixed(1)}%. Ótimo desempenho!`
-                : 'Selecione um período para ver os insights de atendimento.'}
+                : 'Analise o fluxo do seu supermercado em tempo real.'}
             </h2>
           </div>
           <div className="absolute -right-20 -top-20 w-80 h-80 bg-primary/10 rounded-full opacity-20 blur-3xl group-hover:bg-primary/20 transition-all duration-700"></div>

@@ -65,9 +65,8 @@ export default function SenhaChamada({ ultimaSenha = null }: { ultimaSenha?: any
         </div>
 
         <div className="mt-8 flex justify-center">
-          <div className="bg-white px-12 py-5 rounded-[32px] shadow-2xl flex items-center gap-6 border-b-[8px] border-outline-variant/30">
-            <span className="material-symbols-outlined text-primary text-[4rem]">storefront</span>
-            <span className="font-sans text-[5rem] font-bold text-ink uppercase leading-none tracking-tighter">
+          <div className="bg-white px-12 py-5 rounded-[32px] shadow-2xl flex items-center justify-center gap-6 border-b-[8px] border-outline-variant/30">
+            <span className="font-sans text-[5rem] font-bold text-ink uppercase leading-none tracking-tighter text-center">
               {config.rotulo_local ? `${config.rotulo_local} ` : ''}
               {ultimaSenha.guiche.replace(/guichê[:\s]*/gi, '').trim()}
             </span>

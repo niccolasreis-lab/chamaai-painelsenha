@@ -136,6 +136,7 @@ export default function Emissao() {
       // Dispara a impressão em background (sem await) para não travar a tela
       if (window.api?.printTicket) {
         window.api.printTicket({
+          ticketId: data.id,
           numero: String(data.numero).padStart(3, '0'),
           balcao: config.nome_estabelecimento || "Balcão Geral",
           data: new Date().toLocaleString('pt-BR'),

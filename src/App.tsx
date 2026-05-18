@@ -12,9 +12,11 @@ import Devices from './admin/Devices';
 import Queue from './admin/Queue';
 import Operators from './admin/Operators';
 import Relatorios from './admin/Relatorios';
+import ToledoConfig from './admin/ToledoConfig';
 import MobileOperador from './operador/MobileOperador';
 import Bridge from './operador/Bridge';
 import Login from './Login';
+import ClientePortal from './cliente/ClientePortal';
 import LicenseGate from './shared/LicenseGate';
 
 function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) {
@@ -135,7 +137,7 @@ function Home() {
       </div>
 
       <div className="mt-8 text-ink-secondary text-xs opacity-50 font-bold uppercase tracking-widest">
-        ChamaAí v1.0.29
+        ChamaAí v1.0.38
       </div>
     </div>
   );
@@ -154,6 +156,8 @@ export default function App() {
           <Route path="/telao" element={<MediaIndoor />} />
           <Route path="/telao/chamada" element={<SenhaChamada />} />
           
+          <Route path="/cliente" element={<ClientePortal />} />
+          
           <Route path="/login" element={<Login />} />
           
           <Route path="/operador" element={<ProtectedRoute><Controle /></ProtectedRoute>} />
@@ -168,6 +172,7 @@ export default function App() {
           <Route path="/admin/queue" element={<ProtectedRoute requireAdmin><Queue /></ProtectedRoute>} />
           <Route path="/admin/operators" element={<ProtectedRoute requireAdmin><Operators /></ProtectedRoute>} />
           <Route path="/admin/relatorios" element={<ProtectedRoute requireAdmin><Relatorios /></ProtectedRoute>} />
+          <Route path="/admin/toledo" element={<ProtectedRoute requireAdmin><ToledoConfig /></ProtectedRoute>} />
         </Routes>
       </HashRouter>
     </LicenseGate>

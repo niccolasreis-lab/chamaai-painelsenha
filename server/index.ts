@@ -5,6 +5,8 @@ import path from 'path';
 import fs from 'fs';
 import cron from 'node-cron';
 import { getDb } from '../electron/services/database';
+import { startToledoWatcher, forceToledoRefresh, reloadCategorias, setBroadcastFn } from './toledo-watcher';
+import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, syncConfiguracaoPublica } from './supabase-sync';
 
 const app = express();
 app.use(cors());
@@ -60,6 +62,9 @@ export function startServer() {
         
         // Limpa a fila de espera para o novo dia
         db.prepare("DELETE FROM senhas WHERE status = 'aguardando'").run();
+
+        // Sync: limpa senhas na nuvem também
+        syncLimparSenhas();
         
         // Otimização do banco de dados
         console.log('[CRON] Otimizando banco de dados (VACUUM)...');
@@ -194,6 +199,19 @@ export function startServer() {
     }
   });
 
+  app.get('/api/senhas/:id/status', (req, res) => {
+    try {
+      const db = getDb();
+      const senha = db.prepare('SELECT status, numero FROM senhas WHERE id = ?').get(req.params.id) as any;
+      if (!senha) {
+        return res.status(404).json({ error: 'Senha não encontrada' });
+      }
+      res.json({ status: senha.status, numero: senha.numero, aguardando: senha.status === 'aguardando' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.post('/api/senhas', (req: express.Request, res: express.Response) => {
     try {
       const { balcao_id, preferencial } = req.body;
@@ -236,6 +254,10 @@ export function startServer() {
       };
 
       broadcastEvent('NOVA_SENHA_EMITIDA', novaSenha);
+
+      // Sync: espelha a nova senha na nuvem para o Portal do Cliente
+      syncNovaSenha(novaSenha.id, numero, 'aguardando');
+
       res.status(201).json(novaSenha);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -372,6 +394,10 @@ export function startServer() {
       };
 
       broadcastEvent('NOVA_SENHA_CHAMADA', payload);
+
+      // Sync: atualiza status na nuvem (Portal do Cliente verá que a vez chegou)
+      syncStatusSenha(proxima.id, 'chamada', guiche);
+
       console.log(`[ChamarProxima] Senha ${proxima.numero} chamada com sucesso para ${guiche}`);
       res.json({ success: true, data: payload });
     } catch (err: any) {
@@ -415,6 +441,10 @@ export function startServer() {
       };
 
       broadcastEvent('NOVA_SENHA_CHAMADA', payload);
+
+      // Sync: atualiza status na nuvem
+      syncStatusSenha(senha_id, 'chamada', guiche);
+
       console.log('[Chamada] Broadcast enviado com sucesso');
       res.json({ success: true, data: payload });
     } catch (err: any) {
@@ -433,6 +463,10 @@ export function startServer() {
       
       // Notifica todos os painéis
       broadcastEvent('SENHA_ESTORNADA', { id: senha_id, aguardando_count: aguardandoCount.count });
+
+      // Sync: volta status na nuvem
+      syncStatusSenha(senha_id, 'aguardando');
+
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -555,6 +589,10 @@ export function startServer() {
 
       // Notify display to update
       broadcastEvent('CONFIG_ATUALIZADA', configuracoes);
+
+      // Sync public configs to Supabase
+      if (configuracoes.nome_estabelecimento) syncConfiguracaoPublica('nome_estabelecimento', configuracoes.nome_estabelecimento);
+      if (configuracoes.portal_voz_alerta) syncConfiguracaoPublica('portal_voz_alerta', configuracoes.portal_voz_alerta);
       
       res.json({ success: true });
     } catch (err: any) {
@@ -575,6 +613,18 @@ export function startServer() {
         .run('logo_cliente', logoPath);
         
       broadcastEvent('CONFIG_ATUALIZADA', { logo_cliente: logoPath });
+
+      // Converter imagem pra base64 e enviar pro portal do cliente no Supabase
+      try {
+        const filePath = path.join(process.cwd(), req.file.path);
+        const base64 = fs.readFileSync(filePath, 'base64');
+        const mimeType = req.file.mimetype;
+        const dataUrl = `data:${mimeType};base64,${base64}`;
+        syncConfiguracaoPublica('logo_cliente_base64', dataUrl);
+      } catch (e) {
+        console.error('Erro ao syncar logo em base64', e);
+      }
+
       res.json({ success: true, logoPath });
     } catch (err: any) {
       console.error('Error uploading logo:', err);
@@ -709,6 +759,197 @@ export function startServer() {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════
+  //  TOLEDO — Encarte de Preços por KG
+  // ═══════════════════════════════════════════════════════════════════
+
+  // GET all Toledo products (for the Encarte slide)
+  app.get('/api/toledo/produtos', (req, res) => {
+    try {
+      const db = getDb();
+      const produtos = db.prepare(
+        'SELECT plu, descricao, preco, categoria, atualizado_em FROM toledo_produtos WHERE preco > 0 ORDER BY categoria ASC, descricao ASC'
+      ).all();
+      res.json(produtos);
+    } catch (err: any) {
+      console.error('[TOLEDO API] Erro ao buscar produtos:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET Toledo processing log
+  app.get('/api/toledo/log', (req, res) => {
+    try {
+      const db = getDb();
+      const logs = db.prepare(
+        'SELECT * FROM toledo_log ORDER BY id DESC LIMIT 50'
+      ).all();
+      res.json(logs);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST force refresh from file
+  app.post('/api/toledo/refresh', async (req, res) => {
+    try {
+      const result = await forceToledoRefresh();
+
+      // Sync: envia produtos atualizados para a nuvem após refresh manual
+      try {
+        const db = getDb();
+        const produtosCloud = db.prepare(
+          'SELECT plu, descricao, preco, categoria FROM toledo_produtos WHERE preco > 0'
+        ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string }>;
+        syncProdutos(produtosCloud);
+      } catch (syncErr) {
+        console.error('[TOLEDO] Sync cloud falhou (não crítico):', syncErr);
+      }
+
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
+  // POST update categories mapping
+  app.post('/api/toledo/categorias', (req, res) => {
+    try {
+      const novasCategorias = req.body;
+      
+      // Save to categorias.json
+      const possiblePaths = [
+        path.join(__dirname, '../../server/categorias.json'),
+        path.join(__dirname, 'categorias.json'),
+        path.join(process.cwd(), 'server', 'categorias.json'),
+      ];
+
+      let saved = false;
+      for (const catPath of possiblePaths) {
+        try {
+          fs.writeFileSync(catPath, JSON.stringify(novasCategorias, null, 2), 'utf-8');
+          saved = true;
+          console.log('[TOLEDO] Categorias salvas em:', catPath);
+          break;
+        } catch (e) {
+          // Try next path
+        }
+      }
+
+      if (!saved) {
+        return res.status(500).json({ error: 'Não foi possível salvar o arquivo de categorias.' });
+      }
+
+      // Reload in-memory mapping
+      reloadCategorias();
+      
+      // Bônus: Atualiza as categorias dos produtos que JÁ ESTÃO no banco!
+      const db = getDb();
+      const updateStmt = db.prepare('UPDATE toledo_produtos SET categoria = ? WHERE plu = ?');
+      const transaction = db.transaction((cats) => {
+        for (const [plu, catName] of Object.entries(cats)) {
+          updateStmt.run(catName, plu);
+        }
+      });
+      transaction(novasCategorias);
+
+      // Sync: envia produtos com categorias atualizadas para a nuvem
+      const produtosCloud = db.prepare(
+        'SELECT plu, descricao, preco, categoria FROM toledo_produtos WHERE preco > 0'
+      ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string }>;
+      syncProdutos(produtosCloud);
+
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET categories mapping
+  app.get('/api/toledo/categorias', (req, res) => {
+    try {
+      const possiblePaths = [
+        path.join(__dirname, '../../server/categorias.json'),
+        path.join(__dirname, 'categorias.json'),
+        path.join(process.cwd(), 'server', 'categorias.json'),
+      ];
+
+      for (const catPath of possiblePaths) {
+        if (fs.existsSync(catPath)) {
+          const data = JSON.parse(fs.readFileSync(catPath, 'utf-8'));
+          return res.json(data);
+        }
+      }
+
+      res.json({});
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── Ordem das categorias no portal do cliente ──────────────────────────────
+
+  const ORDEM_CAT_PATH = path.join(process.cwd(), 'server', 'categorias-ordem.json');
+
+  app.get('/api/toledo/categorias-ordem', (_req: express.Request, res: express.Response) => {
+    try {
+      if (fs.existsSync(ORDEM_CAT_PATH)) {
+        const data = JSON.parse(fs.readFileSync(ORDEM_CAT_PATH, 'utf-8'));
+        return res.json(data);
+      }
+      res.json([]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/toledo/categorias-ordem', async (req: express.Request, res: express.Response) => {
+    try {
+      const ordem: string[] = req.body;
+      fs.writeFileSync(ORDEM_CAT_PATH, JSON.stringify(ordem, null, 2), 'utf-8');
+
+      // Sync: grava a ordem no Supabase para o portal cliente (Vercel) ler
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const sb = createClient(
+          'https://npfqnsgjicmxwmurwosu.supabase.co',
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5wZnFuc2dqaWNteHdtdXJ3b3N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3ODQyNDQsImV4cCI6MjA5MjM2MDI0NH0.wLIFMxZkE9rjGQjZF7eFi0dyDioOGQfg1jfhRy32O90'
+        );
+        await sb.from('configuracoes_publicas').upsert({
+          chave: 'categorias_ordem',
+          valor: JSON.stringify(ordem),
+          updated_at: new Date().toISOString()
+        });
+        console.log('[SYNC] ✅ Ordem de categorias sincronizada com Supabase');
+      } catch (syncErr) {
+        console.error('[SYNC] ⚠️ Erro ao sincronizar ordem (não crítico):', syncErr);
+      }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Update product description manually (admin)
+  app.put('/api/toledo/produtos/:plu', (req, res) => {
+    try {
+      const { plu } = req.params;
+      const { descricao } = req.body;
+      const db = getDb();
+      
+      db.prepare(`UPDATE toledo_produtos SET descricao = ?, atualizado_em = datetime('now') WHERE plu = ?`)
+        .run(descricao, plu);
+      
+      broadcastEvent('TOLEDO_PRECOS_ATUALIZADOS', { action: 'description_update' });
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+
   // Catch-all 404 handler for API
   app.use('/api', (req, res) => {
     console.warn(`404 - Not Found: ${req.method} ${req.url}`);
@@ -738,6 +979,9 @@ export function startServer() {
       // 2. Limpeza total de senhas e chamadas para um reinício do zero
       db.prepare("DELETE FROM chamadas").run();
       db.prepare("DELETE FROM senhas").run();
+
+      // Sync: limpa senhas na nuvem
+      syncLimparSenhas();
       
       // Notifica todos os terminais para resetarem seu estado local IMEDIATAMENTE
       broadcastEvent('SISTEMA_RESETADO', { success: true });
@@ -755,6 +999,21 @@ export function startServer() {
     console.log('========================================');
     console.log(`  Server running on http://localhost:${PORT}`);
     console.log('========================================');
+
+    // Start Toledo file watcher after server is ready
+    try {
+      setBroadcastFn(broadcastEvent);  // Inject SSE broadcaster (avoids circular dependency)
+      startToledoWatcher();
+    } catch (err) {
+      console.error('[TOLEDO] Erro ao iniciar watcher (não crítico):', err);
+    }
+
+    // Start Supabase command listener for remote operator (Vercel)
+    try {
+      startSupabaseCommandListener();
+    } catch (err) {
+      console.error('[SUPABASE] Erro ao iniciar command listener (não crítico):', err);
+    }
   });
 
   server.on('error', (err: any) => {

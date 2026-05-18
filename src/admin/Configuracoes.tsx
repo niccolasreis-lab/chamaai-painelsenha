@@ -16,9 +16,10 @@ export default function Configuracoes() {
     reset_diario_automatico: '1',
     fila_normal_ativa: '1',
     fila_preferencial_ativa: '1',
-    prefixo_normal: 'N',
     prefixo_preferencial: 'P',
     logo_cliente: '',
+    nome_estabelecimento: 'ChamaAí - Atendimento',
+    portal_voz_alerta: 'Feminina',
     som_personalizado: '',
     ocultar_tipo_senha: '0',
     texto_rodape: 'ChamaAí - Atendimento de Segunda a Sexta, 8h às 18h',
@@ -30,6 +31,7 @@ export default function Configuracoes() {
     impressora_interface: '',
     impressora_type: 'EPSON',
     impressora_width: '48',
+    portal_cliente_url: '',
   });
 
   useEffect(() => {
@@ -229,6 +231,17 @@ export default function Configuracoes() {
                 Telão & Interface
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="col-span-2">
+                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">NOME DO ESTABELECIMENTO</label>
+                  <input
+                    name="nome_estabelecimento"
+                    value={config.nome_estabelecimento || ''}
+                    onChange={handleChange}
+                    className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold"
+                    type="text"
+                  />
+                  <p className="text-[10px] text-ink-secondary/60 mt-1 font-medium">Aparece no portal do cliente e no telão.</p>
+                </div>
                 <div className="col-span-2 md:col-span-1">
                   <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">TEXTO DO RODAPÉ (TELÃO)</label>
                   <input
@@ -308,6 +321,31 @@ export default function Configuracoes() {
                       <option key={p.name} value={p.name}>{p.name}</option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">VOZ DE ALERTA DO CELULAR</label>
+                  <select
+                    name="portal_voz_alerta"
+                    value={config.portal_voz_alerta || 'Feminina'}
+                    onChange={handleChange}
+                    className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-bold"
+                  >
+                    <option value="Feminina">Voz Feminina (Padrão)</option>
+                    <option value="Masculina">Voz Masculina</option>
+                    <option value="Apenas Beep">Apenas Som (Beep)</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">URL DO PORTAL DO CLIENTE (QR CODE)</label>
+                  <input
+                    name="portal_cliente_url"
+                    value={config.portal_cliente_url || ''}
+                    onChange={handleChange}
+                    placeholder="Ex: https://chamacliente.vercel.app"
+                    className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold"
+                    type="text"
+                  />
+                  <p className="text-[10px] text-ink-secondary/60 mt-1 font-medium">URL do deploy na Vercel. Se vazio, o QR Code aponta para a rede local (Wi-Fi).</p>
                 </div>
                 <button
                   onClick={async () => {

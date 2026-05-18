@@ -71,3 +71,27 @@
     transform: scale(1);
   }
 }
+
+/* ── EncarteGranel Animations ─────────────────────────────────── */
+@keyframes slideProgress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+@keyframes granelCardIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.encarte-granel-card {
+  animation: granelCardIn 350ms ease both;
+}
+
+@keyframes granelTicker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.encarte-granel-ticker {
+  animation: granelTicker 30s linear infinite;
+}

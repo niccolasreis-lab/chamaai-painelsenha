@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import SenhaChamada from './SenhaChamada';
+import EncartePrecos from './EncartePrecos';
+import EncarteGranel from './EncarteGranel';
 import { useSSE } from '../shared/useSSE';
 import { getApiUrl } from '../shared/apiConfig';
 import { playNotificationSound } from '../shared/sounds';
@@ -13,6 +15,12 @@ export default function MediaIndoor() {
   const [activeMidiaIndex, setActiveMidiaIndex] = useState(0);
   const [config, setConfig] = useState<any>({});
   const [pessoasAguardando, setPessoasAguardando] = useState(0);
+  // Toledo Encarte state
+  const [showingEncarte, setShowingEncarte] = useState(false);
+  const [encarteEnabled, setEncarteEnabled] = useState(false);
+  const [encarteDuracao, setEncarteDuracao] = useState(15);
+  const [encarteItensPorSlide, setEncarteItensPorSlide] = useState(12);
+  const [encarteRefreshKey, setEncarteRefreshKey] = useState(0);
   const API_URL = getApiUrl();
 
   const fetchConfig = async () => {
@@ -20,6 +28,10 @@ export default function MediaIndoor() {
       const res = await fetch(`${API_URL}/api/configuracoes`);
       const data = await res.json();
       setConfig(data);
+      // Update encarte settings from config
+      setEncarteEnabled(data.toledo_encarte_ativo === '1');
+      setEncarteDuracao(parseInt(data.toledo_encarte_duracao || '15', 10));
+      setEncarteItensPorSlide(parseInt(data.toledo_itens_por_slide || '12', 10));
     } catch (err) {
       console.error('Erro ao buscar configs', err);
     }
@@ -105,6 +117,9 @@ export default function MediaIndoor() {
       fetchConfig();
     } else if (sseEvent.event === 'MIDIAS_ATUALIZADAS') {
       fetchMidias();
+    } else if (sseEvent.event === 'TOLEDO_PRECOS_ATUALIZADOS') {
+      // Force re-render of the encarte by bumping a key
+      setEncarteRefreshKey(prev => prev + 1);
     } else if (sseEvent.event === 'RECARREGAR_PAGINA') {
       window.location.reload();
     } else if (sseEvent.event === 'SISTEMA_RESETADO') {
@@ -115,22 +130,50 @@ export default function MediaIndoor() {
     }
   }, [sseEvent]);
 
-  const nextMedia = () => {
+  const nextMedia = useCallback(() => {
     if (midias.length > 0) {
-      setActiveMidiaIndex((prev) => (prev + 1) % midias.length);
+      const nextIndex = (activeMidiaIndex + 1) % midias.length;
+      
+      // Check if we should show the encarte at this transition point
+      // The encarte position config determines after which media index it appears
+      const encartePos = parseInt(config.toledo_encarte_posicao || '0', 10);
+      
+      if (encarteEnabled && !showingEncarte && activeMidiaIndex === encartePos) {
+        // Show the encarte instead of advancing to next media
+        setShowingEncarte(true);
+        return;
+      }
+      
+      setActiveMidiaIndex(nextIndex);
+    } else if (encarteEnabled && !showingEncarte) {
+      // No regular media but encarte is enabled → show it
+      setShowingEncarte(true);
     }
-  };
+  }, [midias.length, activeMidiaIndex, encarteEnabled, showingEncarte, config.toledo_encarte_posicao]);
+
+  // Called when the encarte finishes all its slides
+  const onEncarteComplete = useCallback(() => {
+    setShowingEncarte(false);
+    // Advance to next regular media
+    if (midias.length > 0) {
+      setActiveMidiaIndex(prev => (prev + 1) % midias.length);
+    }
+  }, [midias.length]);
 
   // Handle Image timer (Videos handle themselves via onEnded)
   useEffect(() => {
-    if (midias.length > 0 && showMedia) {
+    if (midias.length > 0 && showMedia && !showingEncarte) {
       const current = midias[activeMidiaIndex];
       if (current.tipo === 'imagem') {
         const timer = setTimeout(nextMedia, 10000); // 10s for images
         return () => clearTimeout(timer);
       }
+    } else if (midias.length === 0 && encarteEnabled && !showingEncarte && showMedia) {
+      // No media at all but encarte is enabled — show it after a brief delay
+      const timer = setTimeout(() => setShowingEncarte(true), 2000);
+      return () => clearTimeout(timer);
     }
-  }, [activeMidiaIndex, midias, showMedia]);
+  }, [activeMidiaIndex, midias, showMedia, showingEncarte, encarteEnabled, nextMedia]);
 
   useEffect(() => {
     // Atualiza o contador de aguardando se vier no evento consolidado
@@ -144,10 +187,10 @@ export default function MediaIndoor() {
   return (
     <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-sans text-ink">
       {/* Top Header Area */}
-      <header className="h-20 bg-white border-b border-outline-variant/30 flex items-center justify-between px-8 shrink-0">
+      <header className="h-32 bg-white border-b border-outline-variant/30 flex items-center justify-between px-8 shrink-0">
         <div className="flex items-center gap-4">
           {config.logo_cliente ? (
-            <img src={`${API_URL}${config.logo_cliente}`} className="h-12 object-contain" alt="Logo" />
+            <img src={`${API_URL}${config.logo_cliente}`} className="h-20 object-contain" alt="Logo" />
           ) : (
             <div className="flex flex-col">
               <h1 className="font-sans text-3xl font-bold text-primary leading-none uppercase tracking-tighter">ChamaAí</h1>
@@ -161,14 +204,7 @@ export default function MediaIndoor() {
           )}
         </div>
         <div className="flex items-center gap-8">
-          {/* Online Badge */}
-          <div className="flex items-center gap-3 text-ink-secondary pr-6 border-r border-outline-variant/30">
-             <span className="material-symbols-outlined text-3xl">cloud_done</span>
-             <div className="bg-success/10 text-success px-4 py-1.5 rounded-full text-xs font-bold uppercase border border-success/20 flex items-center gap-2">
-               <span className="w-2 h-2 bg-success rounded-full animate-pulse"></span>
-               ONLINE
-             </div>
-          </div>
+
 
           {/* Aguardando Badge */}
           <div className="flex items-center gap-6 bg-blue-500/5 px-8 py-3 rounded-3xl">
@@ -188,14 +224,32 @@ export default function MediaIndoor() {
           <div className="h-full w-full">
             {activeMidia ? (
               <div className="h-full w-full animate-fade-in relative">
-                {activeMidia.tipo === 'video' ? (
+                {showingEncarte ? (
+                  config.toledo_encarte_estilo === 'granel' ? (
+                    <EncarteGranel
+                      key={`encarte-granel-${encarteRefreshKey}`}
+                      duracao={encarteDuracao}
+                      itensPorSlide={encarteItensPorSlide}
+                      onComplete={onEncarteComplete}
+                      config={config}
+                    />
+                  ) : (
+                    <EncartePrecos
+                      key={`encarte-${encarteRefreshKey}`}
+                      duracao={encarteDuracao}
+                      itensPorSlide={encarteItensPorSlide}
+                      onComplete={onEncarteComplete}
+                      config={config}
+                    />
+                  )
+                ) : activeMidia.tipo === 'video' ? (
                   <video 
                     key={`${activeMidia.id}-${activeMidiaIndex}`}
                     src={`${API_URL}${activeMidia.caminho}`} 
                     className="w-full h-full object-contain"
                     autoPlay
                     muted
-                    loop={midias.length === 1}
+                    loop={midias.length === 1 && !encarteEnabled}
                     onEnded={nextMedia}
                     playsInline
                     preload="auto"
@@ -208,8 +262,27 @@ export default function MediaIndoor() {
                     className="w-full h-full object-contain"
                   />
                 )}
-                
-
+              </div>
+            ) : showingEncarte && encarteEnabled ? (
+              /* Encarte shown when there are no regular media */
+              <div className="h-full w-full animate-fade-in">
+                {config.toledo_encarte_estilo === 'granel' ? (
+                  <EncarteGranel
+                    key={`encarte-granel-only-${encarteRefreshKey}`}
+                    duracao={encarteDuracao}
+                    itensPorSlide={encarteItensPorSlide}
+                    onComplete={onEncarteComplete}
+                    config={config}
+                  />
+                ) : (
+                  <EncartePrecos
+                    key={`encarte-only-${encarteRefreshKey}`}
+                    duracao={encarteDuracao}
+                    itensPorSlide={encarteItensPorSlide}
+                    onComplete={onEncarteComplete}
+                    config={config}
+                  />
+                )}
               </div>
             ) : (
               /* Background Branding when no media */
@@ -288,20 +361,32 @@ export default function MediaIndoor() {
         </div>
       </div>
 
-      {/* Bottom Footer Area */}
+      {/* Bottom Footer Area (Letreiro Digital) */}
       {config.mostrar_rodape !== '0' && (
-        <footer className="h-14 bg-white border-t border-outline-variant/30 flex items-center justify-between px-8 shrink-0">
-          <div className="flex items-center gap-4">
-            <p className="font-sans text-sm font-bold text-ink-secondary/60 uppercase tracking-widest">
-              {config.texto_rodape || 'ChamaAí - Atendimento de Segunda a Sexta, 8h às 18h'}
-            </p>
+        <footer className="h-14 bg-ink text-white flex items-center justify-between shrink-0 relative overflow-hidden">
+          <div className="flex-1 overflow-hidden relative h-full flex items-center">
+            <div 
+              className="whitespace-nowrap inline-block font-sans text-[1.1rem] font-bold uppercase tracking-[0.1em] text-white/90"
+              style={{ animation: 'marquee 25s linear infinite' }}
+            >
+              <span className="text-primary mx-6">⚡</span>
+              {config.texto_rodape || 'Aproveite nossas promoções exclusivas! • Peça já o seu cartão ChamaAí e ganhe 10% de desconto.'}
+              <span className="text-primary mx-6">⚡</span>
+              {config.texto_rodape || 'Aproveite nossas promoções exclusivas! • Peça já o seu cartão ChamaAí e ganhe 10% de desconto.'}
+            </div>
           </div>
-          <div className="font-sans text-lg font-bold text-ink-secondary flex items-center gap-2">
-            <span className="lowercase font-sans">{currentTime.toLocaleDateString('pt-BR', { weekday: 'short' })}.</span>
-            {currentTime.toLocaleDateString('pt-BR')} · {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          <div className="font-sans text-lg font-bold shrink-0 flex items-center gap-2 bg-ink pl-8 pr-8 z-10 h-full border-l border-white/10 shadow-[-10px_0_15px_rgba(0,0,0,0.5)]">
+            <span className="lowercase font-sans opacity-60">{currentTime.toLocaleDateString('pt-BR', { weekday: 'short' })}.</span>
+            {currentTime.toLocaleDateString('pt-BR')} <span className="opacity-40 mx-1">•</span> {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </div>
         </footer>
       )}
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(100vw); }
+          100% { transform: translateX(-100%); }
+        }
+      `}</style>
       {/* Fullscreen Call Overlay */}
       {!showMedia && ultimaSenha && (
         <div className="absolute inset-0 z-50">
