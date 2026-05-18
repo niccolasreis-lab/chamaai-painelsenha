@@ -1,5 +1,6 @@
 export interface ElectronAPI {
   printTicket: (data: {
+    ticketId?: number;
     numero: string;
     balcao: string;
     data: string;

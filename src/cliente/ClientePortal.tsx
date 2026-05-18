@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getApiUrl } from '../shared/apiConfig';
 import { jsPDF } from 'jspdf';
@@ -12,11 +12,6 @@ interface Produto {
   categoria: string;
 }
 
-interface Categoria {
-  id: string;
-  name: string;
-}
-
 export default function ClientePortal() {
   const [searchParams] = useSearchParams();
   const ticketId = searchParams.get('ticket');
@@ -26,7 +21,6 @@ export default function ClientePortal() {
   const [ticketNumero, setTicketNumero] = useState<string>('');
   
   const [produtos, setProdutos] = useState<Produto[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [busca, setBusca] = useState('');
   
   // Carrinho de pré-seleção: armazena PLU e Quantidade (apenas representativa para a lista)

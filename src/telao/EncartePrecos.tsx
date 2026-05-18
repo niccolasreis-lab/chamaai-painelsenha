@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getApiUrl } from '../shared/apiConfig';
 
 interface EncarteProps {
@@ -9,7 +9,6 @@ interface EncarteProps {
 }
 
 export default function EncartePrecos({ duracao, itensPorSlide, onComplete, config }: EncarteProps) {
-  const [produtos, setProdutos] = useState<any[]>([]);
   const [slides, setSlides] = useState<any[][]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());

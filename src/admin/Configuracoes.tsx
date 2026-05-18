@@ -9,7 +9,6 @@ export default function Configuracoes() {
   const [printers, setPrinters] = useState<any[]>([]);
   const API_URL = getApiUrl();
   const [config, setConfig] = useState<Record<string, string>>({
-    nome_estabelecimento: 'Supermercado',
     tempo_destaque_senha: '5',
     volume_audio: '80',
     intervalo_midia_seg: '10',

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getApiUrl } from '../shared/apiConfig';
 
 interface EncarteGranelProps {
@@ -224,8 +224,6 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
   const [currentSlide, setCurrentSlide] = useState(0);
   const [animKey, setAnimKey] = useState(0);
   const progressRef = useRef<HTMLDivElement>(null);
-  const tickerRef = useRef<HTMLDivElement>(null);
-  const [allProducts, setAllProducts] = useState<any[]>([]);
 
   const API_URL = getApiUrl();
   const colunas = parseInt(config?.toledo_encarte_colunas || '4', 10);
@@ -236,8 +234,6 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
     fetch(`${API_URL}/api/toledo/produtos`)
       .then(r => r.json())
       .then((data: any[]) => {
-        setAllProducts(data);
-
         // Group by category
         const groups: Record<string, any[]> = {};
         data.forEach(p => {
@@ -376,7 +372,6 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
             const pIcon = getProductIcon(p.descricao);
             const isOferta = p.descricao.includes('OFERTA') || p.descricao.includes('*');
             const cleanName = p.descricao.replace(/\* OFERTA \*/g, '').replace(/OFERTA/gi, '').replace(/\*/g, '').trim();
-            const tag = slide.tag || 'granel';
 
             return (
               <div
