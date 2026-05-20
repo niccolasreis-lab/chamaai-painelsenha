@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import * as path from 'path';
 import { initDatabase, getDb } from './services/database';
-import { startServer } from '../server/index';
+import { startServer, stopServer } from '../server/index';
 import { PrinterService, PrinterConfig } from './services/printer';
 import { autoUpdater } from 'electron-updater';
 
@@ -145,8 +145,25 @@ ipcMain.handle('print-ticket', async (_event, data) => {
 });
 
 ipcMain.handle('update-printer-config', async (_event, newConfig) => {
+  try {
+    const db = getDb();
+    const stmt = db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES (?, ?, datetime('now'))");
+    if (newConfig.interface !== undefined) stmt.run('impressora_interface', String(newConfig.interface));
+    if (newConfig.type !== undefined) stmt.run('impressora_type', String(newConfig.type));
+    if (newConfig.width !== undefined) stmt.run('impressora_width', String(newConfig.width));
+    if (newConfig.footer !== undefined) stmt.run('impressora_footer', String(newConfig.footer));
+    if (newConfig.logoPath !== undefined) stmt.run('impressora_logoPath', String(newConfig.logoPath));
+    console.log('[ELECTRON] Configurações de impressora salvas localmente no banco de dados SQLite.');
+  } catch (err) {
+    console.error('[ELECTRON] Erro ao salvar configurações de impressora localmente:', err);
+  }
+  
   printerService.updateConfig(newConfig);
   return { success: true };
+});
+
+ipcMain.handle('get-printer-config', async () => {
+  return loadPrinterConfig();
 });
 
 ipcMain.handle('set-auto-launch', async (_event, { enable, route }) => {
@@ -210,30 +227,34 @@ ipcMain.handle('install-update', async () => {
   try {
     console.log('[UPDATE] Iniciando procedimento de limpeza para instalação...');
     
-    // 1. Mata processos que possam travar arquivos (usando padrões que evitam erros de caracteres especiais)
+    // 1. Desliga graciosamente todos os processos, watchers e conexões de banco locais
+    try { stopServer(); } catch(e) { console.error('Erro no stopServer:', e); }
+
+    // 2. Mata processos zumbis que possam travar arquivos (usando PowerShell para evitar o próprio PID)
     const { execSync } = require('child_process');
+    const currentPid = process.pid;
     const commands = [
-      'taskkill /f /im "ChamaA*.exe" /t', // Pega ChamaAí.exe e variações
-      'taskkill /f /im "chamaai-novo.exe" /t',
-      'wmic process where "CommandLine like \'%chamaai%\'" call terminate'
+      `powershell -NoProfile -Command "Get-Process | Where-Object { ($_.ProcessName -like '*ChamaA*') -and ($_.Id -ne ${currentPid}) } | Stop-Process -Force"`,
+      `powershell -NoProfile -Command "Get-Process | Where-Object { ($_.ProcessName -like '*chamaai-novo*') -and ($_.Id -ne ${currentPid}) } | Stop-Process -Force"`,
+      `powershell -NoProfile -Command "Get-Process | Where-Object { ($_.CommandLine -match 'chamaai') -and ($_.Id -ne ${currentPid}) } | Stop-Process -Force"`
     ];
 
     commands.forEach(cmd => {
       try { execSync(cmd, { windowsHide: true }); } catch (e) { /* Silencioso se não encontrar */ }
     });
 
-    // 2. Força o encerramento das janelas
+    // 3. Força o encerramento das janelas
     app.removeAllListeners('window-all-closed');
     BrowserWindow.getAllWindows().forEach(win => {
       win.removeAllListeners('close');
       win.destroy();
     });
 
-    // 3. Pequeno delay para o SO liberar os descritores de arquivo
+    // 4. Pequeno delay para o SO liberar os descritores de arquivo (incluindo SQLite e SQLite WAL)
     setTimeout(() => {
       console.log('[UPDATE] Chamando quitAndInstall...');
       autoUpdater.quitAndInstall(true, true);
-    }, 1500);
+    }, 2500);
     
     return { success: true };
   } catch (err: any) {

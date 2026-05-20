@@ -425,6 +425,62 @@ export default function ToledoConfig() {
             </select>
           </div>
 
+          {/* Tamanho da Fonte — Descrição */}
+          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
+            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
+              Fonte Descrição
+            </label>
+            <select
+              value={config.toledo_fonte_descricao || '1.25rem'}
+              onChange={(e) => handleSaveConfig('toledo_fonte_descricao', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none"
+            >
+              <option value="0.9rem">0.9rem (Pequeno)</option>
+              <option value="1rem">1rem (Médio)</option>
+              <option value="1.1rem">1.1rem</option>
+              <option value="1.25rem">1.25rem (Padrão)</option>
+              <option value="1.5rem">1.5rem (Grande)</option>
+            </select>
+            <p className="text-[10px] text-ink-secondary mt-2 text-center">Tamanho do texto do produto</p>
+          </div>
+
+          {/* Tamanho da Fonte — Preço */}
+          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
+            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
+              Fonte Preço
+            </label>
+            <select
+              value={config.toledo_fonte_preco || '1.75rem'}
+              onChange={(e) => handleSaveConfig('toledo_fonte_preco', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none"
+            >
+              <option value="1.25rem">1.25rem (Pequeno)</option>
+              <option value="1.5rem">1.5rem (Médio)</option>
+              <option value="1.75rem">1.75rem (Padrão)</option>
+              <option value="2rem">2rem (Grande)</option>
+              <option value="2.5rem">2.5rem (Extra Grande)</option>
+            </select>
+            <p className="text-[10px] text-ink-secondary mt-2 text-center">Tamanho do preço no encarte</p>
+          </div>
+
+          {/* Ocultar Guichê no Telão */}
+          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
+            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
+              Guichê no Telão
+            </label>
+            <button
+              onClick={() => handleSaveConfig('telao_ocultar_guiche', config.telao_ocultar_guiche === '1' ? '0' : '1')}
+              className={`w-full py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-all ${
+                config.telao_ocultar_guiche === '1'
+                  ? 'bg-error/10 text-error border border-error/20 hover:bg-error/20'
+                  : 'bg-success/10 text-success border border-success/20 hover:bg-success/20'
+              }`}
+            >
+              {config.telao_ocultar_guiche === '1' ? '✕ Oculto' : '✓ Visível'}
+            </button>
+            <p className="text-[10px] text-ink-secondary mt-2 text-center">Exibir guichê na chamada</p>
+          </div>
+
           {/* Estilo do Encarte */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm md:col-span-2 lg:col-span-5">
             <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">

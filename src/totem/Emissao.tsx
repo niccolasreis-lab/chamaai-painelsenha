@@ -141,7 +141,8 @@ export default function Emissao() {
           balcao: config.nome_estabelecimento || "Balcão Geral",
           data: new Date().toLocaleString('pt-BR'),
           preferencial: data.preferencial,
-          logo: config.logo_cliente ? `${API_URL}${config.logo_cliente}` : undefined
+          logo: config.logo_cliente ? `${API_URL}${config.logo_cliente}` : undefined,
+          mostraEncarte: config.toledo_encarte_ativo === '1'
         }).catch(err => console.error('Erro na impressão background', err));
       }
 

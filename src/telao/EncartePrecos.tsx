@@ -259,11 +259,11 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
                           : (idx % 2 === 0 ? 'bg-white/[0.04]' : 'bg-white/[0.08]')
                         }`}
                     >
-                      <span className={`text-[1.25rem] font-bold line-clamp-2 pr-4 flex-1 leading-tight tracking-wide ${group.isOferta ? 'text-red-100' : 'text-white'}`}>
+                      <span className={`font-bold line-clamp-2 pr-4 flex-1 leading-tight tracking-wide ${group.isOferta ? 'text-red-100' : 'text-white'}`} style={{ fontSize: config.toledo_fonte_descricao || '1.25rem' }}>
                         {produto.descricao.replace(/\*|OFERTA/gi, '').trim()}
                       </span>
                       <div className="flex items-baseline gap-1 shrink-0">
-                        <span className={`${group.isOferta ? 'text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.8)]' : accentClass} text-[1.75rem] font-black tracking-tighter drop-shadow-sm`}>
+                        <span className={`${group.isOferta ? 'text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.8)]' : accentClass} font-black tracking-tighter drop-shadow-sm`} style={{ fontSize: config.toledo_fonte_preco || '1.75rem' }}>
                           {formatPreco(produto.preco)}
                         </span>
                         <span className={`${group.isOferta ? 'text-red-400' : accentClass} opacity-60 text-sm font-bold uppercase`}>/kg</span>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { margin: 0; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    background: white;
+    overflow: hidden;
+  }
+  body { 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    width: 80mm; 
+    text-align: center; 
+    color: black; 
+  }
+  #ticket-content {
+    padding: 0px 5px 10px 5px; /* Sem padding no topo */
+    display: block;
+    width: 100%;
+    margin: 0;
+    border: 1px solid #ccc; /* Apenas para visualização no navegador */
+  }
+  .balcao { font-weight: 900; font-size: 22px; text-transform: uppercase; border-bottom: 2px solid black; padding-bottom: 5px; margin-bottom: 10px; margin-top: 5px; }
+  .numero { font-weight: 900; font-size: 64px; margin: 5px 0 10px 0; letter-spacing: 2px; line-height: 1; }
+  .tipo { font-weight: 900; font-size: 20px; margin-bottom: 10px; padding: 6px; border-radius: 5px; border: 2px solid black; }
+  .preferencial { background: black; color: white; }
+  .data { font-size: 16px; margin-bottom: 10px; font-weight: 900; }
+  .footer { font-size: 14px; font-weight: bold; border-top: 2px dashed black; padding-top: 10px; margin-top: 10px; padding-bottom: 5px; }
+  .logo { max-width: 80%; max-height: 100px; object-fit: contain; margin-bottom: 5px; margin-top: 5px; }
+  .qr-container { margin-top: 6px; border-top: 2px dashed black; padding-top: 6px; }
+  .qr-text { font-size: 11px; margin-bottom: 4px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; }
+  .qr-code { width: 90px; height: 90px; margin-bottom: 2px; display: inline-block; }
+  .qr-obs { font-size: 9px; font-weight: bold; margin-top: 1px; }
+</style>
+</head>
+<body>
+  <div id="ticket-content">
+    <div class="balcao">ChamaAí - Supermercado</div>
+    <div class="numero">A001</div>
+    <div class="tipo ">ATENDIMENTO NORMAL</div>
+    <div class="data">19/05/2026 09:05:00</div>
+
+    <div class="qr-container">
+      <div class="qr-text">Confira Nossas Ofertas:</div>
+      <img class="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https%3A%2F%2Fchamacliente.vercel.app%2F%23%2F%3Fticket%3D123" alt="QR Code" />
+      <div class="qr-obs">* Preços válidos para hoje.</div>
+    </div>
+    <div class="footer">Obrigado pela preferência!</div>
+  </div>
+</body>
+</html>

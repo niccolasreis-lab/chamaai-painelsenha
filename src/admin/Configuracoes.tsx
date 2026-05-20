@@ -7,6 +7,7 @@ export default function Configuracoes() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [printers, setPrinters] = useState<any[]>([]);
+  const [backups, setBackups] = useState<any[]>([]);
   const API_URL = getApiUrl();
   const [config, setConfig] = useState<Record<string, string>>({
     tempo_destaque_senha: '5',
@@ -31,10 +32,21 @@ export default function Configuracoes() {
     impressora_type: 'EPSON',
     impressora_width: '48',
     portal_cliente_url: '',
+    print_logo: '1',
+    print_escrita: '1',
+    print_qrcode: '1',
+    backup_incluir_config: '1',
+    backup_incluir_operadores: '1',
+    backup_incluir_balcoes: '1',
+    backup_incluir_midias: '1',
+    backup_agendado_ativo: '0',
+    backup_frequencia: 'diario',
+    backup_destino: '',
   });
 
   useEffect(() => {
     fetchConfig();
+    fetchBackups();
     if ((window as any).api?.getPrinters) {
       (window as any).api.getPrinters().then((list: any[]) => {
         setPrinters(list);
@@ -42,13 +54,41 @@ export default function Configuracoes() {
     }
   }, []);
 
+  const fetchBackups = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/backups?limit=20`);
+      if (res.ok) {
+        const data = await res.json();
+        setBackups(data.backups || []);
+      }
+    } catch (err) {
+      console.error('Erro ao listar backups', err);
+    }
+  };
+
   const fetchConfig = async () => {
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/configuracoes`);
       const data = await res.json();
       if (Object.keys(data).length > 0) {
-        setConfig(prev => ({ ...prev, ...data }));
+        let mergedData = { ...data };
+        
+        // Se estiver rodando no Electron, carrega as configurações locais de impressora do banco local
+        if ((window as any).api?.getPrinterConfig) {
+          try {
+            const localPrinter = await (window as any).api.getPrinterConfig();
+            if (localPrinter) {
+              mergedData.impressora_interface = localPrinter.interface || '';
+              mergedData.impressora_type = localPrinter.type || 'EPSON';
+              mergedData.impressora_width = String(localPrinter.width || '48');
+            }
+          } catch (err) {
+            console.error('Erro ao carregar configurações de impressora local:', err);
+          }
+        }
+        
+        setConfig(prev => ({ ...prev, ...mergedData }));
       }
     } catch (err) {
       console.error('Erro ao buscar configurações', err);
@@ -119,14 +159,21 @@ export default function Configuracoes() {
 
   const handleBackup = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/backup`);
-      const data = await res.json();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const params = new URLSearchParams({
+        config: config.backup_incluir_config || '1',
+        operadores: config.backup_incluir_operadores || '1',
+        balcoes: config.backup_incluir_balcoes || '1',
+        midias: config.backup_incluir_midias || '0',
+      });
+      const res = await fetch(`${API_URL}/api/admin/backup?${params.toString()}`);
+      if (!res.ok) throw new Error('Erro ao gerar backup');
+      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `backup_chamaai_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `backup_chamaai_${new Date().toISOString().split('T')[0]}.zip`;
       a.click();
+      URL.revokeObjectURL(url);
     } catch (err) {
       alert('Erro ao gerar backup.');
     }
@@ -135,25 +182,54 @@ export default function Configuracoes() {
   const handleRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!confirm('Deseja restaurar este backup? Isso substituirá as configurações atuais.')) return;
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const data = JSON.parse(event.target?.result as string);
-        const res = await fetch(`${API_URL}/api/admin/restore`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        if (res.ok) {
-          alert('Sistema restaurado com sucesso! Recarregando...');
-          window.location.reload();
-        }
-      } catch (err) {
-        alert('Erro ao restaurar backup.');
+    if (!confirm('Deseja restaurar este backup manual (.zip)? Isso substituirá as configurações atuais e o sistema será reiniciado.')) return;
+    
+    const formData = new FormData();
+    formData.append('backupFile', file);
+    
+    try {
+      const res = await fetch(`${API_URL}/api/admin/restore`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        alert('Sistema restaurado com sucesso! Recarregando...');
+        window.location.reload();
+      } else {
+        const data = await res.json();
+        alert(`Erro ao restaurar: ${data.error}`);
       }
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      alert('Erro de conexão ao restaurar backup.');
+    }
+  };
+
+  const handleRestoreLocal = async (filename: string) => {
+    if (!confirm(`Restaurar o backup "${filename}"? Todos os dados atuais serão sobrescritos.`)) return;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/backups/${filename}/restore`, { method: 'POST' });
+      if (res.ok) {
+        alert('Backup restaurado com sucesso! Recarregando...');
+        window.location.reload();
+      } else {
+        const err = await res.json();
+        alert(`Erro: ${err.error}`);
+      }
+    } catch (e) {
+      alert('Erro de conexão ao restaurar.');
+    }
+  };
+
+  const handleDeleteBackup = async (filename: string) => {
+    if (!confirm(`Tem certeza que deseja excluir permanentemente o backup "${filename}"?`)) return;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/backups/${filename}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchBackups();
+      }
+    } catch (e) {
+      alert('Erro de conexão ao excluir.');
+    }
   };
 
   if (loading) {
@@ -346,6 +422,89 @@ export default function Configuracoes() {
                   />
                   <p className="text-[10px] text-ink-secondary/60 mt-1 font-medium">URL do deploy na Vercel. Se vazio, o QR Code aponta para a rede local (Wi-Fi).</p>
                 </div>
+                <div className="border-t border-outline-variant/30 pt-6 mt-2 flex flex-col xl:flex-row gap-6">
+                  <div className="flex-1">
+                    <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-4 text-xs">LAYOUT DO TICKET IMPRESSO</label>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30">
+                        <span className="font-bold text-ink text-sm uppercase">Exibir Logotipo</span>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" name="print_logo" checked={config.print_logo !== '0'} onChange={handleChange} className="sr-only peer" />
+                          <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                        </label>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30">
+                        <span className="font-bold text-ink text-sm uppercase">Exibir Nome do Estabelecimento</span>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" name="print_escrita" checked={config.print_escrita !== '0'} onChange={handleChange} className="sr-only peer" />
+                          <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                        </label>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30">
+                        <span className="font-bold text-ink text-sm uppercase">Exibir QR Code</span>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" name="print_qrcode" checked={config.print_qrcode !== '0'} onChange={handleChange} className="sr-only peer" />
+                          <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preview Visual do Ticket */}
+                  <div className="w-full xl:w-[280px] shrink-0 bg-surface-variant/30 border-2 border-dashed border-outline-variant/50 rounded-2xl p-4 flex flex-col items-center overflow-hidden relative">
+                    <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-4 text-xs text-center">PREVIEW (SIMULAÇÃO)</label>
+                    
+                    {/* Boca da impressora */}
+                    <div className="w-[90%] h-4 bg-ink/80 rounded-full mb-0 z-10 shadow-md relative">
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-1 bg-black/50 rounded-full"></div>
+                    </div>
+                    
+                    {/* Papel (Ticket) animado ao mudar qualquer config */}
+                    <div 
+                      key={`${config.print_logo}-${config.print_escrita}-${config.print_qrcode}-${config.nome_estabelecimento}`}
+                      className="w-[80%] bg-white shadow-lg pt-4 pb-8 px-4 flex flex-col items-center gap-3 relative z-0 animate-print-slide"
+                    >
+                      {/* Logo */}
+                      {config.print_logo !== '0' && config.logo_cliente && (
+                        <img src={`${API_URL}${config.logo_cliente}`} className="h-8 object-contain grayscale opacity-80" alt="Logo Preview" />
+                      )}
+                      
+                      {/* Nome */}
+                      {config.print_escrita !== '0' && (
+                        <div className="font-bold text-center text-[10px] text-black w-full break-words leading-tight">
+                          {config.nome_estabelecimento || 'NOME DO ESTABELECIMENTO'}
+                        </div>
+                      )}
+                      
+                      <div className="w-full border-t-2 border-dashed border-gray-300 my-1"></div>
+                      
+                      {/* Senha (Mock) */}
+                      <div className="text-center w-full">
+                        <div className="text-[10px] text-black/70">Senha</div>
+                        <div className="text-3xl font-black text-black">A001</div>
+                      </div>
+                      
+                      <div className="w-full border-t-2 border-dashed border-gray-300 my-1"></div>
+
+                      {/* QR Code */}
+                      {config.print_qrcode !== '0' && (
+                        <div className="flex flex-col items-center gap-1">
+                          <div className="w-16 h-16 bg-black p-1 flex flex-wrap gap-0.5">
+                             <div className="w-full h-full bg-white grid grid-cols-4 gap-0.5 p-0.5">
+                               {Array.from({ length: 16 }).map((_, i) => (
+                                 <div key={i} className={`bg-black ${Math.random() > 0.4 ? 'opacity-100' : 'opacity-0'}`}></div>
+                               ))}
+                             </div>
+                          </div>
+                          <div className="text-[7px] text-black/60 text-center uppercase tracking-widest mt-1">Acompanhe pelo celular</div>
+                        </div>
+                      )}
+                      
+                      {/* Efeito serrilhado no final usando clip-path / radial-gradient */}
+                      <div className="absolute -bottom-2 left-0 right-0 h-4 bg-[radial-gradient(circle,transparent_50%,#fff_50%)] bg-[length:8px_8px] bg-bottom bg-repeat-x rotate-180"></div>
+                    </div>
+                  </div>
+                </div>
                 <button
                   onClick={async () => {
                     const api = (window as any).api;
@@ -518,37 +677,150 @@ export default function Configuracoes() {
               </div>
             </div>
 
-            {/* Backup & Restore */}
+            {/* Backup & Dados */}
             <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
               <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">cloud_sync</span>
                 Backup & Dados
               </h2>
-              <div className="grid grid-cols-1 gap-4">
-                <button 
-                  onClick={handleBackup}
-                  className="w-full flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30 hover:border-primary/50 transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-primary">download</span>
-                    <span className="font-bold text-ink text-xs uppercase tracking-widest">Exportar Backup</span>
+              <div className="space-y-6">
+                {/* Escopo do Backup */}
+                <div>
+                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-3 text-xs">O QUE INCLUIR NO BACKUP</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { key: 'backup_incluir_config', label: 'Configurações', icon: 'settings' },
+                      { key: 'backup_incluir_operadores', label: 'Operadores', icon: 'group' },
+                      { key: 'backup_incluir_balcoes', label: 'Balcões', icon: 'point_of_sale' },
+                      { key: 'backup_incluir_midias', label: 'Mídias e Imagens', icon: 'perm_media' },
+                    ].map(item => (
+                      <label key={item.key} className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                        config[item.key] !== '0'
+                          ? 'bg-primary/5 border-primary/30 text-ink'
+                          : 'bg-surface-variant border-outline-variant/30 text-ink-secondary'
+                      }`}>
+                        <input
+                          type="checkbox"
+                          name={item.key}
+                          checked={config[item.key] !== '0'}
+                          onChange={handleChange}
+                          className="w-4 h-4 rounded accent-primary shrink-0"
+                        />
+                        <span className="material-symbols-outlined text-lg shrink-0">{item.icon}</span>
+                        <span className="font-bold text-[11px] uppercase tracking-wider">{item.label}</span>
+                      </label>
+                    ))}
                   </div>
-                  <span className="material-symbols-outlined text-ink-secondary opacity-20 group-hover:opacity-100 transition-opacity">chevron_right</span>
-                </button>
+                </div>
 
-                <div className="relative">
-                  <input type="file" id="restore-input" className="hidden" accept=".json" onChange={handleRestore} />
-                  <label 
-                    htmlFor="restore-input"
-                    className="w-full flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30 hover:border-success/50 transition-all group cursor-pointer"
+                {/* Agendamento */}
+                <div className={`border-t border-outline-variant/30 pt-6 space-y-4 transition-opacity ${
+                  config.backup_incluir_config === '0' && config.backup_incluir_operadores === '0' && config.backup_incluir_balcoes === '0' && config.backup_incluir_midias === '0'
+                    ? 'opacity-40 pointer-events-none' : ''
+                }`}>
+                  <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30">
+                    <div>
+                      <span className="font-bold text-ink text-sm uppercase block">Agendamento Automático</span>
+                      {config.backup_incluir_config === '0' && config.backup_incluir_operadores === '0' && config.backup_incluir_balcoes === '0' && config.backup_incluir_midias === '0' && (
+                        <span className="text-[10px] text-error font-bold">Selecione ao menos um item acima</span>
+                      )}
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" name="backup_agendado_ativo" checked={config.backup_agendado_ativo === '1'} onChange={handleChange} className="sr-only peer" />
+                      <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">FREQUÊNCIA</label>
+                    <select
+                      name="backup_frequencia"
+                      value={config.backup_frequencia || 'diario'}
+                      onChange={handleChange}
+                      className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-bold"
+                    >
+                      <option value="diario">Diário</option>
+                      <option value="semanal">Semanal (Domingos)</option>
+                      <option value="mensal">Mensal (Dia 1º)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">DESTINO DOS BACKUPS</label>
+                    <input
+                      name="backup_destino"
+                      value={config.backup_destino || ''}
+                      onChange={handleChange}
+                      placeholder="C:\ChamaAi\Backups (padrão)"
+                      className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold font-mono text-sm"
+                      type="text"
+                    />
+                  </div>
+                </div>
+
+                {/* Ações */}
+                <div className="grid grid-cols-1 gap-3 pt-2">
+                  <button
+                    onClick={handleBackup}
+                    className="w-full flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30 hover:border-primary/50 transition-all group"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-success">upload</span>
-                      <span className="font-bold text-ink text-xs uppercase tracking-widest">Restaurar Backup</span>
+                      <span className="material-symbols-outlined text-primary">download</span>
+                      <span className="font-bold text-ink text-xs uppercase tracking-widest">Fazer Backup Agora</span>
                     </div>
                     <span className="material-symbols-outlined text-ink-secondary opacity-20 group-hover:opacity-100 transition-opacity">chevron_right</span>
-                  </label>
+                  </button>
+
+                  <div className="relative">
+                    <input type="file" id="restore-input" className="hidden" accept=".json,.zip" onChange={handleRestore} />
+                    <label
+                      htmlFor="restore-input"
+                      className="w-full flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30 hover:border-success/50 transition-all group cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-success">upload</span>
+                        <span className="font-bold text-ink text-xs uppercase tracking-widest">Restaurar de Arquivo Manual</span>
+                      </div>
+                      <span className="material-symbols-outlined text-ink-secondary opacity-20 group-hover:opacity-100 transition-opacity">chevron_right</span>
+                    </label>
+                  </div>
                 </div>
+
+                {/* Histórico de Backups */}
+                {backups.length > 0 && (
+                  <div className="mt-6 pt-6 border-t border-outline-variant/30">
+                    <h3 className="font-sans text-[14px] font-bold text-ink mb-4 flex items-center gap-2 uppercase tracking-wider">
+                      <span className="material-symbols-outlined text-primary text-[20px]">history</span>
+                      Histórico de Backups
+                    </h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                      {backups.map((bkp, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 bg-surface-variant/50 rounded-xl border border-outline-variant/30 hover:border-primary/30 transition-all group">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-ink text-sm">{bkp.nome}</span>
+                            <span className="text-ink-secondary text-[11px] uppercase tracking-widest">
+                              {new Date(bkp.criado_em).toLocaleString()} • {bkp.tamanhoMB} MB
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleRestoreLocal(bkp.nome)}
+                              title="Restaurar"
+                              className="p-2 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors flex items-center justify-center"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">restore</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBackup(bkp.nome)}
+                              title="Excluir"
+                              className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors flex items-center justify-center"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

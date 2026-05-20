@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { HashRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import Emissao from './totem/Emissao';
 import Confirmacao from './totem/Confirmacao';
@@ -40,6 +41,18 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
 }
 
 function Home() {
+  const [showModal, setShowModal] = useState(false);
+  const [tempIp, setTempIp] = useState(localStorage.getItem('server_ip_override') || '');
+
+  const handleSaveConnection = () => {
+    if (tempIp.trim() === '') {
+      localStorage.removeItem('server_ip_override');
+    } else {
+      localStorage.setItem('server_ip_override', tempIp.trim());
+    }
+    setShowModal(false);
+    window.location.reload();
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-background text-ink font-sans">
@@ -99,18 +112,7 @@ function Home() {
       <div className="mt-16 flex flex-col items-center gap-4 w-full max-w-lg">
         <div className="w-full h-[1px] bg-outline-variant/30"></div>
         <button 
-          onClick={() => {
-            const currentIp = localStorage.getItem('server_ip_override') || '';
-            const ip = prompt('⚙️ CONFIGURAÇÃO DE REDE\n\nDigite o IP do Servidor (PC do Telão) para que este computador se conecte a ele.\n\nExemplo: 192.168.1.100\n\nDeixe VAZIO para usar este PC como servidor principal.', currentIp);
-            if (ip !== null) {
-              if (ip.trim() === '') {
-                localStorage.removeItem('server_ip_override');
-              } else {
-                localStorage.setItem('server_ip_override', ip.trim());
-              }
-              window.location.reload();
-            }
-          }}
+          onClick={() => setShowModal(true)}
           className="group relative flex flex-col items-center gap-2 p-6 rounded-[24px] border border-outline-variant/30 hover:border-primary/50 hover:bg-primary/5 transition-all w-full"
         >
           <div className="flex items-center gap-3 text-primary">
@@ -135,6 +137,47 @@ function Home() {
           O IP deve ser fixo no roteador para evitar desconexões.
         </p>
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface rounded-3xl p-8 max-w-md w-full shadow-2xl border border-outline-variant/30 flex flex-col gap-6">
+            <div>
+              <h3 className="font-sans text-2xl font-bold text-ink uppercase mb-2">Configuração de Rede</h3>
+              <p className="text-sm font-sans text-ink-secondary font-medium">
+                Digite o IP ou Nome do Computador Principal (Telão) para que este terminal se conecte a ele.
+              </p>
+            </div>
+            <div>
+              <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">IP DO SERVIDOR</label>
+              <input 
+                type="text" 
+                value={tempIp}
+                onChange={(e) => setTempIp(e.target.value)}
+                placeholder="Ex: 192.168.1.100 (Deixe em branco para este PC ser o Servidor)"
+                className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-bold text-lg"
+                autoFocus
+              />
+              <p className="text-[10px] text-ink-secondary/60 mt-2 font-semibold uppercase tracking-wider">
+                Deixe o campo vazio para que este computador atue como o Servidor Principal (Localhost).
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setShowModal(false)}
+                className="flex-1 py-4 bg-surface-variant text-ink rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-outline-variant/50 transition-all"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleSaveConnection}
+                className="flex-1 py-4 bg-primary text-white rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-primary-hover active:scale-95 transition-all"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 text-ink-secondary text-xs opacity-50 font-bold uppercase tracking-widest">
         ChamaAí v1.0.38

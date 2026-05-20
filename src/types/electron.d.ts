@@ -6,6 +6,7 @@ export interface ElectronAPI {
     data: string;
     preferencial: boolean;
     logo?: string;
+    mostraEncarte?: boolean;
   }) => Promise<boolean>;
   updatePrinterConfig: (config: any) => Promise<any>;
   testPrinter: () => Promise<boolean>;

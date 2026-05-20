@@ -121,10 +121,14 @@ export async function syncProdutos(produtos: Array<{ plu: string; descricao: str
 /**
  * Inicia o loop de monitoramento de comandos enviados pelo Operador Web (Vercel).
  */
+let listenerTimer: NodeJS.Timeout | null = null;
+
 export function startSupabaseCommandListener() {
   console.log('[SUPABASE SYNC] 🎧 Iniciando listener de comandos do Operador Nuvem...');
   
-  setInterval(async () => {
+  if (listenerTimer) clearInterval(listenerTimer);
+
+  listenerTimer = setInterval(async () => {
     try {
       // Busca 1 comando pendente mais antigo
       const { data, error } = await supabase
@@ -178,6 +182,14 @@ export function startSupabaseCommandListener() {
       // Erro silencioso de rede, ignora e tenta no próximo ciclo
     }
   }, 2000); // Poll a cada 2 segundos
+}
+
+export function stopSupabaseCommandListener() {
+  if (listenerTimer) {
+    clearInterval(listenerTimer);
+    listenerTimer = null;
+    console.log('[SUPABASE SYNC] Listener do Supabase encerrado.');
+  }
 }
 
 // ── Configurações Públicas (Portal do Cliente) ────────────────────────────────

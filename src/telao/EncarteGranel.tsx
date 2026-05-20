@@ -397,7 +397,7 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
                 {/* Body */}
                 <div style={{ flex: 1, padding: '4px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', minWidth: 0 }}>
                   <span style={{
-                    fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 18, lineHeight: 1.1,
+                    fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: config?.toledo_fonte_descricao || '18px', lineHeight: 1.1,
                     color: COLORS.text, textTransform: 'uppercase',
                     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                   }}>
@@ -419,7 +419,7 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
                   <div>
                     <sup style={{ fontWeight: 800, fontSize: 16, color: isOferta ? '#dc2626' : COLORS.amber, top: '-0.3em' }}>R$</sup>
                     <span style={{
-                      fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, fontSize: 36, lineHeight: 1,
+                      fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, fontSize: config?.toledo_fonte_preco || '36px', lineHeight: 1,
                       color: isOferta ? '#dc2626' : COLORS.amber
                     }}>{formatPreco(p.preco)}</span>
                   </div>

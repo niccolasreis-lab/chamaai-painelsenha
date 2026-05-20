@@ -6,7 +6,7 @@ import fs from 'fs';
 import cron from 'node-cron';
 import { getDb } from '../electron/services/database';
 import { startToledoWatcher, forceToledoRefresh, reloadCategorias, setBroadcastFn } from './toledo-watcher';
-import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, syncConfiguracaoPublica } from './supabase-sync';
+import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica } from './supabase-sync';
 
 const app = express();
 app.use(cors());
@@ -40,6 +40,12 @@ export function startServer() {
 
   const upload = multer({ storage });
 
+  // Upload configurado especificamente para arquivos de backup grandes
+  const backupUpload = multer({ 
+    dest: path.join(process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi', 'Backups', '_temp'),
+    limits: { fileSize: 500 * 1024 * 1024 } // Limite rígido de 500MB
+  });
+
   // Serve static files from uploads folder
   app.use('/uploads', express.static(UPLOADS_DIR));
 
@@ -63,6 +69,9 @@ export function startServer() {
         // Limpa a fila de espera para o novo dia
         db.prepare("DELETE FROM senhas WHERE status = 'aguardando'").run();
 
+        const hoje = new Date().toISOString().split('T')[0];
+        db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('ultimo_reset', ?, datetime('now'))").run(hoje);
+
         // Sync: limpa senhas na nuvem também
         syncLimparSenhas();
         
@@ -79,68 +88,11 @@ export function startServer() {
       console.error('[CRON] Erro ao resetar senhas:', err);
     }
 
-    // --- BACKUP DIÁRIO DE SEGURANÇA (ZIP + Auto-limpeza 5 dias) ---
+    // --- BACKUP INTELIGENTE (Agendado com opt-in) ---
     try {
-      const { execSync } = require('child_process');
-      const backupDir = path.join('\\\\serverad\\Santa Paula\\10 - TI', 'ChamaAi_Backups');
-      if (!fs.existsSync(backupDir)) {
-        fs.mkdirSync(backupDir, { recursive: true });
-      }
-      
-      const dataStr = new Date().toISOString().split('T')[0];
-      const zipFile = path.join(backupDir, `backup_${dataStr}.zip`);
-      
-      // Só faz backup se o ZIP do dia ainda não existir
-      if (!fs.existsSync(zipFile)) {
-        // Cria pasta temporária para montar o conteúdo
-        const tempDir = path.join(backupDir, `_temp_${dataStr}`);
-        if (!fs.existsSync(tempDir)) {
-          fs.mkdirSync(tempDir, { recursive: true });
-        }
-        
-        // Copia o Banco de Dados
-        const dbPath = path.join(userDataPath, 'database.sqlite');
-        if (fs.existsSync(dbPath)) {
-          fs.copyFileSync(dbPath, path.join(tempDir, 'database.sqlite'));
-        }
-        
-        // Mídias ignoradas no backup diário para não pesar a rede
-        
-        // Compacta em ZIP usando PowerShell nativo do Windows
-        try {
-          execSync(`powershell -NoProfile -Command "Compress-Archive -Path '${tempDir}\\*' -DestinationPath '${zipFile}' -Force"`, { timeout: 60000 });
-          console.log(`[CRON] 📦 Backup diário compactado com sucesso: ${zipFile}`);
-        } catch (zipErr) {
-          console.error('[CRON] ❌ Erro ao compactar backup:', zipErr);
-        }
-        
-        // Remove a pasta temporária
-        try {
-          fs.rmSync(tempDir, { recursive: true, force: true });
-        } catch (cleanErr) {
-          console.error('[CRON] ⚠️ Erro ao limpar pasta temporária:', cleanErr);
-        }
-      }
-      
-      // --- AUTO-LIMPEZA: Remove backups com mais de 5 dias ---
-      const DIAS_RETER = 5;
-      const agora = Date.now();
-      const arquivos = fs.readdirSync(backupDir);
-      
-      for (const arquivo of arquivos) {
-        if (!arquivo.startsWith('backup_') || !arquivo.endsWith('.zip')) continue;
-        
-        const filePath = path.join(backupDir, arquivo);
-        const stats = fs.statSync(filePath);
-        const idadeDias = (agora - stats.mtimeMs) / (1000 * 60 * 60 * 24);
-        
-        if (idadeDias > DIAS_RETER) {
-          fs.unlinkSync(filePath);
-          console.log(`[CRON] 🗑️ Backup antigo removido (${Math.floor(idadeDias)} dias): ${arquivo}`);
-        }
-      }
+      executarBackupAgendado();
     } catch (err) {
-      console.error('[CRON] ❌ Erro ao realizar backup diário:', err);
+      console.error('[CRON] ❌ Erro ao executar backup agendado:', err);
     }
     // ----------------------------------
 
@@ -202,11 +154,26 @@ export function startServer() {
   app.get('/api/senhas/:id/status', (req, res) => {
     try {
       const db = getDb();
-      const senha = db.prepare('SELECT status, numero FROM senhas WHERE id = ?').get(req.params.id) as any;
+      const senha = db.prepare('SELECT id, status, numero, preferencial FROM senhas WHERE id = ?').get(req.params.id) as any;
       if (!senha) {
         return res.status(404).json({ error: 'Senha não encontrada' });
       }
-      res.json({ status: senha.status, numero: senha.numero, aguardando: senha.status === 'aguardando' });
+
+      let posicao: number | null = null;
+      if (senha.status === 'aguardando') {
+        const ahead = db.prepare(
+          `SELECT COUNT(*) as count FROM senhas 
+           WHERE status = 'aguardando' 
+             AND (
+               (preferencial > ?) 
+               OR 
+               (preferencial = ? AND id < ?)
+             )`
+        ).get(senha.preferencial, senha.preferencial, senha.id) as any;
+        posicao = (ahead?.count ?? 0) + 1;
+      }
+
+      res.json({ status: senha.status, numero: senha.numero, aguardando: senha.status === 'aguardando', posicao });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -568,7 +535,16 @@ export function startServer() {
     try {
       const configuracoes = req.body;
       const db = getDb();
-      
+
+      // Validação de tamanhos de fonte CSS
+      const cssSize = /^(\d+(\.\d+)?)(rem|em|px|vw|vh|%)$/;
+      const fontKeys = ['toledo_fonte_descricao', 'toledo_fonte_preco'];
+      for (const key of fontKeys) {
+        if (configuracoes[key] && !cssSize.test(configuracoes[key])) {
+          return res.status(400).json({ error: `Tamanho de fonte inválido para ${key}: ${configuracoes[key]}` });
+        }
+      }
+
       console.log('Saving configs:', configuracoes);
 
       const stmt = db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES (?, ?, datetime('now'))");
@@ -593,6 +569,7 @@ export function startServer() {
       // Sync public configs to Supabase
       if (configuracoes.nome_estabelecimento) syncConfiguracaoPublica('nome_estabelecimento', configuracoes.nome_estabelecimento);
       if (configuracoes.portal_voz_alerta) syncConfiguracaoPublica('portal_voz_alerta', configuracoes.portal_voz_alerta);
+      if (configuracoes.toledo_encarte_ativo !== undefined) syncConfiguracaoPublica('toledo_encarte_ativo', String(configuracoes.toledo_encarte_ativo));
       
       res.json({ success: true });
     } catch (err: any) {
@@ -651,74 +628,151 @@ export function startServer() {
     }
   });
 
-  // BACKUP
-  app.get('/api/admin/backup', (req, res) => {
+  // BACKUP — Gera ZIP com escopo selecionável
+  app.get('/api/admin/backup', async (req, res) => {
     try {
-      const db = getDb();
-      const tables = ['configuracoes', 'balcoes', 'midias', 'operadores'];
-      const backupData: any = {};
-      
-      for (const table of tables) {
-        backupData[table] = db.prepare(`SELECT * FROM ${table}`).all();
+      const incluirConfig = req.query.config !== '0';
+      const incluirOperadores = req.query.operadores !== '0';
+      const incluirBalcoes = req.query.balcoes !== '0';
+      const incluirMidias = req.query.midias === '1';
+
+      const dataDir = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+      const tempBackupDir = path.join(dataDir, 'Backups', '_manual');
+      if (!fs.existsSync(tempBackupDir)) {
+        fs.mkdirSync(tempBackupDir, { recursive: true });
       }
-      
-      res.json(backupData);
+
+      const zipFile = await gerarBackupZip({
+        incluirConfig,
+        incluirOperadores,
+        incluirBalcoes,
+        incluirMidias,
+        destino: tempBackupDir,
+      });
+
+      if (zipFile && fs.existsSync(zipFile)) {
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${path.basename(zipFile)}"`);
+        const stream = fs.createReadStream(zipFile);
+        stream.pipe(res);
+        stream.on('end', () => {
+          // Limpa o arquivo temporário após download
+          try { fs.unlinkSync(zipFile); } catch (e) {}
+        });
+      } else {
+        res.status(500).json({ error: 'Erro ao gerar backup' });
+      }
     } catch (err: any) {
       console.error('Backup error:', err);
       res.status(500).json({ error: err.message });
     }
   });
 
-  // RESTORE
-  app.post('/api/admin/restore', (req, res) => {
-    const db = getDb();
+  // --- GERENCIADOR DE BACKUPS ---
+  
+  // LISTAR BACKUPS
+  app.get('/api/admin/backups', (req, res) => {
     try {
-      const backupData = req.body;
+      const dataDir = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+      const backupDir = path.join(dataDir, 'Backups');
+      const limit = parseInt((req.query.limit as string) || '20');
       
-      const tables = ['configuracoes', 'balcoes', 'midias', 'operadores'];
+      if (!fs.existsSync(backupDir)) return res.json({ backups: [] });
       
-      // Desabilita foreign keys temporariamente para evitar erros de integridade durante a limpeza
-      db.prepare('PRAGMA foreign_keys = OFF').run();
+      const arquivos = fs.readdirSync(backupDir);
+      const backups = arquivos
+        .filter(file => file.startsWith('backup_') && file.endsWith('.zip'))
+        .map(file => {
+          const stats = fs.statSync(path.join(backupDir, file));
+          return {
+            nome: file,
+            tamanhoMB: (stats.size / (1024 * 1024)).toFixed(2),
+            criado_em: stats.mtime.toISOString()
+          };
+        })
+        .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime())
+        .slice(0, limit);
+        
+      res.json({ backups });
+    } catch (err: any) {
+      console.error('Erro ao listar backups:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 
-      const transaction = db.transaction((data: any) => {
-        // Limpa as tabelas de senhas e chamadas para evitar órfãos
-        console.log('[RESTORE] Limpando tabelas de senhas e histórico...');
-        db.prepare('DELETE FROM chamadas').run();
-        db.prepare('DELETE FROM senhas').run();
+  // EXCLUIR BACKUP
+  app.delete('/api/admin/backups/:filename', (req, res) => {
+    try {
+      const filename = req.params.filename;
+      // Validação rígida contra Path Traversal
+      if (!filename || !filename.startsWith('backup_') || !filename.endsWith('.zip') || filename.includes('..') || filename.includes('/')) {
+        return res.status(400).json({ error: 'Nome de arquivo inválido.' });
+      }
+      
+      const dataDir = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+      const filePath = path.join(dataDir, 'Backups', filename);
+      
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: 'Backup não encontrado.' });
+      }
+    } catch (err: any) {
+      console.error('Erro ao excluir backup:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 
-        for (const table of tables) {
-          if (data[table]) {
-            console.log(`[RESTORE] Restaurando tabela: ${table} (${data[table].length} linhas)`);
-            db.prepare(`DELETE FROM ${table}`).run();
-            
-            if (data[table].length > 0) {
-              const columns = Object.keys(data[table][0]);
-              const placeholders = columns.map(() => '?').join(',');
-              const stmt = db.prepare(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${placeholders})`);
-              
-              for (const row of data[table]) {
-                // Mapeia os valores na ordem correta das colunas
-                const values = columns.map(col => row[col]);
-                stmt.run(values);
-              }
-            }
-          } else {
-            console.log(`[RESTORE] Tabela ${table} não encontrada no backup, pulando.`);
-          }
-        }
-      });
+  // RESTAURAR BACKUP LOCAL
+  app.post('/api/admin/backups/:filename/restore', async (req, res) => {
+    try {
+      const filename = req.params.filename;
+      // Validação rígida contra Path Traversal
+      if (!filename || !filename.startsWith('backup_') || !filename.endsWith('.zip') || filename.includes('..') || filename.includes('/')) {
+        return res.status(400).json({ error: 'Nome de arquivo inválido.' });
+      }
       
-      transaction(backupData);
+      const dataDir = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+      const filePath = path.join(dataDir, 'Backups', filename);
       
-      // Reabilita foreign keys
-      db.prepare('PRAGMA foreign_keys = ON').run();
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'Backup não encontrado.' });
+      }
       
-      console.log('[RESTORE] Backup restaurado com sucesso.');
+      await restoreBackupZip(filePath);
+      
+      // Reinicia o estado e força os terminais a regarregarem as configs
+      broadcastEvent('SISTEMA_RESETADO', { success: true });
+      broadcastEvent('CONFIG_ATUALIZADA', { reset: true });
       res.json({ success: true });
     } catch (err: any) {
-      console.error('[RESTORE ERROR]:', err);
-      // Garante que reabilita as FKs mesmo em caso de erro
-      try { db.prepare('PRAGMA foreign_keys = ON').run(); } catch(e) {}
+      console.error('Erro ao restaurar backup local:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // RESTORE MANUAL (Upload)
+  app.post('/api/admin/restore', backupUpload.single('backupFile'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+      }
+      
+      await restoreBackupZip(req.file.path);
+      
+      // Apaga o zip de upload após uso
+      try { fs.unlinkSync(req.file.path); } catch(e) {}
+      
+      // Reinicia o estado e força os terminais a regarregarem as configs
+      broadcastEvent('SISTEMA_RESETADO', { success: true });
+      broadcastEvent('CONFIG_ATUALIZADA', { reset: true });
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('[RESTORE MANUAL ERROR]:', err);
+      if (req.file && fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch(e) {}
+      }
       res.status(500).json({ error: err.message });
     }
   });
@@ -1053,10 +1107,63 @@ export function startServer() {
     console.log(`  Server running on http://localhost:${PORT}`);
     console.log('========================================');
 
+    // Startup reset check and configs synchronization
+    try {
+      const db = getDb();
+      
+      // 1. Sync public configuration options to Supabase
+      const rows = db.prepare("SELECT chave, valor FROM configuracoes").all() as any[];
+      const cfg = rows.reduce((acc, row) => ({ ...acc, [row.chave]: row.valor }), {} as Record<string, string>);
+      
+      if (cfg['nome_estabelecimento']) {
+        syncConfiguracaoPublica('nome_estabelecimento', cfg['nome_estabelecimento']);
+      }
+      if (cfg['portal_voz_alerta']) {
+        syncConfiguracaoPublica('portal_voz_alerta', cfg['portal_voz_alerta']);
+      }
+      if (cfg['toledo_encarte_ativo'] !== undefined) {
+        syncConfiguracaoPublica('toledo_encarte_ativo', cfg['toledo_encarte_ativo']);
+      }
+      if (cfg['logo_cliente']) {
+        const logoRelPath = cfg['logo_cliente'].replace(/^\//, ''); // remove leading slash
+        const fullLogoPath = path.join(userDataPath, logoRelPath);
+        if (fs.existsSync(fullLogoPath)) {
+          const base64 = fs.readFileSync(fullLogoPath, 'base64');
+          const ext = path.extname(fullLogoPath).toLowerCase().replace('.', '');
+          const mimeType = ext === 'svg' ? 'image/svg+xml' : `image/${ext}`;
+          const dataUrl = `data:${mimeType};base64,${base64}`;
+          syncConfiguracaoPublica('logo_cliente_base64', dataUrl);
+          console.log('[STARTUP] ✅ Logo do estabelecimento sincronizada em base64 com Supabase');
+        }
+      }
+
+      // 2. Perform daily reset if the server was off at reset time
+      const configReset = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'reset_diario_automatico'").get() as any;
+      if (configReset && configReset.valor === '1') {
+        const hoje = new Date().toISOString().split('T')[0];
+        const ultimoResetRecord = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'ultimo_reset'").get() as any;
+        
+        if (!ultimoResetRecord || ultimoResetRecord.valor !== hoje) {
+          console.log('[STARTUP] Detectado que o reset diário de hoje ainda não foi realizado. Executando agora...');
+          db.prepare("UPDATE balcoes SET contador_atual = 0").run();
+          db.prepare("DELETE FROM senhas WHERE status = 'aguardando'").run();
+          
+          db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('ultimo_reset', ?, datetime('now'))").run(hoje);
+          
+          // Clear cloud
+          syncLimparSenhas();
+          
+          console.log('[STARTUP] Reset diário concluído com sucesso.');
+        }
+      }
+    } catch (err) {
+      console.error('[STARTUP] Erro no check de reset diário / sync de configurações:', err);
+    }
+
     // Start Toledo file watcher after server is ready
     try {
       setBroadcastFn(broadcastEvent);  // Inject SSE broadcaster (avoids circular dependency)
-      startToledoWatcher();
+      toledoWatcherCleanup = startToledoWatcher();
     } catch (err) {
       console.error('[TOLEDO] Erro ao iniciar watcher (não crítico):', err);
     }
@@ -1069,6 +1176,8 @@ export function startServer() {
     }
   });
 
+  serverInstance = server;
+
   server.on('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`Port ${PORT} is already in use.`);
@@ -1078,7 +1187,291 @@ export function startServer() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// BACKUP INTELIGENTE — Agendamento & Opt-in
+// ═══════════════════════════════════════════════════════════════════
+
+function carregarConfiguracoes(): Record<string, string> {
+  try {
+    const db = getDb();
+    const rows = db.prepare('SELECT chave, valor FROM configuracoes').all() as any[];
+    return rows.reduce((acc, row) => ({ ...acc, [row.chave]: row.valor }), {} as Record<string, string>);
+  } catch {
+    return {};
+  }
+}
+
+async function executarBackupAgendado() {
+  const cfg = carregarConfiguracoes();
+
+  // Opt-in rigoroso
+  if (cfg.backup_agendado_ativo !== '1') {
+    console.log('[BACKUP] Agendamento desativado, ignorando.');
+    return;
+  }
+
+  // Verificar frequência
+  const hoje = new Date();
+  if (cfg.backup_frequencia === 'semanal' && hoje.getDay() !== 0) return;
+  if (cfg.backup_frequencia === 'mensal' && hoje.getDate() !== 1) return;
+
+  console.log('[BACKUP] Executando backup agendado...');
+
+  const dataDir = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+  const backupDir = cfg.backup_destino && cfg.backup_destino.trim() !== '' 
+    ? cfg.backup_destino.trim() 
+    : path.join(dataDir, 'Backups');
+
+  await gerarBackupZip({
+    incluirConfig: cfg.backup_incluir_config !== '0',
+    incluirOperadores: cfg.backup_incluir_operadores !== '0',
+    incluirBalcoes: cfg.backup_incluir_balcoes !== '0',
+    incluirMidias: cfg.backup_incluir_midias !== '0',
+    destino: backupDir,
+  });
+
+  // Auto-limpeza: manter backups dos últimos 30 dias
+  await limparBackupsAntigos(backupDir, 30);
+}
+
+async function gerarBackupZip(opts: {
+  incluirConfig: boolean;
+  incluirOperadores: boolean;
+  incluirBalcoes: boolean;
+  incluirMidias: boolean;
+  destino: string;
+}) {
+  const { execSync } = require('child_process');
+  const crypto = require('crypto');
+  const db = getDb();
+  const dataDir = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+  const uploadsDir = path.join(dataDir, 'uploads');
+
+  if (!fs.existsSync(opts.destino)) {
+    fs.mkdirSync(opts.destino, { recursive: true });
+  }
+
+  const dataStr = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+  const timestamp = Date.now();
+  const zipFile = path.join(opts.destino, `backup_${dataStr}_${timestamp}.zip`);
+  const tempDir = path.join(opts.destino, `_temp_${timestamp}`);
+
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+
+  try {
+    const backupData: any = {};
+
+    if (opts.incluirConfig) {
+      backupData.configuracoes = db.prepare('SELECT * FROM configuracoes').all();
+    }
+    if (opts.incluirOperadores) {
+      backupData.operadores = db.prepare('SELECT * FROM operadores').all();
+    }
+    if (opts.incluirBalcoes) {
+      backupData.balcoes = db.prepare('SELECT * FROM balcoes').all();
+    }
+    if (opts.incluirMidias) {
+      backupData.midias = db.prepare('SELECT * FROM midias').all();
+    }
+
+    // Salvar dados do banco como JSON
+    const dbJsonPath = path.join(tempDir, 'database.json');
+    fs.writeFileSync(dbJsonPath, JSON.stringify(backupData, null, 2), 'utf-8');
+
+    // Copiar arquivos físicos de mídia se solicitado
+    if (opts.incluirMidias && fs.existsSync(uploadsDir)) {
+      const uploadsBackupDir = path.join(tempDir, 'uploads');
+      fs.mkdirSync(uploadsBackupDir, { recursive: true });
+      const files = fs.readdirSync(uploadsDir);
+      for (const file of files) {
+        const src = path.join(uploadsDir, file);
+        const dst = path.join(uploadsBackupDir, file);
+        if (fs.statSync(src).isFile()) {
+          fs.copyFileSync(src, dst);
+        }
+      }
+    }
+
+    // Gerar manifest com SHA-256
+    const manifest: Record<string, string> = {};
+    const walkDir = (dir: string, prefix: string = '') => {
+      const entries = fs.readdirSync(dir);
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry);
+        const relPath = prefix ? `${prefix}/${entry}` : entry;
+        if (fs.statSync(fullPath).isDirectory()) {
+          walkDir(fullPath, relPath);
+        } else {
+          const hash = crypto.createHash('sha256').update(fs.readFileSync(fullPath)).digest('hex');
+          manifest[relPath] = hash;
+        }
+      }
+    };
+    walkDir(tempDir);
+    fs.writeFileSync(path.join(tempDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf-8');
+
+    // Compactar em ZIP usando PowerShell
+    execSync(
+      `powershell -NoProfile -Command "Compress-Archive -Path '${tempDir}\\*' -DestinationPath '${zipFile}' -Force"`,
+      { timeout: 120000 }
+    );
+    console.log(`[BACKUP] ✅ Backup gerado com sucesso: ${zipFile}`);
+
+    return zipFile;
+  } finally {
+    // Limpar pasta temporária
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch (e) {
+      console.error('[BACKUP] ⚠️ Erro ao limpar pasta temporária:', e);
+    }
+  }
+}
+
+async function restoreBackupZip(zipFilePath: string): Promise<void> {
+  const { execSync } = require('child_process');
+  const crypto = require('crypto');
+  const db = getDb();
+  const dataDir = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+  const uploadsDir = path.join(dataDir, 'uploads');
+  const tempDir = path.join(dataDir, 'Backups', `_extract_${Date.now()}`);
+
+  try {
+    fs.mkdirSync(tempDir, { recursive: true });
+    
+    // Extrai o ZIP via PowerShell nativo
+    execSync(
+      `powershell -NoProfile -Command "Expand-Archive -Path '${zipFilePath}' -DestinationPath '${tempDir}' -Force"`,
+      { timeout: 120000 }
+    );
+
+    // Valida o Manifest
+    const manifestPath = path.join(tempDir, 'manifest.json');
+    if (!fs.existsSync(manifestPath)) {
+      throw new Error('Arquivo manifest.json ausente. Backup corrompido, inválido ou criado em versão antiga.');
+    }
+    
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    const tempUploads = path.join(tempDir, 'uploads');
+    
+    // Checa a integridade via SHA-256 de todos os arquivos
+    for (const [relPath, expectedHash] of Object.entries(manifest)) {
+      if (typeof expectedHash !== 'string') continue;
+      const fullPath = path.join(tempDir, relPath);
+      if (!fs.existsSync(fullPath)) throw new Error(`Arquivo faltante no pacote de backup: ${relPath}`);
+      const hash = crypto.createHash('sha256').update(fs.readFileSync(fullPath)).digest('hex');
+      if (hash !== expectedHash) throw new Error(`Hash inválido (corrupção detectada) para: ${relPath}`);
+    }
+
+    // Lê os dados do banco SQLite em JSON
+    const dbJsonPath = path.join(tempDir, 'database.json');
+    if (!fs.existsSync(dbJsonPath)) throw new Error('Arquivo database.json ausente no backup.');
+    const backupData = JSON.parse(fs.readFileSync(dbJsonPath, 'utf-8'));
+
+    // Inicia a restauração atômica do SQLite
+    const tables = ['configuracoes', 'balcoes', 'midias', 'operadores'];
+    db.prepare('PRAGMA foreign_keys = OFF').run();
+
+    try {
+      const transaction = db.transaction((data: any) => {
+        db.prepare('DELETE FROM chamadas').run();
+        db.prepare('DELETE FROM senhas').run();
+
+        for (const table of tables) {
+          if (data[table]) {
+            db.prepare(`DELETE FROM ${table}`).run();
+            if (data[table].length > 0) {
+              const columns = Object.keys(data[table][0]);
+              const placeholders = columns.map(() => '?').join(',');
+              const stmt = db.prepare(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${placeholders})`);
+              for (const row of data[table]) {
+                const values = columns.map(col => row[col]);
+                stmt.run(values);
+              }
+            }
+          }
+        }
+      });
+      transaction(backupData);
+    } finally {
+      db.prepare('PRAGMA foreign_keys = ON').run();
+    }
+
+    // Apenas após o sucesso atômico do banco de dados, prosseguimos para copiar os arquivos de mídia.
+    // Isso previne que arquivos antigos sejam perdidos se o banco falhar.
+    if (fs.existsSync(tempUploads)) {
+      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+      const files = fs.readdirSync(tempUploads);
+      for (const file of files) {
+        fs.copyFileSync(path.join(tempUploads, file), path.join(uploadsDir, file));
+      }
+    }
+
+  } finally {
+    // Limpeza da extração
+    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
+  }
+}
+
+async function limparBackupsAntigos(backupDir: string, diasReter: number) {
+  try {
+    if (!fs.existsSync(backupDir)) return;
+    const agora = Date.now();
+    const arquivos = fs.readdirSync(backupDir);
+    for (const arquivo of arquivos) {
+      if (!arquivo.startsWith('backup_') || !arquivo.endsWith('.zip')) continue;
+      const filePath = path.join(backupDir, arquivo);
+      const stats = fs.statSync(filePath);
+      const idadeDias = (agora - stats.mtimeMs) / (1000 * 60 * 60 * 24);
+      if (idadeDias > diasReter) {
+        fs.unlinkSync(filePath);
+        console.log(`[BACKUP] 🗑️ Backup antigo removido (${Math.floor(idadeDias)} dias): ${arquivo}`);
+      }
+    }
+  } catch (e) {
+    console.error('[BACKUP] ⚠️ Erro ao limpar backups antigos:', e);
+  }
+}
+
 export function broadcastEvent(event: string, data: any) {
   const payload = `data: ${JSON.stringify({ event, data })}\n\n`;
   sseClients.forEach(client => client.write(payload));
+}
+
+let serverInstance: any = null;
+let toledoWatcherCleanup: (() => void) | null = null;
+
+export function stopServer() {
+  console.log('[SERVER] Iniciando desligamento gracioso...');
+  
+  if (toledoWatcherCleanup) {
+    try {
+      toledoWatcherCleanup();
+      toledoWatcherCleanup = null;
+    } catch(e) {
+      console.error('Erro ao parar Toledo watcher', e);
+    }
+  }
+
+  try {
+    stopSupabaseCommandListener();
+  } catch(e) {
+    console.error('Erro ao parar Supabase listener', e);
+  }
+
+  try {
+    const db = getDb();
+    if (db) db.close();
+    console.log('[SERVER] SQLite fechado.');
+  } catch(e) {
+    console.error('Erro ao fechar DB', e);
+  }
+
+  if (serverInstance) {
+    serverInstance.close(() => {
+      console.log('[SERVER] Servidor HTTP Express encerrado.');
+    });
+  }
 }

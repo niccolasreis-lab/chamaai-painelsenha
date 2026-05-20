@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getApiUrl } from '../shared/apiConfig';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { ShoppingCart, Search, FileText, AlertTriangle, Plus, Minus, Trash2 } from 'lucide-react';
+import { playNotificationSound } from '../shared/sounds';
+import { Bell, Volume2 } from 'lucide-react';
 
 interface Produto {
   plu: string;
@@ -19,6 +21,19 @@ export default function ClientePortal() {
 
   const [ticketStatus, setTicketStatus] = useState<'carregando' | 'aguardando' | 'expirado' | 'erro'>('carregando');
   const [ticketNumero, setTicketNumero] = useState<string>('');
+  const [queuePosition, setQueuePosition] = useState<number | null>(null);
+  const ultimoAlertaPosicao = useRef<number | null>(null);
+  const bannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showExpiringBanner, setShowExpiringBanner] = useState(false);
+
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
+
+  // Inicializa a permissão de notificação se suportado
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotifPermission(Notification.permission);
+    }
+  }, []);
 
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [busca, setBusca] = useState('');
@@ -65,12 +80,14 @@ export default function ClientePortal() {
   const [carrinho, setCarrinho] = useState<Record<string, number>>({});
   const [showCarrinho, setShowCarrinho] = useState(false);
 
-  // Verifica status do ticket e fila
+  // Verifica status do ticket e fila (polling adaptativo)
   useEffect(() => {
     if (!ticketId) {
       setTicketStatus('erro');
       return;
     }
+
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const checkStatus = async () => {
       try {
@@ -79,10 +96,59 @@ export default function ClientePortal() {
         const data = await res.json();
 
         setTicketNumero(data.numero || '');
+
         if (data.aguardando) {
           setTicketStatus('aguardando');
+          
+          if (data.posicao !== undefined && data.posicao !== null) {
+            setQueuePosition(data.posicao);
+
+            // Alerta sonoro: toca apenas quando a posição DIMINUI e está <= 3
+            if (data.posicao <= 3 && (
+              ultimoAlertaPosicao.current === null || 
+              data.posicao < ultimoAlertaPosicao.current
+            )) {
+              ultimoAlertaPosicao.current = data.posicao;
+              try {
+                const tipoSom = config.tipo_som || 'chime';
+                const volume = parseInt(config.volume_audio || '80');
+                const customUrl = config.som_personalizado ? `${API_URL}${config.som_personalizado}` : undefined;
+                playNotificationSound(tipoSom as any, volume, customUrl);
+              } catch (e) {
+                // Silencioso se o navegador bloquear autoplay
+              }
+              
+              if ('Notification' in window && Notification.permission === 'granted') {
+                try {
+                  new Notification('Sua senha está próxima!', {
+                    body: data.posicao === 1 ? 'Prepare-se! Sua senha é a próxima a ser chamada!' : `Faltam apenas ${data.posicao} senhas na sua frente!`,
+                    icon: config.logo_cliente ? `${API_URL}${config.logo_cliente}` : undefined
+                  });
+                } catch (e) { }
+              }
+            }
+          }
         } else {
-          setTicketStatus('expirado');
+          // Senha foi chamada — manter banner por 4 segundos antes de mudar status
+          if (ticketStatus === 'aguardando' && queuePosition !== null && queuePosition <= 3) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+              try {
+                new Notification('Sua vez chegou!', {
+                  body: 'Dirija-se ao local de atendimento indicado.',
+                  icon: config.logo_cliente ? `${API_URL}${config.logo_cliente}` : undefined
+                });
+              } catch (e) { }
+            }
+            setShowExpiringBanner(true);
+            if (bannerTimeoutRef.current) clearTimeout(bannerTimeoutRef.current);
+            bannerTimeoutRef.current = setTimeout(() => {
+              setShowExpiringBanner(false);
+              setTicketStatus('expirado');
+            }, 4000);
+          } else {
+            setTicketStatus('expirado');
+          }
+          setQueuePosition(null);
         }
       } catch (err) {
         setTicketStatus('erro');
@@ -90,10 +156,19 @@ export default function ClientePortal() {
     };
 
     checkStatus();
-    // Poll a cada 10 segundos
-    const interval = setInterval(checkStatus, 10000);
-    return () => clearInterval(interval);
-  }, [ticketId, API_URL]);
+    
+    // Polling adaptativo: 2s quando posição <= 10, 5s demais
+    const startPolling = () => {
+      const intervalo = queuePosition !== null && queuePosition <= 10 ? 2000 : 5000;
+      intervalId = setInterval(checkStatus, intervalo);
+    };
+    startPolling();
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      if (bannerTimeoutRef.current) clearTimeout(bannerTimeoutRef.current);
+    };
+  }, [ticketId, API_URL, queuePosition, config]);
 
   // Carrega produtos
   useEffect(() => {
@@ -331,6 +406,62 @@ export default function ClientePortal() {
           </div>
         </div>
       </div>
+
+      {/* Banner de Solicitação de Notificações (PWA/Browser) */}
+      {'Notification' in window && notifPermission === 'default' && (
+        <div className="mx-4 mt-3">
+          <div className="bg-surface border border-outline-variant rounded-2xl p-4 shadow-sm flex flex-col items-center text-center">
+            <Bell className="w-8 h-8 text-primary mb-2" />
+            <h3 className="font-bold text-ink mb-1">Ativar Notificações</h3>
+            <p className="text-xs text-ink-secondary mb-3">Seja avisado no celular quando sua senha estiver próxima, mesmo com a tela desligada.</p>
+            <button 
+              onClick={() => {
+                Notification.requestPermission().then(perm => setNotifPermission(perm));
+              }}
+              className="w-full bg-primary text-white font-bold rounded-xl py-3 active:scale-95 transition-transform"
+            >
+              ATIVAR AGORA
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Alerta de Notificações Bloqueadas */}
+      {'Notification' in window && notifPermission === 'denied' && (
+        <div className="mx-4 mt-3">
+          <div className="bg-surface-variant/50 border border-outline-variant rounded-2xl p-4 text-center">
+            <AlertTriangle className="w-5 h-5 text-error mx-auto mb-2 opacity-80" />
+            <p className="text-xs text-ink-secondary leading-tight">
+              As notificações estão bloqueadas. Para ser avisado sobre sua senha, ative-as nas configurações do seu navegador.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Banner de Alerta de Posição na Fila */}
+      {(queuePosition !== null && queuePosition <= 3 || showExpiringBanner) && (
+        <div className="mx-4 mt-3 animate-pulse">
+          <div className={`rounded-2xl p-4 shadow-lg border-2 flex items-center gap-4 ${
+            queuePosition === 1 || showExpiringBanner
+              ? 'bg-gradient-to-r from-red-500 to-orange-500 border-red-300 text-white'
+              : 'bg-gradient-to-r from-amber-400 to-orange-400 border-amber-300 text-white'
+          }`}>
+            <div className="shrink-0 w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+              <Bell className="w-6 h-6 text-white animate-bounce" />
+            </div>
+            <div className="flex-1">
+              <p className="font-black text-lg leading-tight uppercase tracking-wide">
+                {showExpiringBanner ? 'SUA VEZ CHEGOU!' : queuePosition === 1 
+                  ? 'Prepare-se! Sua senha é a próxima a ser chamada!' 
+                  : `Prepare-se! Faltam apenas ${queuePosition} senhas na sua frente!`}
+              </p>
+              <p className="text-white/80 text-xs font-bold mt-1 uppercase tracking-widest flex items-center gap-1">
+                <Volume2 className="w-3 h-3" /> Alerta sonoro ativado
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Catálogo de Produtos */}
       <div className="p-4 space-y-8">

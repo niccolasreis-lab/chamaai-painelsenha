@@ -169,3 +169,14 @@ export function getDb() {
   }
   return db;
 }
+
+export function closeDatabase() {
+  if (db) {
+    try {
+      db.close();
+      console.log('Banco de dados SQLite fechado com segurança.');
+    } catch (err) {
+      console.error('Erro ao fechar o banco de dados:', err);
+    }
+  }
+}

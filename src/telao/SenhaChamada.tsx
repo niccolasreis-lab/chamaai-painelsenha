@@ -64,14 +64,16 @@ export default function SenhaChamada({ ultimaSenha = null }: { ultimaSenha?: any
           {senhaFormatada}
         </div>
 
-        <div className="mt-8 flex justify-center">
-          <div className="bg-white px-12 py-5 rounded-[32px] shadow-2xl flex items-center justify-center gap-6 border-b-[8px] border-outline-variant/30">
-            <span className="font-sans text-[5rem] font-bold text-ink uppercase leading-none tracking-tighter text-center">
-              {config.rotulo_local ? `${config.rotulo_local} ` : ''}
-              {ultimaSenha.guiche.replace(/guichê[:\s]*/gi, '').trim()}
-            </span>
+        {config.telao_ocultar_guiche !== '1' && (
+          <div className="mt-8 flex justify-center">
+            <div className="bg-white px-12 py-5 rounded-[32px] shadow-2xl flex items-center justify-center gap-6 border-b-[8px] border-outline-variant/30">
+              <span className="font-sans text-[5rem] font-bold text-ink uppercase leading-none tracking-tighter text-center">
+                {config.rotulo_local ? `${config.rotulo_local} ` : ''}
+                {ultimaSenha.guiche.replace(/guichê[:\s]*/gi, '').trim()}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
