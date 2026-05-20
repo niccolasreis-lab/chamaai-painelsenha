@@ -1441,7 +1441,7 @@ export function broadcastEvent(event: string, data: any) {
 }
 
 let serverInstance: any = null;
-let toledoWatcherCleanup: (() => void) | null = null;
+let toledoWatcherCleanup: (() => void) | null | undefined = null;
 
 export function stopServer() {
   console.log('[SERVER] Iniciando desligamento gracioso...');
