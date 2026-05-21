@@ -144,6 +144,10 @@ ipcMain.handle('print-ticket', async (_event, data) => {
   return await printerService.printTicket(data);
 });
 
+ipcMain.handle('reprint-last-ticket', async () => {
+  return await printerService.reprintLastTicket();
+});
+
 ipcMain.handle('update-printer-config', async (_event, newConfig) => {
   try {
     const db = getDb();

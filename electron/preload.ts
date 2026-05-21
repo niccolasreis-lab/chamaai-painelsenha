@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 // Expose safe APIs to the renderer process
 contextBridge.exposeInMainWorld('api', {
   printTicket: (data: any) => ipcRenderer.invoke('print-ticket', data),
+  reprintLastTicket: () => ipcRenderer.invoke('reprint-last-ticket'),
   updatePrinterConfig: (config: any) => ipcRenderer.invoke('update-printer-config', config),
   testPrinter: () => ipcRenderer.invoke('test-printer'),
   getPrinters: () => ipcRenderer.invoke('get-printers'),

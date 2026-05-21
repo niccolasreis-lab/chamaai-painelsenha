@@ -155,6 +155,19 @@ export function initDatabase() {
       INSERT OR IGNORE INTO configuracoes VALUES ('toledo_itens_por_slide',   '12', datetime('now'));
     `);
 
+    // Fila de sincronização local → Supabase (Outbox Pattern)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS supabase_sync_queue (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        tabela         TEXT NOT NULL,
+        acao           TEXT NOT NULL,
+        payload        TEXT NOT NULL,
+        tentativas     INTEGER DEFAULT 0,
+        max_tentativas INTEGER DEFAULT 10,
+        criado_em      TEXT DEFAULT (datetime('now'))
+      );
+    `);
+
     console.log('SQLite Database initialized at', dbPath);
     return db;
   } catch (err) {

@@ -59,6 +59,7 @@ export class PrinterService {
   private config: PrinterConfig;
   private simulationMode: boolean;
   private printWindow: any = null;
+  private lastPrintedTicket: TicketData | null = null;
 
   constructor(config?: Partial<PrinterConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -116,17 +117,29 @@ export class PrinterService {
     return false; // Default to not showing if not explicitly enabled
   }
 
-  async printTicket(data: TicketData): Promise<boolean> {
+  async printTicket(data: TicketData): Promise<{ success: boolean; error?: string }> {
+    this.lastPrintedTicket = data;
     if (this.simulationMode) {
       return this.printSimulation(data);
     }
     return this.printReal(data);
   }
 
-  private async printReal(data: TicketData): Promise<boolean> {
+  async reprintLastTicket(): Promise<{ success: boolean; error?: string }> {
+    if (!this.lastPrintedTicket) {
+      return { success: false, error: 'Nenhum ticket anterior para reimprimir.' };
+    }
+    console.log('[PrinterService] 🔄 Reimprimindo último ticket:', this.lastPrintedTicket.numero);
+    if (this.simulationMode) {
+      return this.printSimulation(this.lastPrintedTicket);
+    }
+    return this.printReal(this.lastPrintedTicket);
+  }
+
+  private async printReal(data: TicketData): Promise<{ success: boolean; error?: string }> {
     console.log(`[PrinterService] Preparando ticket (Modo Nativo) para: ${this.config.interface}`);
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       try {
         this.initPrintWindow();
 
@@ -306,28 +319,28 @@ export class PrinterService {
             }, (success: boolean, failureReason: any) => {
               if (!success) {
                 console.error('[PrinterService] ❌ Falha na impressão:', failureReason);
-                reject(new Error(`A impressora '${this.config.interface}' rejeitou o documento. Verifique se ela está online.`));
+                resolve({ success: false, error: `A impressora '${this.config.interface}' rejeitou o documento. Verifique se ela está online e com papel.` });
               } else {
                 console.log(`[PrinterService] ✅ Enviado com sucesso via Driver Nativo.`);
-                resolve(true);
+                resolve({ success: true });
               }
             });
           } catch (e: any) {
             console.error('[PrinterService] Erro ao processar tamanho do ticket:', e);
-            reject(new Error('Erro interno ao calcular tamanho do papel.'));
+            resolve({ success: false, error: 'Erro interno ao calcular tamanho do papel.' });
           }
         });
       } catch (err: any) {
         console.error('[PrinterService] Erro geral:', err);
-        reject(err);
+        resolve({ success: false, error: err.message || 'Erro desconhecido na impressora.' });
       }
     });
   }
 
-  private printSimulation(data: TicketData): Promise<boolean> {
+  private printSimulation(data: TicketData): Promise<{ success: boolean; error?: string }> {
     return new Promise((resolve) => {
       console.log('\n[ SIMULAÇÃO ] Senha: ' + data.numero + '\n');
-      resolve(true);
+      resolve({ success: true });
     });
   }
 }

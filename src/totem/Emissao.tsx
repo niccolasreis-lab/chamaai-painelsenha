@@ -12,6 +12,10 @@ export default function Emissao() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [tempIp, setTempIp] = useState(localStorage.getItem('server_ip_override') || '');
   const [error, setError] = useState(false);
+  const [printerError, setPrinterError] = useState<{ visible: boolean; message: string; senhaNumero?: string }>({
+    visible: false,
+    message: '',
+  });
 
   const fetchConfig = async () => {
     try {
@@ -124,6 +128,16 @@ export default function Emissao() {
     );
   }
 
+  const handleReprint = async () => {
+    if (!window.api?.reprintLastTicket) return;
+    const result = await window.api.reprintLastTicket();
+    if (result.success) {
+      setPrinterError({ visible: false, message: '' });
+    } else {
+      setPrinterError(prev => ({ ...prev, message: result.error || 'Falha ao reimprimir.' }));
+    }
+  };
+
   const emitirSenha = async (preferencial: boolean) => {
     try {
       const res = await fetch(`${API_URL}/api/senhas`, {
@@ -132,30 +146,79 @@ export default function Emissao() {
         body: JSON.stringify({ balcao_id: 1, preferencial })
       });
       const data = await res.json();
-      
-      // Dispara a impressão em background (sem await) para não travar a tela
+
+      // Redireciona imediatamente — senha já está registrada no banco
+      navigate('/totem/confirmacao', { state: { senha: data } });
+
+      // Dispara a impressão e verifica o resultado
       if (window.api?.printTicket) {
         window.api.printTicket({
           ticketId: data.id,
           numero: String(data.numero).padStart(3, '0'),
-          balcao: config.nome_estabelecimento || "Balcão Geral",
+          balcao: config.nome_estabelecimento || 'Balcão Geral',
           data: new Date().toLocaleString('pt-BR'),
           preferencial: data.preferencial,
           logo: config.logo_cliente ? `${API_URL}${config.logo_cliente}` : undefined,
           mostraEncarte: config.toledo_encarte_ativo === '1'
-        }).catch(err => console.error('Erro na impressão background', err));
+        }).then(result => {
+          if (!result.success) {
+            setPrinterError({
+              visible: true,
+              message: result.error || 'Falha desconhecida na impressora.',
+              senhaNumero: String(data.numero).padStart(3, '0'),
+            });
+          }
+        }).catch(err => console.error('Erro na impressão', err));
       }
-
-      // Redireciona instantaneamente para dar feedback rápido ao usuário
-      navigate('/totem/confirmacao', { state: { senha: data } });
     } catch (err) {
       console.error('Erro ao emitir senha', err);
       alert('Erro de conexão ao emitir senha. Tente novamente.');
     }
   };
 
+  // Modal de erro da impressora (aparece como overlay sobre a tela de confirmação)
+  const PrinterErrorModal = () => {
+    if (!printerError.visible) return null;
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+        <div className="bg-surface rounded-3xl p-8 max-w-md w-full shadow-2xl border border-error/30 flex flex-col gap-6">
+          <div className="flex flex-col items-center text-center gap-3">
+            <div className="w-20 h-20 rounded-full bg-error/10 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[3.5rem] text-error">print_disabled</span>
+            </div>
+            <h3 className="font-sans text-2xl font-bold text-ink uppercase tracking-widest">Falha na Impressão</h3>
+            <p className="text-ink-secondary font-medium text-sm">{printerError.message}</p>
+            {printerError.senhaNumero && (
+              <div className="bg-surface-variant rounded-2xl px-6 py-4 mt-2 w-full">
+                <p className="text-xs text-ink-secondary uppercase tracking-widest mb-1">Sua Senha</p>
+                <p className="font-sans text-6xl font-black text-primary tracking-tighter">{printerError.senhaNumero}</p>
+                <p className="text-xs text-ink-secondary mt-1">Anote o número acima</p>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={handleReprint}
+              className="w-full py-4 bg-primary text-white rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-primary-hover active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined">print</span>
+              Tentar Reimprimir
+            </button>
+            <button
+              onClick={() => setPrinterError({ visible: false, message: '' })}
+              className="w-full py-4 bg-surface-variant text-ink rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-outline-variant/50 transition-all"
+            >
+              Visualizar Número na Tela
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="h-screen w-screen bg-background flex flex-col font-sans select-none overflow-hidden fixed inset-0">
+      <PrinterErrorModal />
       {/* Header */}
       <header className="bg-primary text-on-primary py-8 shadow-md flex justify-center items-center border-b-[6px] border-primary-hover shrink-0">
         <h1 className="font-sans text-5xl font-bold uppercase tracking-widest flex items-center gap-6">

@@ -6,7 +6,7 @@ import fs from 'fs';
 import cron from 'node-cron';
 import { getDb } from '../electron/services/database';
 import { startToledoWatcher, forceToledoRefresh, reloadCategorias, setBroadcastFn } from './toledo-watcher';
-import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica } from './supabase-sync';
+import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica, startSyncWorker, stopSyncWorker } from './supabase-sync';
 import { migrateDatabaseAndConfigs } from './categorizador';
 
 const app = express();
@@ -1183,6 +1183,13 @@ export function startServer() {
     } catch (err) {
       console.error('[SUPABASE] Erro ao iniciar command listener (não crítico):', err);
     }
+
+    // Start Supabase sync worker (Outbox Pattern — processa fila local a cada 5s)
+    try {
+      startSyncWorker();
+    } catch (err) {
+      console.error('[SUPABASE] Erro ao iniciar sync worker (não crítico):', err);
+    }
   });
 
   serverInstance = server;
@@ -1468,6 +1475,12 @@ export function stopServer() {
     stopSupabaseCommandListener();
   } catch(e) {
     console.error('Erro ao parar Supabase listener', e);
+  }
+
+  try {
+    stopSyncWorker();
+  } catch(e) {
+    console.error('Erro ao parar Sync worker', e);
   }
 
   try {
