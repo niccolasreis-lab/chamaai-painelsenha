@@ -341,82 +341,151 @@ export default function ClientePortal() {
   }, [produtosFiltrados]);
 
   const gerarPDF = async () => {
-    const doc = new jsPDF();
-    let yPos = 22;
-
-    // Se houver logo do cliente, tenta carregar e desenhar
-    if (config.logo_cliente) {
-      try {
-        const logoUrl = `${API_URL}${config.logo_cliente}`;
-        const base64Logo = await loadImageToBase64(logoUrl);
-        doc.addImage(base64Logo, 'PNG', 14, 14, 30, 15);
-        yPos = 38;
-      } catch (e) {
-        console.error('Erro ao adicionar logotipo ao PDF:', e);
+    try {
+      if (Object.keys(carrinho).length === 0) {
+        alert("Adicione itens à lista primeiro.");
+        return;
       }
-    }
 
-    // Título
-    doc.setFontSize(config.logo_cliente ? 16 : 18);
-    doc.setFont('helvetica', 'bold');
-    doc.text(config.nome_estabelecimento || 'Lista de Pré-Seleção - ChamaAí', config.logo_cliente ? 48 : 14, config.logo_cliente ? 24 : yPos);
+      const doc = new jsPDF({ format: 'a5' }); // Formato A5 para celulares
+      let yPos = 15;
 
-    // Subtítulo se tiver logo
-    if (config.logo_cliente) {
+      // Tenta carregar o logotipo do cliente
+      let base64Logo = '';
+      if (config.logo_cliente) {
+        try {
+          const logoUrl = `${API_URL}${config.logo_cliente}`;
+          base64Logo = await loadImageToBase64(logoUrl);
+        } catch (e) {
+          console.error('Erro ao adicionar logotipo ao PDF:', e);
+        }
+      }
+
+      // --- CABEÇALHO PREMIUM ---
+      // Fundo escuro/elegante para o cabeçalho
+      doc.setFillColor(30, 41, 59); // slate-800
+      doc.rect(0, 0, 148, 45, 'F'); // Largura do A5 é ~148mm
+
+      // Adiciona o logotipo se disponível
+      if (base64Logo) {
+        try {
+          doc.addImage(base64Logo, 'PNG', 12, 10, 25, 12);
+        } catch (e) {
+          console.error('Erro ao renderizar logo no PDF:', e);
+        }
+      }
+
+      // Título / Nome da Empresa (Branco)
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(config.nome_estabelecimento || 'Sua Lista - ChamaAí', base64Logo ? 42 : 12, 18);
+
+      // Subtítulo
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(120);
-      doc.text('Lista de Pré-Seleção de Produtos', 48, 29);
-    }
+      doc.setTextColor(203, 213, 225); // slate-300
+      doc.text('Lista de Pré-Seleção de Produtos', base64Logo ? 42 : 12, 24);
+      
+      // Senha em destaque
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(250, 204, 21); // yellow-400 para destacar a senha
+      doc.text(`Senha: ${ticketNumero || 'N/A'}`, base64Logo ? 42 : 12, 32);
 
-    // Data e Senha
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100);
-    doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 14, config.logo_cliente ? 38 : 32);
-    doc.text(`Senha associada: ${ticketNumero || 'N/A'}`, 14, config.logo_cliente ? 44 : 38);
+      // Data alinhada à direita
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184); // slate-400
+      doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 136, 18, { align: 'right' });
 
-    // Termo de Isenção Legal (AIRTIGHT DISCLAIMER)
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(220, 38, 38); // Red
-    doc.text('⚠️ ATENÇÃO E ISENÇÃO DE RESPONSABILIDADE:', 14, config.logo_cliente ? 52 : 46);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100);
-    doc.text('* Esta é uma lista de PRÉ-SELEÇÃO para agilizar seu atendimento no balcão.', 14, config.logo_cliente ? 56 : 50);
-    doc.text('* O peso e valor cobrado reais serão determinados EXCLUSIVAMENTE pela balança oficial no caixa.', 14, config.logo_cliente ? 60 : 54);
-    doc.text('* Os valores são apenas estimativas de referência baseadas nos preços de hoje.', 14, config.logo_cliente ? 64 : 58);
-
-    // Tabela
-    const tableData = Object.entries(carrinho).map(([plu, item]) => {
-      const p = produtos.find(x => x.plu === plu);
-      const qtdFormatada = item.tipo === 'peso' 
-        ? `${item.quantidade}g` 
-        : `${item.quantidade} un`;
-      const precoRef = p ? `R$ ${p.preco.toFixed(2).replace('.', ',')}/${item.tipo === 'peso' ? 'kg' : 'un'}` : '-';
-      const subtotalEstimado = p 
-        ? `R$ ${(p.preco * (item.tipo === 'peso' ? item.quantidade / 1000 : item.quantidade)).toFixed(2).replace('.', ',')}` 
-        : '-';
+      // --- DADOS DA TABELA ---
+      let valorTotalEstimado = 0;
+      const tableData = Object.entries(carrinho).map(([plu, item]) => {
+        const p = produtos.find(x => x.plu === plu);
+        const precoOriginal = p ? p.preco : 0;
+        const totalEst = precoOriginal * (item.tipo === 'peso' ? item.quantidade / 1000 : item.quantidade);
+        valorTotalEstimado += totalEst;
         
-      return [
-        p?.descricao || `Produto ${plu}`,
-        plu,
-        qtdFormatada,
-        precoRef,
-        subtotalEstimado
-      ];
-    });
+        return [
+          p?.descricao || `Produto ${plu}`,
+          plu,
+          item.tipo === 'peso' ? `${item.quantidade}g` : `${item.quantidade} un`,
+          p ? `R$ ${precoOriginal.toFixed(2).replace('.', ',')}` : '-',
+          `R$ ${totalEst.toFixed(2).replace('.', ',')}`
+        ];
+      });
 
-    (doc as any).autoTable({
-      startY: config.logo_cliente ? 72 : 66,
-      head: [['Produto', 'Cód. PLU', 'Qtd. / Peso', 'Preço Ref.', 'Total Est.*']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [37, 99, 235] },
-      styles: { fontSize: 9 }
-    });
+      yPos = 55;
 
-    doc.save(`Minha_Lista_${new Date().getTime()}.pdf`);
+      // Renderiza a tabela com estilo premium
+      (doc as any).autoTable({
+        startY: yPos,
+        head: [['PRODUTO', 'PLU', 'QTD/PESO', 'V. UN.', 'TOTAL']],
+        body: tableData,
+        theme: 'plain', // Usando plain para customizar linhas
+        headStyles: { 
+          fillColor: [241, 245, 249], // slate-100
+          textColor: [71, 85, 105], // slate-600
+          fontSize: 7, 
+          fontStyle: 'bold',
+          halign: 'center' 
+        },
+        styles: { 
+          fontSize: 8.5, 
+          cellPadding: 4,
+          textColor: [51, 65, 85], // slate-700
+          lineColor: [226, 232, 240], // slate-200
+          lineWidth: { bottom: 0.1 }
+        },
+        columnStyles: {
+          0: { cellWidth: 'auto', halign: 'left', fontStyle: 'bold', textColor: [15, 23, 42] },
+          1: { halign: 'center', cellWidth: 15 },
+          2: { halign: 'center', cellWidth: 20 },
+          3: { halign: 'center', cellWidth: 22 },
+          4: { halign: 'right', cellWidth: 22, fontStyle: 'bold', textColor: [15, 23, 42] },
+        }
+      });
+
+      // Pega a posição Y final da tabela
+      const finalY = (doc as any).lastAutoTable.finalY + 10;
+
+      // --- RESUMO DO TOTAL ---
+      doc.setFillColor(248, 250, 252); // slate-50
+      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.setLineWidth(0.2);
+      doc.roundedRect(12, finalY, 124, 12, 2, 2, 'FD');
+      
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Total Estimado:', 18, finalY + 8);
+      
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.setFont('helvetica', 'bold');
+      doc.text(`R$ ${valorTotalEstimado.toFixed(2).replace('.', ',')}`, 132, finalY + 8, { align: 'right' });
+
+      // --- AVISO LEGAL PREMIUM ---
+      const avisoY = finalY + 20;
+      doc.setFillColor(254, 242, 242); // red-50
+      doc.setDrawColor(252, 165, 165); // red-300
+      doc.setLineWidth(0.3);
+      doc.roundedRect(12, avisoY, 124, 18, 2, 2, 'FD'); // Fills and Draws outline
+
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(220, 38, 38); // red-600
+      doc.text('ATENÇÃO: ISENÇÃO DE RESPONSABILIDADE', 16, avisoY + 6);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(153, 27, 27); // red-800
+      doc.text('* Esta é uma lista de pré-seleção estimativa para agilizar seu atendimento.', 16, avisoY + 11);
+      doc.text('* O peso e valor oficiais serão aferidos EXCLUSIVAMENTE na balança do caixa.', 16, avisoY + 15);
+
+      doc.save(`Minha_Lista_${new Date().getTime()}.pdf`);
+    } catch (err: any) {
+      alert("Erro ao gerar PDF: " + err.message);
+    }
   };
 
   if (ticketStatus === 'carregando') {
