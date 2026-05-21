@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { getApiUrl } from '../shared/apiConfig';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import { ShoppingCart, Search, FileText, AlertTriangle, Plus, Minus, Trash2 } from 'lucide-react';
+import { ShoppingCart, Search, FileText, AlertTriangle, Plus, Trash2 } from 'lucide-react';
 import { playNotificationSound } from '../shared/sounds';
 import { Bell, Volume2 } from 'lucide-react';
 
@@ -12,6 +12,36 @@ interface Produto {
   descricao: string;
   preco: number;
   categoria: string;
+}
+
+interface ItemCarrinho {
+  plu: string;
+  quantidade: number; // Gramas para peso (ex: 250), unidades para unidade (ex: 3)
+  tipo: 'peso' | 'unidade';
+}
+
+const EMOJIS_CATEGORIA: Record<string, string> = {
+  'Queijos e Laticínios': '🧀',
+  'Embutidos, Frios e Carnes': '🥩',
+  'Peixes e Frutos do Mar': '🐟',
+  'Oleaginosas e Castanhas': '🥜',
+  'Frutas Secas e Desidratadas': '🍇',
+  'Farinhas, Amidos e Polvilhos': '🌾',
+  'Grãos, Cereais e Sementes': '🌱',
+  'Temperos, Especiarias e Conservas': '🌿',
+  'Suplementos, Chás e Produtos Naturais': '🍵',
+  'Outros e Utilidades': '📦',
+  'Todos': '✨'
+};
+
+function getEmojiCategoria(cat: string): string {
+  return EMOJIS_CATEGORIA[cat] || '📦';
+}
+
+function getTipoProduto(descricao: string): 'peso' | 'unidade' {
+  const desc = descricao.toLowerCase();
+  const termosUnidade = [' un', ' un.', 'pc', 'pct', 'unid', 'unidade', 'pacote', 'bandeja', 'un/'];
+  return termosUnidade.some(t => desc.includes(t)) ? 'unidade' : 'peso';
 }
 
 export default function ClientePortal() {
@@ -36,8 +66,15 @@ export default function ClientePortal() {
   }, []);
 
   const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [loadingProdutos, setLoadingProdutos] = useState(true);
   const [busca, setBusca] = useState('');
+  const [categoriaAtiva, setCategoriaAtiva] = useState<string>('Todos');
   const [config, setConfig] = useState<any>({});
+
+  // Drawer Bottom Sheet State
+  const [selectedProduct, setSelectedProduct] = useState<Produto | null>(null);
+  const [drawerQuantidade, setDrawerQuantidade] = useState<number>(250);
+  const [drawerInputManual, setDrawerInputManual] = useState<string>('250');
 
   // Carrega configurações da loja
   useEffect(() => {
@@ -76,8 +113,8 @@ export default function ClientePortal() {
     });
   };
 
-  // Carrinho de pré-seleção: armazena PLU e Quantidade (apenas representativa para a lista)
-  const [carrinho, setCarrinho] = useState<Record<string, number>>({});
+  // Carrinho de pré-seleção: armazena objeto detalhado do produto
+  const [carrinho, setCarrinho] = useState<Record<string, ItemCarrinho>>({});
   const [showCarrinho, setShowCarrinho] = useState(false);
 
   // Verifica status do ticket e fila (polling adaptativo)
@@ -144,9 +181,12 @@ export default function ClientePortal() {
             bannerTimeoutRef.current = setTimeout(() => {
               setShowExpiringBanner(false);
               setTicketStatus('expirado');
+              // Limpa carrinho ao expirar
+              localStorage.removeItem(`carrinho_${ticketId}`);
             }, 4000);
           } else {
             setTicketStatus('expirado');
+            localStorage.removeItem(`carrinho_${ticketId}`);
           }
           setQueuePosition(null);
         }
@@ -168,11 +208,12 @@ export default function ClientePortal() {
       if (intervalId) clearInterval(intervalId);
       if (bannerTimeoutRef.current) clearTimeout(bannerTimeoutRef.current);
     };
-  }, [ticketId, API_URL, queuePosition, config]);
+  }, [ticketId, API_URL, queuePosition, config, ticketStatus]);
 
   // Carrega produtos
   useEffect(() => {
     const fetchProdutos = async () => {
+      setLoadingProdutos(true);
       try {
         const res = await fetch(`${API_URL}/api/toledo/produtos`);
         const data = await res.json();
@@ -181,6 +222,8 @@ export default function ClientePortal() {
         }
       } catch (e) {
         console.error('Erro ao carregar produtos');
+      } finally {
+        setLoadingProdutos(false);
       }
     };
     if (ticketStatus === 'aguardando') {
@@ -188,39 +231,74 @@ export default function ClientePortal() {
     }
   }, [ticketStatus, API_URL]);
 
-  // Restaura carrinho local
+  // Restaura carrinho local com migração robusta de dados legados
   useEffect(() => {
     if (ticketId) {
       const salvo = localStorage.getItem(`carrinho_${ticketId}`);
       if (salvo) {
         try {
-          setCarrinho(JSON.parse(salvo));
+          const parsed = JSON.parse(salvo);
+          const migrated: Record<string, ItemCarrinho> = {};
+          
+          Object.entries(parsed).forEach(([plu, value]) => {
+            if (typeof value === 'number') {
+              // Legado (somente o multiplicador)
+              const descEstimada = produtos.find(x => x.plu === plu)?.descricao || '';
+              const tipo = getTipoProduto(descEstimada);
+              migrated[plu] = {
+                plu,
+                quantidade: value,
+                tipo
+              };
+            } else if (value && typeof value === 'object' && 'quantidade' in value) {
+              // Estrutura nova
+              migrated[plu] = value as any;
+            }
+          });
+          
+          setCarrinho(migrated);
         } catch (e) { }
       }
     }
-  }, [ticketId]);
+  }, [ticketId, produtos]);
 
   // Salva carrinho local
   useEffect(() => {
-    if (ticketId && Object.keys(carrinho).length > 0) {
-      localStorage.setItem(`carrinho_${ticketId}`, JSON.stringify(carrinho));
+    if (ticketId) {
+      if (Object.keys(carrinho).length > 0) {
+        localStorage.setItem(`carrinho_${ticketId}`, JSON.stringify(carrinho));
+      } else {
+        localStorage.removeItem(`carrinho_${ticketId}`);
+      }
     }
   }, [carrinho, ticketId]);
 
-  const handleAdd = (plu: string) => {
-    setCarrinho(prev => ({ ...prev, [plu]: (prev[plu] || 0) + 1 }));
+  const handleOpenDrawer = (product: Produto) => {
+    setSelectedProduct(product);
+    const itemExistente = carrinho[product.plu];
+    const tipo = getTipoProduto(product.descricao);
+    
+    if (itemExistente) {
+      setDrawerQuantidade(itemExistente.quantidade);
+      setDrawerInputManual(itemExistente.quantidade.toString());
+    } else {
+      const defaultQtd = tipo === 'peso' ? 250 : 1;
+      setDrawerQuantidade(defaultQtd);
+      setDrawerInputManual(defaultQtd.toString());
+    }
   };
 
-  const handleRemove = (plu: string) => {
-    setCarrinho(prev => {
-      const novo = { ...prev };
-      if (novo[plu] > 1) {
-        novo[plu]--;
-      } else {
-        delete novo[plu];
+  const handleSaveItem = (product: Produto) => {
+    const tipo = getTipoProduto(product.descricao);
+    setCarrinho(prev => ({
+      ...prev,
+      [product.plu]: {
+        plu: product.plu,
+        quantidade: drawerQuantidade,
+        tipo
       }
-      return novo;
-    });
+    }));
+    setSelectedProduct(null);
   };
 
   const handleClearItem = (plu: string) => {
@@ -231,15 +309,27 @@ export default function ClientePortal() {
     });
   };
 
-  const totalItens = Object.values(carrinho).reduce((acc, val) => acc + val, 0);
+  const totalItens = Object.keys(carrinho).length;
+
+  const todasCategorias = useMemo(() => {
+    const cats = new Set<string>();
+    produtos.forEach(p => {
+      if (p.categoria) cats.add(p.categoria);
+    });
+    return ['Todos', ...Array.from(cats)];
+  }, [produtos]);
 
   const produtosFiltrados = useMemo(() => {
-    if (!busca.trim()) return produtos;
+    let list = produtos;
+    if (categoriaAtiva !== 'Todos') {
+      list = list.filter(p => p.categoria === categoriaAtiva);
+    }
+    if (!busca.trim()) return list;
     const term = busca.toLowerCase();
-    return produtos.filter(p => p.descricao.toLowerCase().includes(term) || p.plu.includes(term));
-  }, [produtos, busca]);
+    return list.filter(p => p.descricao.toLowerCase().includes(term) || p.plu.includes(term));
+  }, [produtos, busca, categoriaAtiva]);
 
-  // Agrupa produtos por categoria
+  // Agrupa produtos por categoria para renderização
   const produtosPorCategoria = useMemo(() => {
     const grupos: Record<string, Produto[]> = {};
     produtosFiltrados.forEach(p => {
@@ -286,26 +376,40 @@ export default function ClientePortal() {
     doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 14, config.logo_cliente ? 38 : 32);
     doc.text(`Senha associada: ${ticketNumero || 'N/A'}`, 14, config.logo_cliente ? 44 : 38);
 
-    // Aviso Legal
+    // Termo de Isenção Legal (AIRTIGHT DISCLAIMER)
     doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(220, 38, 38); // Red
-    doc.text('* Valores válidos apenas para a data de hoje.', 14, config.logo_cliente ? 52 : 46);
-    doc.text('* Preços sujeitos à alteração da balança sem aviso prévio.', 14, config.logo_cliente ? 56 : 50);
+    doc.text('⚠️ ATENÇÃO E ISENÇÃO DE RESPONSABILIDADE:', 14, config.logo_cliente ? 52 : 46);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text('* Esta é uma lista de PRÉ-SELEÇÃO para agilizar seu atendimento no balcão.', 14, config.logo_cliente ? 56 : 50);
+    doc.text('* O peso e valor cobrado reais serão determinados EXCLUSIVAMENTE pela balança oficial no caixa.', 14, config.logo_cliente ? 60 : 54);
+    doc.text('* Os valores são apenas estimativas de referência baseadas nos preços de hoje.', 14, config.logo_cliente ? 64 : 58);
 
     // Tabela
-    const tableData = Object.entries(carrinho).map(([plu, qtd]) => {
+    const tableData = Object.entries(carrinho).map(([plu, item]) => {
       const p = produtos.find(x => x.plu === plu);
+      const qtdFormatada = item.tipo === 'peso' 
+        ? `${item.quantidade}g` 
+        : `${item.quantidade} un`;
+      const precoRef = p ? `R$ ${p.preco.toFixed(2).replace('.', ',')}/${item.tipo === 'peso' ? 'kg' : 'un'}` : '-';
+      const subtotalEstimado = p 
+        ? `R$ ${(p.preco * (item.tipo === 'peso' ? item.quantidade / 1000 : item.quantidade)).toFixed(2).replace('.', ',')}` 
+        : '-';
+        
       return [
         p?.descricao || `Produto ${plu}`,
         plu,
-        qtd.toString(),
-        p ? `R$ ${p.preco.toFixed(2).replace('.', ',')}/kg` : '-'
+        qtdFormatada,
+        precoRef,
+        subtotalEstimado
       ];
     });
 
     (doc as any).autoTable({
-      startY: config.logo_cliente ? 62 : 55,
-      head: [['Produto', 'Cód.', 'Qtd.', 'Preço Ref. (Kg/Un)']],
+      startY: config.logo_cliente ? 72 : 66,
+      head: [['Produto', 'Cód. PLU', 'Qtd. / Peso', 'Preço Ref.', 'Total Est.*']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [37, 99, 235] },
@@ -347,12 +451,13 @@ export default function ClientePortal() {
                 <ShoppingCart className="w-5 h-5" /> Sua Seleção Final
               </h3>
               <div className="space-y-3 mb-6">
-                {Object.entries(carrinho).map(([plu, qtd]) => {
+                {Object.entries(carrinho).map(([plu, item]) => {
                   const p = produtos.find(x => x.plu === plu) || { descricao: `Produto ${plu}` };
+                  const labelQtd = item.tipo === 'peso' ? `${item.quantidade}g` : `${item.quantidade} un`;
                   return (
                     <div key={plu} className="flex justify-between items-center bg-surface-variant/50 p-3 rounded-lg text-sm text-left">
                       <span className="font-semibold text-ink line-clamp-1 flex-1 pr-2">{p.descricao}</span>
-                      <span className="bg-primary/10 text-primary font-bold px-2 py-1 rounded">x{qtd}</span>
+                      <span className="bg-primary/10 text-primary font-bold px-2 py-1 rounded">{labelQtd}</span>
                     </div>
                   );
                 })}
@@ -393,21 +498,44 @@ export default function ClientePortal() {
           <span>Sua Senha: <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">{ticketNumero}</span></span>
           <span className="flex items-center gap-1 text-primary"><span className="w-2 h-2 rounded-full bg-success animate-pulse"></span> AO VIVO</span>
         </div>
-        <div className="p-4 pt-2">
+        
+        {/* Barra de Pesquisa */}
+        <div className="p-4 pt-2 pb-1">
           <div className="relative">
             <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-ink-secondary" />
             <input
               type="text"
-              placeholder="Pesquisar produto ou código..."
+              placeholder="Pesquisar produto ou código PLU..."
               value={busca}
               onChange={e => setBusca(e.target.value)}
               className="w-full bg-surface-variant border border-outline-variant rounded-xl py-3 pl-10 pr-4 text-sm font-medium outline-none focus:border-primary transition-colors"
             />
           </div>
         </div>
+
+        {/* Categorias Swipable Horizontal */}
+        <div className="px-4 pb-3 overflow-x-auto scrollbar-hide flex gap-2 w-full pt-1 select-none">
+          {todasCategorias.map(cat => {
+            const isActive = categoriaAtiva === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setCategoriaAtiva(cat)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border whitespace-nowrap transition-all duration-300 ${
+                  isActive
+                    ? 'bg-primary text-white border-primary shadow-md shadow-primary/15 scale-[1.03]'
+                    : 'bg-surface-variant/40 border-outline-variant/60 text-ink hover:bg-surface-variant'
+                }`}
+              >
+                <span>{getEmojiCategoria(cat)}</span>
+                <span>{cat === 'Todos' ? 'Todos Itens' : cat}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Banner de Solicitação de Notificações (PWA/Browser) */}
+      {/* Banner de Solicitação de Notificações */}
       {'Notification' in window && notifPermission === 'default' && (
         <div className="mx-4 mt-3">
           <div className="bg-surface border border-outline-variant rounded-2xl p-4 shadow-sm flex flex-col items-center text-center">
@@ -465,44 +593,322 @@ export default function ClientePortal() {
 
       {/* Catálogo de Produtos */}
       <div className="p-4 space-y-8">
-        {Object.entries(produtosPorCategoria).map(([categoria, items]) => (
-          <div key={categoria}>
-            <h2 className="text-xl font-bold text-ink mb-4 pl-1 border-l-4 border-primary">{categoria}</h2>
-            <div className="grid grid-cols-1 gap-3">
-              {items.map(p => {
-                const qtd = carrinho[p.plu] || 0;
-                return (
-                  <div key={p.plu} className="bg-surface border border-outline-variant rounded-2xl p-4 flex justify-between items-center shadow-sm">
-                    <div className="flex-1 pr-4">
-                      <span className="text-xs font-mono text-ink-secondary bg-surface-variant px-1.5 py-0.5 rounded mb-1 inline-block">{p.plu}</span>
-                      <h3 className="font-bold text-ink leading-tight line-clamp-2 text-sm">{p.descricao}</h3>
-                      <p className="text-primary font-black mt-1">R$ {p.preco.toFixed(2).replace('.', ',')}<span className="text-xs font-medium text-ink-secondary">/kg</span></p>
-                    </div>
-
-                    {qtd === 0 ? (
-                      <button
-                        onClick={() => handleAdd(p.plu)}
-                        className="bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                      >
-                        <Plus className="w-5 h-5" />
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-3 bg-surface-variant p-1 rounded-full shrink-0">
-                        <button onClick={() => handleRemove(p.plu)} className="w-8 h-8 flex items-center justify-center bg-surface rounded-full shadow-sm text-ink-secondary"><Minus className="w-4 h-4" /></button>
-                        <span className="font-bold text-sm w-4 text-center">{qtd}</span>
-                        <button onClick={() => handleAdd(p.plu)} className="w-8 h-8 flex items-center justify-center bg-primary rounded-full shadow-sm text-white"><Plus className="w-4 h-4" /></button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+        {loadingProdutos ? (
+          /* SKELETON LOADINGS */
+          <div className="space-y-4 pt-4">
+            <div className="h-6 bg-surface-variant rounded-md w-36 animate-pulse mb-6"></div>
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-surface border border-outline-variant/60 rounded-2xl p-4 flex justify-between items-center shadow-sm animate-pulse">
+                <div className="flex-1 pr-4">
+                  <div className="h-4 bg-surface-variant rounded-md w-16 mb-2"></div>
+                  <div className="h-5 bg-surface-variant rounded-md w-3/4 mb-2"></div>
+                  <div className="h-4 bg-surface-variant rounded-md w-24"></div>
+                </div>
+                <div className="w-10 h-10 bg-surface-variant rounded-full shrink-0"></div>
+              </div>
+            ))}
           </div>
-        ))}
-        {Object.keys(produtosPorCategoria).length === 0 && (
+        ) : (
+          Object.entries(produtosPorCategoria).map(([categoria, items]) => (
+            <div key={categoria}>
+              <h2 className="text-lg font-bold text-ink mb-4 pl-2 border-l-4 border-primary flex items-center gap-2">
+                <span>{getEmojiCategoria(categoria)}</span>
+                <span>{categoria}</span>
+              </h2>
+              <div className="grid grid-cols-1 gap-3">
+                {items.map(p => {
+                  const item = carrinho[p.plu];
+                  const isSelected = !!item;
+                  const tipo = getTipoProduto(p.descricao);
+                  const labelQuantidade = isSelected
+                    ? item.tipo === 'peso'
+                      ? `${item.quantidade}g`
+                      : `${item.quantidade} un`
+                    : '';
+
+                  return (
+                    <div
+                      key={p.plu}
+                      onClick={() => handleOpenDrawer(p)}
+                      className={`bg-surface border rounded-2xl p-4 flex justify-between items-center shadow-sm transition-all duration-300 active:scale-[0.98] cursor-pointer ${
+                        isSelected
+                          ? 'border-primary ring-2 ring-primary/10 bg-primary/[0.02]'
+                          : 'border-outline-variant/60 hover:border-primary/40'
+                      }`}
+                    >
+                      <div className="flex-1 pr-4">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="text-[10px] font-mono font-bold text-ink-secondary bg-surface-variant/80 px-2 py-0.5 rounded-md">
+                            PLU {p.plu}
+                          </span>
+                          {isSelected && (
+                            <span className="bg-success/15 text-success font-black text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider flex items-center gap-0.5">
+                              ✓ {labelQuantidade}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="font-bold text-ink leading-tight text-sm line-clamp-2">
+                          {p.descricao}
+                        </h3>
+                        <p className="text-primary font-black mt-1.5 text-base">
+                          R$ {p.preco.toFixed(2).replace('.', ',')}
+                          <span className="text-xs font-semibold text-ink-secondary">
+                            /{tipo === 'peso' ? 'kg' : 'un'}
+                          </span>
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 ml-2">
+                        {isSelected ? (
+                          <div className="bg-primary text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md shadow-primary/20">
+                            <span className="material-symbols-outlined text-lg font-bold">edit</span>
+                          </div>
+                        ) : (
+                          <div className="bg-primary/10 text-primary transition-colors w-10 h-10 rounded-full flex items-center justify-center">
+                            <Plus className="w-5 h-5" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))
+        )}
+        
+        {!loadingProdutos && Object.keys(produtosPorCategoria).length === 0 && (
           <p className="text-center text-ink-secondary mt-10">Nenhum produto encontrado.</p>
         )}
       </div>
+
+      {/* Drawer Bottom Sheet para Ajuste de Peso/Quantidade */}
+      {selectedProduct && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          {/* Background overlay (Android safe) */}
+          <div
+            className="absolute inset-0 bg-black/60 transition-opacity"
+            onClick={() => setSelectedProduct(null)}
+          ></div>
+
+          {/* Gaveta principal */}
+          <div className="relative w-full max-w-md bg-surface rounded-t-[32px] p-6 shadow-[0_-8px_32px_rgba(0,0,0,0.15)] border-t border-outline-variant/30 transform transition-transform duration-300 max-h-[90vh] overflow-y-auto animate-slide-up pb-8 z-10">
+            {/* Barra de arraste visual */}
+            <div className="w-12 h-1.5 bg-outline-variant/60 rounded-full mx-auto mb-6"></div>
+
+            {/* Informações do Produto */}
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-[10px] font-mono font-bold text-ink-secondary bg-surface-variant px-2 py-0.5 rounded-md">
+                  PLU {selectedProduct.plu}
+                </span>
+                <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                  {getTipoProduto(selectedProduct.descricao) === 'peso' ? 'Por Peso' : 'Por Unidade'}
+                </span>
+              </div>
+              <h3 className="font-bold text-lg text-ink leading-snug">
+                {selectedProduct.descricao}
+              </h3>
+              <p className="text-xl font-black text-primary mt-2">
+                R$ {selectedProduct.preco.toFixed(2).replace('.', ',')}
+                <span className="text-sm font-medium text-ink-secondary">
+                  /{getTipoProduto(selectedProduct.descricao) === 'peso' ? 'kg' : 'un'}
+                </span>
+              </p>
+            </div>
+
+            {/* Controles de Quantidade */}
+            {getTipoProduto(selectedProduct.descricao) === 'peso' ? (
+              /* Seletor por Peso */
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-ink-secondary mb-3">
+                    Predefinições de Peso
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[100, 250, 500, 750, 1000, 1500, 2000, 3000].map(grams => (
+                      <button
+                        key={grams}
+                        type="button"
+                        onClick={() => {
+                          setDrawerQuantidade(grams);
+                          setDrawerInputManual(grams.toString());
+                        }}
+                        className={`py-2.5 px-1 text-xs font-bold rounded-xl border transition-all ${
+                          drawerQuantidade === grams
+                            ? 'bg-primary text-white border-primary shadow-sm shadow-primary/20 scale-[1.03]'
+                            : 'bg-surface-variant/40 border-outline-variant/50 text-ink hover:bg-surface-variant'
+                        }`}
+                      >
+                        {grams >= 1000 ? `${grams / 1000} kg` : `${grams}g`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-ink-secondary mb-2 flex justify-between">
+                    <span>Ajuste Preciso</span>
+                    <span className="text-primary font-black text-sm">
+                      {drawerQuantidade >= 1000 ? `${(drawerQuantidade / 1000).toFixed(3).replace('.', ',')} kg` : `${drawerQuantidade}g`}
+                    </span>
+                  </label>
+                  <div className="flex items-center gap-4 bg-surface-variant/40 p-2 rounded-2xl border border-outline-variant/30 justify-between">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newVal = Math.max(50, drawerQuantidade - 50);
+                        setDrawerQuantidade(newVal);
+                        setDrawerInputManual(newVal.toString());
+                      }}
+                      className="w-12 h-12 bg-surface text-ink hover:bg-surface-variant border border-outline-variant/30 rounded-xl flex items-center justify-center font-black text-xl shadow-sm active:scale-95 transition-all"
+                    >
+                      -
+                    </button>
+                    <div className="flex items-baseline gap-1">
+                      <input
+                        type="number"
+                        pattern="[0-9]*"
+                        value={drawerInputManual}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setDrawerInputManual(val);
+                          const num = parseInt(val);
+                          if (!isNaN(num) && num > 0) {
+                            setDrawerQuantidade(num);
+                          }
+                        }}
+                        onBlur={() => {
+                          if (!drawerInputManual || isNaN(parseInt(drawerInputManual)) || parseInt(drawerInputManual) <= 0) {
+                            setDrawerQuantidade(250);
+                            setDrawerInputManual('250');
+                          }
+                        }}
+                        className="w-20 bg-transparent text-center font-black text-2xl text-ink outline-none border-b border-primary/30 focus:border-primary"
+                      />
+                      <span className="font-bold text-ink-secondary text-sm">g</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newVal = Math.min(10000, drawerQuantidade + 50);
+                        setDrawerQuantidade(newVal);
+                        setDrawerInputManual(newVal.toString());
+                      }}
+                      className="w-12 h-12 bg-primary text-white hover:bg-primary-hover rounded-xl flex items-center justify-center font-black text-xl shadow-md shadow-primary/10 active:scale-95 transition-all"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Seletor por Unidade */
+              <div className="space-y-4">
+                <label className="block text-xs font-bold uppercase tracking-widest text-ink-secondary mb-1 flex justify-between">
+                  <span>Quantidade</span>
+                  <span className="text-primary font-black text-sm">{drawerQuantidade} un</span>
+                </label>
+                <div className="flex items-center gap-4 bg-surface-variant/40 p-2 rounded-2xl border border-outline-variant/30 justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newVal = Math.max(1, drawerQuantidade - 1);
+                      setDrawerQuantidade(newVal);
+                      setDrawerInputManual(newVal.toString());
+                    }}
+                    className="w-12 h-12 bg-surface text-ink hover:bg-surface-variant border border-outline-variant/30 rounded-xl flex items-center justify-center font-black text-xl shadow-sm active:scale-95 transition-all"
+                  >
+                    -
+                  </button>
+                  <div className="flex items-baseline gap-1">
+                    <input
+                      type="number"
+                      pattern="[0-9]*"
+                      value={drawerInputManual}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setDrawerInputManual(val);
+                        const num = parseInt(val);
+                        if (!isNaN(num) && num > 0) {
+                          setDrawerQuantidade(num);
+                        }
+                      }}
+                      onBlur={() => {
+                        if (!drawerInputManual || isNaN(parseInt(drawerInputManual)) || parseInt(drawerInputManual) <= 0) {
+                          setDrawerQuantidade(1);
+                          setDrawerInputManual('1');
+                        }
+                      }}
+                      className="w-20 bg-transparent text-center font-black text-2xl text-ink outline-none border-b border-primary/30 focus:border-primary"
+                    />
+                    <span className="font-bold text-ink-secondary text-sm">un</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newVal = Math.min(100, drawerQuantidade + 1);
+                      setDrawerQuantidade(newVal);
+                      setDrawerInputManual(newVal.toString());
+                    }}
+                    className="w-12 h-12 bg-primary text-white hover:bg-primary-hover rounded-xl flex items-center justify-center font-black text-xl shadow-md shadow-primary/10 active:scale-95 transition-all"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Card de Preço Estimado em Tempo Real */}
+            <div className="mt-6 bg-primary/[0.02] border border-primary/10 rounded-2xl p-4 flex flex-col items-center text-center">
+              <span className="text-[10px] font-bold text-primary uppercase tracking-widest mb-1">
+                Subtotal Estimado
+              </span>
+              <div className="text-2xl font-black text-success">
+                R${' '}
+                {(
+                  (selectedProduct.preco *
+                    (getTipoProduto(selectedProduct.descricao) === 'peso' ? drawerQuantidade / 1000 : drawerQuantidade))
+                )
+                  .toFixed(2)
+                  .replace('.', ',')}
+              </div>
+              <span className="text-[9px] font-bold text-ink-secondary/70 mt-1.5 leading-relaxed text-center">
+                * Referência: {getTipoProduto(selectedProduct.descricao) === 'peso' 
+                  ? `${drawerQuantidade >= 1000 ? `${drawerQuantidade / 1000}kg` : `${drawerQuantidade}g`} × R$ ${selectedProduct.preco.toFixed(2).replace('.', ',')}/kg`
+                  : `${drawerQuantidade} un × R$ ${selectedProduct.preco.toFixed(2).replace('.', ',')}/un`
+                }
+              </span>
+            </div>
+
+            {/* Botões de Ação */}
+            <div className="grid grid-cols-1 gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => handleSaveItem(selectedProduct)}
+                className="w-full bg-primary hover:bg-primary-hover text-white py-4 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-primary/10 active:scale-95 transition-transform"
+              >
+                <span className="material-symbols-outlined text-lg">check_circle</span>
+                {carrinho[selectedProduct.plu] ? 'Atualizar na Lista' : 'Confirmar e Adicionar'}
+              </button>
+              
+              {carrinho[selectedProduct.plu] && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleClearItem(selectedProduct.plu);
+                    setSelectedProduct(null);
+                  }}
+                  className="w-full bg-error/5 hover:bg-error/10 text-error py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1 active:scale-95 transition-transform"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Remover da Lista
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Bar Carrinho */}
       {totalItens > 0 && (
@@ -510,35 +916,87 @@ export default function ClientePortal() {
           <div className="pointer-events-auto bg-surface rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-outline-variant overflow-hidden">
             {showCarrinho ? (
               <div className="flex flex-col max-h-[60vh]">
+                {/* Header do carrinho com "Limpar Tudo" */}
                 <div className="p-4 border-b border-outline-variant flex justify-between items-center bg-surface-variant/30">
                   <h3 className="font-bold text-ink flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Sua Lista</h3>
-                  <button onClick={() => setShowCarrinho(false)} className="text-sm font-bold text-primary">FECHAR</button>
+                  <div className="flex gap-4 items-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm('Deseja limpar todos os itens selecionados da sua lista?')) {
+                          setCarrinho({});
+                          setShowCarrinho(false);
+                        }
+                      }}
+                      className="text-xs font-bold text-error uppercase tracking-wider"
+                    >
+                      Limpar Tudo
+                    </button>
+                    <button type="button" onClick={() => setShowCarrinho(false)} className="text-sm font-bold text-primary">FECHAR</button>
+                  </div>
                 </div>
+
+                {/* Lista de itens no carrinho */}
                 <div className="overflow-y-auto p-4 space-y-3">
-                  {Object.entries(carrinho).map(([plu, qtd]) => {
+                  {Object.entries(carrinho).map(([plu, item]) => {
                     const p = produtos.find(x => x.plu === plu) || { descricao: `Produto ${plu}`, preco: 0 };
+                    const labelQtd = item.tipo === 'peso' ? `${item.quantidade}g` : `${item.quantidade} un`;
+                    const subtotal = p.preco * (item.tipo === 'peso' ? item.quantidade / 1000 : item.quantidade);
+                    
                     return (
-                      <div key={plu} className="flex justify-between items-center">
-                        <div className="flex-1 pr-2">
-                          <p className="font-semibold text-sm line-clamp-1 text-ink">{p.descricao}</p>
-                          <p className="text-xs text-ink-secondary">Qtd: {qtd}</p>
+                      <div key={plu} className="flex justify-between items-center bg-surface-variant/20 p-3 rounded-xl border border-outline-variant/30">
+                        <div className="flex-1 pr-3">
+                          <p className="font-bold text-sm text-ink line-clamp-1">{p.descricao}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                              {labelQtd}
+                            </span>
+                            <span className="text-xs font-bold text-success">
+                              Est: R$ {subtotal.toFixed(2).replace('.', ',')}
+                            </span>
+                          </div>
                         </div>
-                        <button onClick={() => handleClearItem(plu)} className="p-2 text-error/70 hover:text-error bg-error/5 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                        <div className="flex gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedProduct(p as any);
+                              setDrawerQuantidade(item.quantidade);
+                              setDrawerInputManual(item.quantidade.toString());
+                              setShowCarrinho(false);
+                            }}
+                            className="p-2 text-primary hover:bg-primary/5 rounded-lg border border-primary/20"
+                          >
+                            <span className="material-symbols-outlined text-base">edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleClearItem(plu)}
+                            className="p-2 text-error hover:bg-error/5 rounded-lg border border-error/20"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
+
+                {/* Footer do carrinho com Aviso Legal Airtight */}
                 <div className="p-4 bg-surface-variant/30 border-t border-outline-variant">
-                  <p className="text-[10px] leading-tight text-ink-secondary text-center mb-3 font-medium">
-                    * Os valores pré-selecionados são válidos apenas hoje e podem haver alterações da balança sem aviso prévio.
-                  </p>
-                  <button onClick={gerarPDF} className="w-full bg-primary text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md">
+                  <div className="bg-error/5 border border-error/15 rounded-xl p-3 mb-4">
+                    <p className="text-[10px] leading-relaxed text-error font-medium text-center uppercase tracking-wide">
+                      ⚠️ <strong>Aviso Importante:</strong> Valores e gramaturas são apenas estimativas para referência. O peso e valor oficial cobrado final serão aferidos na balança do caixa de atendimento.
+                    </p>
+                  </div>
+                  <button onClick={gerarPDF} className="w-full bg-primary text-white py-3.5 rounded-xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-md">
                     <FileText className="w-5 h-5" /> GERAR PDF DA LISTA
                   </button>
                 </div>
               </div>
             ) : (
               <button
+                type="button"
                 onClick={() => setShowCarrinho(true)}
                 className="w-full p-4 flex items-center justify-between text-ink"
               >
@@ -547,7 +1005,7 @@ export default function ClientePortal() {
                     <ShoppingCart className="w-6 h-6 text-primary" />
                     <span className="absolute -top-2 -right-2 bg-error text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-surface">{totalItens}</span>
                   </div>
-                  <span className="font-bold text-sm">Ver Minha Lista</span>
+                  <span className="font-bold text-sm">Ver Minha Lista de Pré-Seleção</span>
                 </div>
                 <span className="text-xs font-bold bg-primary/10 text-primary px-3 py-1.5 rounded-lg uppercase tracking-wider">Expandir</span>
               </button>
