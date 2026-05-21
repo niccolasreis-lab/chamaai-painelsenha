@@ -7,6 +7,7 @@ import cron from 'node-cron';
 import { getDb } from '../electron/services/database';
 import { startToledoWatcher, forceToledoRefresh, reloadCategorias, setBroadcastFn } from './toledo-watcher';
 import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica } from './supabase-sync';
+import { migrateDatabaseAndConfigs } from './categorizador';
 
 const app = express();
 app.use(cors());
@@ -1110,6 +1111,14 @@ export function startServer() {
     // Startup reset check and configs synchronization
     try {
       const db = getDb();
+
+      // Execute category migration safely on server startup
+      try {
+        migrateDatabaseAndConfigs(db);
+        reloadCategorias();
+      } catch (migErr: any) {
+        console.error('[STARTUP] Erro ao executar migração de categorias:', migErr.message);
+      }
       
       // 1. Sync public configuration options to Supabase
       const rows = db.prepare("SELECT chave, valor FROM configuracoes").all() as any[];

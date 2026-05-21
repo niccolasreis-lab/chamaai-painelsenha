@@ -109,58 +109,51 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
   const getCategoryStyle = (nome: string, isOferta: boolean) => {
     if (isOferta) return { icon: '🔥', bg: 'bg-red-500/20', border: 'border-red-500/50', text: 'text-red-400', isPulse: true };
     
-    const n = nome.toLowerCase();
+    // Normalização de string para evitar problemas com acentos e capitalização
+    const n = (nome || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
     
-    // Açougue e Carnes
-    if (n.match(/açougue|acougue|carne|bovina|suína|suina|frango|ave/)) 
+    // 1. Queijos e Laticínios
+    if (n === 'queijos e laticinios' || n.includes('queijo') || n.includes('laticinio')) 
+      return { icon: '🧀', bg: 'bg-blue-300/10', border: 'border-blue-300/20', text: 'text-blue-200' };
+    
+    // 2. Embutidos, Frios e Carnes
+    if (n === 'embutidos, frios e carnes' || n.includes('embutido') || n.includes('frio') || n.includes('carne')) 
       return { icon: '🥩', bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400' };
     
-    // Peixaria
-    if (n.match(/peix|frutos do mar/)) 
+    // 3. Peixes e Frutos do Mar
+    if (n === 'peixes e frutos do mar' || n.includes('peixe') || n.includes('mar')) 
       return { icon: '🐟', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-400' };
     
-    // Frios e Embutidos
-    if (n.match(/frio|embutido|salame|presunto|mortadela/)) 
-      return { icon: '🧀', bg: 'bg-yellow-400/10', border: 'border-yellow-400/20', text: 'text-yellow-400' };
+    // 4. Oleaginosas e Castanhas
+    if (n === 'oleaginosas e castanhas' || n.includes('oleaginosa') || n.includes('castanha')) 
+      return { icon: '🥜', bg: 'bg-amber-600/10', border: 'border-amber-600/20', text: 'text-amber-500' };
     
-    // Laticínios
-    if (n.match(/laticínio|laticinio|leite|iogurte|queijo|manteiga|requeijão/)) 
-      return { icon: '🥛', bg: 'bg-blue-300/10', border: 'border-blue-300/20', text: 'text-blue-200' };
+    // 5. Frutas Secas e Desidratadas
+    if (n === 'frutas secas e desidratadas' || n.includes('fruta seca') || n.includes('desidratada')) 
+      return { icon: '🍇', bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400' };
     
-    // Hortifruti
-    if (n.match(/horti|fruta|verdura|legume|vegetal|cebola|alho/)) 
-      return { icon: '🍎', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400' };
+    // 6. Farinhas, Amidos e Polvilhos
+    if (n === 'farinhas, amidos e polvilhos' || n.includes('farinha') || n.includes('amido') || n.includes('polvilho')) 
+      return { icon: '🌾', bg: 'bg-orange-400/10', border: 'border-orange-400/20', text: 'text-orange-300' };
     
-    // Padaria e Confeitaria
-    if (n.match(/padaria|pão|pao|bolo|doce|sobremesa|confeitaria|salgado/)) 
-      return { icon: '🥖', bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400' };
+    // 7. Grãos, Cereais e Sementes
+    if (n === 'graos, cereais e sementes' || n.includes('grao') || n.includes('cereal') || n.includes('semente')) 
+      return { icon: '🌱', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400' };
     
-    // Bebidas
-    if (n.match(/bebida|suco|cerveja|refrigerante|vinho|destilado|água/)) 
-      return { icon: '🥤', bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400' };
+    // 8. Temperos, Especiarias e Conservas
+    if (n === 'temperos, especiarias e conservas' || n.includes('tempero') || n.includes('especiaria') || n.includes('conserva')) 
+      return { icon: '🌿', bg: 'bg-teal-400/10', border: 'border-teal-400/20', text: 'text-teal-300' };
     
-    // Mercearia e Grãos
-    if (n.match(/mercearia|grão|grao|cereal|arroz|feijão|feijao|macarrão|massa|óleo|azeite/)) 
-      return { icon: '🍚', bg: 'bg-orange-400/10', border: 'border-orange-400/20', text: 'text-orange-300' };
+    // 9. Suplementos, Chás e Produtos Naturais
+    if (n === 'suplementos, chas e produtos naturais' || n.includes('suplemento') || n.includes('cha') || n.includes('produto natural')) 
+      return { icon: '🍵', bg: 'bg-sky-400/10', border: 'border-sky-400/20', text: 'text-sky-300' };
     
-    // Limpeza e Higiene
-    if (n.match(/limpeza|higiene|perfumaria|sabão|detergente|shampoo/)) 
-      return { icon: '🧼', bg: 'bg-teal-400/10', border: 'border-teal-400/20', text: 'text-teal-300' };
-    
-    // Congelados
-    if (n.match(/congelado|sorvete|pizza|lasanha/)) 
-      return { icon: '🧊', bg: 'bg-sky-400/10', border: 'border-sky-400/20', text: 'text-sky-300' };
-      
-    // Pet Shop
-    if (n.match(/pet|animal|ração|racao|gato|cachorro/)) 
-      return { icon: '🐕', bg: 'bg-amber-600/10', border: 'border-amber-600/20', text: 'text-amber-500' };
-
-    // Bazar e Outros
-    if (n.match(/bazar|utilidade|casa/)) 
-      return { icon: '🏠', bg: 'bg-slate-400/10', border: 'border-slate-400/20', text: 'text-slate-300' };
-
     // Default
-    return { icon: '🛒', bg: 'bg-white/5', border: 'border-white/10', text: 'text-white/80' };
+    return { icon: '📦', bg: 'bg-white/5', border: 'border-white/10', text: 'text-white/80' };
   };
 
   const formatPreco = (preco: number) => {
@@ -171,7 +164,8 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
   const currentSlideData = slides[currentSlide] || [];
   const totalSlides = slides.length || 1;
 
-  const theme = config.toledo_tema || 'escuro';
+  // ── Theme resolution: toledo_encarte_tema → toledo_tema → 'padrao' ──
+  const theme = config.toledo_encarte_tema || config.toledo_tema || 'padrao';
   let bgGradient = 'linear-gradient(135deg, #0f172a 0%, #020617 100%)';
   let accentClass = 'text-emerald-400';
   let accentBgClass = 'bg-emerald-400';
@@ -187,13 +181,26 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
     accentClass = 'text-amber-400';
     accentBgClass = 'bg-amber-400';
     glowClass = 'from-amber-400 to-orange-600 shadow-amber-500/30';
+  } else if (theme === 'hortifruti') {
+    bgGradient = 'linear-gradient(135deg, #0a2a0f 0%, #1a4a1f 30%, #0a2a0f 70%, #051a08 100%)';
+    accentClass = 'text-lime-400';
+    accentBgClass = 'bg-lime-400';
+    glowClass = 'from-lime-400 to-green-600 shadow-lime-500/30';
   }
+
+  // CSS custom properties for proportional scaling
+  const descFont = config.toledo_fonte_descricao || '1.25rem';
+  const priceFont = config.toledo_fonte_preco || '1.75rem';
+  const cssVars = {
+    '--desc-font': descFont,
+    '--price-font': priceFont,
+  } as React.CSSProperties;
 
   // To fix tailwind dynamic class issue with accentBgClass split
   const accentColor = accentBgClass.split('-')[1];
 
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden animate-fade-in" style={{ background: bgGradient }}>
+    <div className="h-full w-full flex flex-col overflow-hidden animate-fade-in" style={{ background: bgGradient, ...cssVars }}>
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="shrink-0 px-2 pt-6 pb-4 flex items-center justify-between">
         <div className="flex items-center gap-5">
@@ -240,11 +247,11 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
               <div key={`${group.nome}-${gIdx}`} className="mb-6 break-inside-avoid-page">
                 {/* Category header */}
                 <div className={`flex items-center gap-4 px-6 py-3 rounded-xl ${style.bg} border ${style.border} mb-3 break-inside-avoid shadow-sm ${style.isPulse ? 'animate-pulse ring-4 ring-red-500/30 scale-[1.02] shadow-red-500/20' : ''}`}>
-                  <span className="text-4xl">{style.icon}</span>
-                  <h2 className={`text-[1.75rem] font-black uppercase tracking-wider ${style.text}`}>
+                  <span style={{ fontSize: 'clamp(1.5rem, calc(var(--desc-font) * 1.8), 5rem)' }}>{style.icon}</span>
+                  <h2 className={`font-black uppercase tracking-wider ${style.text}`} style={{ fontSize: 'clamp(1.25rem, calc(var(--desc-font) * 1.15), 5rem)' }}>
                     {group.nome}
                   </h2>
-                  <span className={`text-sm font-bold uppercase tracking-widest ${style.text} opacity-60 ml-auto`}>
+                  <span className={`font-bold uppercase tracking-widest ${style.text} opacity-60 ml-auto`} style={{ fontSize: 'clamp(0.7rem, calc(var(--desc-font) * 0.6), 2.5rem)' }}>
                     {group.produtos.length} {group.produtos.length === 1 ? 'item' : 'itens'}
                   </span>
                 </div>
@@ -263,10 +270,10 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
                         {produto.descricao.replace(/\*|OFERTA/gi, '').trim()}
                       </span>
                       <div className="flex items-baseline gap-1 shrink-0">
-                        <span className={`${group.isOferta ? 'text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.8)]' : accentClass} font-black tracking-tighter drop-shadow-sm`} style={{ fontSize: config.toledo_fonte_preco || '1.75rem' }}>
+                        <span className={`${group.isOferta ? 'text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.8)]' : accentClass} font-black tracking-tighter drop-shadow-sm`} style={{ fontSize: 'var(--price-font)' }}>
                           {formatPreco(produto.preco)}
                         </span>
-                        <span className={`${group.isOferta ? 'text-red-400' : accentClass} opacity-60 text-sm font-bold uppercase`}>/kg</span>
+                        <span className={`${group.isOferta ? 'text-red-400' : accentClass} opacity-60 font-bold uppercase`} style={{ fontSize: 'clamp(0.7rem, calc(var(--price-font) * 0.3), 3rem)' }}>/kg</span>
                       </div>
                     </div>
                   ))}

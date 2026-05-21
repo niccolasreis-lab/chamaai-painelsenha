@@ -28,44 +28,50 @@ const STRIPE_COLORS = [COLORS.green, COLORS.amber, COLORS.gold, COLORS.forest];
 
 // ── Category icon/label map ──────────────────────────────────────────────────
 function getCategoryMeta(name: string) {
-  const n = name.toLowerCase();
-  if (n.match(/grão|grao|cereal|arroz|feijão|feijao|aveia|lentilha/))
-    return { icon: '🌾', label: 'Energia · Fibras Naturais', tag: 'granel' };
-  if (n.match(/fruta|desidratada|cristalizada|uva|damasco|banana/))
-    return { icon: '🍇', label: 'Secas · Cristalizadas', tag: 'desidratada' };
-  if (n.match(/especiaria|tempero|pimenta|canela|cravo|cominho/))
-    return { icon: '🌿', label: 'Temperos · Aromas Naturais', tag: 'especiaria' };
-  if (n.match(/oleaginosa|castanha|nozes|amêndoa|amendoim|pistache/))
-    return { icon: '🥜', label: 'Oleaginosas · Proteínas', tag: 'granel' };
-  if (n.match(/farinha|polvilho|amido|fubá|trigo/))
-    return { icon: '🫘', label: 'Farináceos · Base Culinária', tag: 'granel' };
-  if (n.match(/doce|bala|confeito|chocolate|goma/))
-    return { icon: '🍬', label: 'Doces · Confeitos', tag: 'granel' };
-  if (n.match(/chá|erva|mate|hibisco|camomila/))
-    return { icon: '🍵', label: 'Chás · Infusões Naturais', tag: 'granel' };
-  if (n.match(/semente|linhaça|chia|gergelim|girassol/))
-    return { icon: '🌻', label: 'Sementes · Superfoods', tag: 'granel' };
-  if (n.match(/açougue|acougue|carne|bovina|suína|suina|frango/))
-    return { icon: '🥩', label: 'Cortes · Carnes Frescas', tag: 'granel' };
-  if (n.match(/frio|embutido|presunto|mortadela|salame/))
-    return { icon: '🧀', label: 'Frios · Embutidos', tag: 'granel' };
-  if (n.match(/laticínio|laticinio|leite|queijo|manteiga/))
-    return { icon: '🥛', label: 'Laticínios · Derivados', tag: 'granel' };
-  if (n.match(/horti|fruta|verdura|legume/))
-    return { icon: '🍎', label: 'Hortifruti · Naturais', tag: 'granel' };
-  if (n.match(/peix|frutos do mar/))
-    return { icon: '🐟', label: 'Peixaria · Frutos do Mar', tag: 'granel' };
-  if (n.match(/padaria|pão|pao|bolo|confeitaria/))
-    return { icon: '🥖', label: 'Padaria · Confeitaria', tag: 'granel' };
-  if (n.match(/bebida|suco|cerveja|refrigerante|vinho/))
-    return { icon: '🥤', label: 'Bebidas · Líquidos', tag: 'granel' };
-  if (n.match(/limpeza|higiene|perfumaria/))
-    return { icon: '🧼', label: 'Limpeza · Higiene', tag: 'granel' };
-  if (n.match(/congelado|sorvete|pizza/))
-    return { icon: '🧊', label: 'Congelados · Práticos', tag: 'granel' };
-  if (n.match(/pet|ração|racao/))
-    return { icon: '🐕', label: 'Pet Shop · Animais', tag: 'granel' };
-  return { icon: '🛒', label: 'Produtos Variados', tag: 'granel' };
+  const n = (name || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+  // 1. Queijos e Laticínios
+  if (n === 'queijos e laticinios' || n.includes('queijo') || n.includes('laticinio'))
+    return { icon: '🧀', label: 'Queijos & Laticínios', tag: 'laticinios' };
+  
+  // 2. Embutidos, Frios e Carnes
+  if (n === 'embutidos, frios e carnes' || n.includes('embutido') || n.includes('frio') || n.includes('carne'))
+    return { icon: '🥩', label: 'Embutidos & Frios', tag: 'frios' };
+  
+  // 3. Peixes e Frutos do Mar
+  if (n === 'peixes e frutos do mar' || n.includes('peixe') || n.includes('mar'))
+    return { icon: '🐟', label: 'Peixes & Frutos do Mar', tag: 'peixes' };
+  
+  // 4. Oleaginosas e Castanhas
+  if (n === 'oleaginosas e castanhas' || n.includes('oleaginosa') || n.includes('castanha'))
+    return { icon: '🥜', label: 'Castanhas & Sementes', tag: 'oleaginosas' };
+  
+  // 5. Frutas Secas e Desidratadas
+  if (n === 'frutas secas e desidratadas' || n.includes('fruta seca') || n.includes('desidratada'))
+    return { icon: '🍇', label: 'Frutas Secas', tag: 'desidratadas' };
+  
+  // 6. Farinhas, Amidos e Polvilhos
+  if (n === 'farinhas, amidos e polvilhos' || n.includes('farinha') || n.includes('amido') || n.includes('polvilho'))
+    return { icon: '🌾', label: 'Farináceos & Amidos', tag: 'farinhas' };
+  
+  // 7. Grãos, Cereais e Sementes
+  if (n === 'graos, cereais e sementes' || n.includes('grao') || n.includes('cereal') || n.includes('semente'))
+    return { icon: '🌱', label: 'Grãos & Cereais', tag: 'graos' };
+  
+  // 8. Temperos, Especiarias e Conservas
+  if (n === 'temperos, especiarias e conservas' || n.includes('tempero') || n.includes('especiaria') || n.includes('conserva'))
+    return { icon: '🌿', label: 'Temperos & Conservas', tag: 'temperos' };
+  
+  // 9. Suplementos, Chás e Produtos Naturais
+  if (n === 'suplementos, chas e produtos naturais' || n.includes('suplemento') || n.includes('cha') || n.includes('produto natural'))
+    return { icon: '🍵', label: 'Suplementos & Chás', tag: 'suplementos' };
+
+  // 10. Outros e Utilidades (Default)
+  return { icon: '📦', label: 'Outros & Utilidades', tag: 'outros' };
 }
 
 function getProductIcon(desc: string) {
@@ -294,8 +300,16 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
     return reais.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
+  // CSS custom properties for proportional scaling
+  const descFont = config?.toledo_fonte_descricao || '1.25rem';
+  const priceFont = config?.toledo_fonte_preco || '1.75rem';
+  const cssVars = {
+    '--desc-font': descFont,
+    '--price-font': priceFont,
+  } as React.CSSProperties;
+
   return (
-    <div className="h-full w-full flex flex-col" style={{ background: COLORS.bg, fontFamily: 'Barlow, Inter, sans-serif', overflow: 'hidden' }}>
+    <div className="h-full w-full flex flex-col" style={{ background: COLORS.bg, fontFamily: 'Barlow, Inter, sans-serif', overflow: 'hidden', ...cssVars }}>
 
       {/* ══════════════ HEADER ══════════════ */}
       <div style={{ background: COLORS.forest, padding: '14px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
@@ -334,20 +348,21 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
       }}>
         {/* Pill */}
         <span style={{
-          background: COLORS.forest, color: '#fff', fontSize: 10, fontWeight: 700,
-          letterSpacing: 3, padding: '5px 12px', borderRadius: 4, textTransform: 'uppercase'
+          background: COLORS.forest, color: '#fff', fontWeight: 700,
+          letterSpacing: 3, padding: '5px 12px', borderRadius: 4, textTransform: 'uppercase' as const,
+          fontSize: 'clamp(8px, calc(var(--desc-font) * 0.5), 18px)',
         }}>Categoria</span>
         {/* Icon */}
-        <span style={{ fontSize: 28 }}>{slide.icon}</span>
+        <span style={{ fontSize: 'clamp(1.5rem, calc(var(--desc-font) * 1.8), 5rem)' }}>{slide.icon}</span>
         {/* Name */}
-        <span style={{ fontFamily: 'Playfair Display, serif', fontWeight: 800, fontSize: 30, color: COLORS.forest }}>
+        <span style={{ fontFamily: 'Playfair Display, serif', fontWeight: 800, color: COLORS.forest, fontSize: 'clamp(1.25rem, calc(var(--desc-font) * 1.15), 5rem)' }}>
           {slide.category}
         </span>
         {/* Spacer + subtitle */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 20 }}>
           <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: COLORS.muted }}>{slide.label}</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.muted, marginLeft: 12, opacity: 0.7 }}>
+            <span style={{ fontSize: 'clamp(10px, calc(var(--desc-font) * 0.55), 24px)', fontWeight: 500, color: COLORS.muted }}>{slide.label}</span>
+            <span style={{ fontSize: 'clamp(9px, calc(var(--desc-font) * 0.5), 20px)', fontWeight: 600, color: COLORS.muted, marginLeft: 12, opacity: 0.7 }}>
               {slide.totalItems} {slide.totalItems === 1 ? 'item' : 'itens'}
             </span>
           </div>
@@ -378,24 +393,29 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
                 key={p.plu}
                 className="encarte-granel-card"
                 style={{
-                  height: 62, background: COLORS.paper,
+                  minHeight: 'clamp(68px, calc(var(--price-font) * 1.4), 180px)',
+                  height: 'auto',
+                  background: COLORS.paper,
                   border: `1px solid rgba(0,0,0,0.07)`, borderRadius: 8,
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                  display: 'flex', overflow: 'hidden', position: 'relative',
+                  display: 'flex', overflow: 'hidden', position: 'relative' as const,
                   animationDelay: `${idx * 45}ms`,
+                  padding: '6px 0',
                 }}
               >
-                {/* Stripe */}
-                <div style={{ width: 4, background: isOferta ? '#e53e3e' : stripe, flexShrink: 0 }} />
+                <div style={{
+                  width: 4, background: isOferta ? '#e53e3e' : stripe, flexShrink: 0
+                }} />
                 {/* Icon area */}
                 <div style={{
-                  width: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 'clamp(40px, calc(var(--desc-font) * 2.5), 120px)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: COLORS.bg, borderRight: '1px solid rgba(0,0,0,0.07)', flexShrink: 0
                 }}>
-                  <span style={{ fontSize: 22 }}>{pIcon}</span>
+                  <span style={{ fontSize: 'clamp(1.2rem, calc(var(--desc-font) * 1.5), 4rem)' }}>{pIcon}</span>
                 </div>
                 {/* Body */}
-                <div style={{ flex: 1, padding: '4px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', minWidth: 0 }}>
+                <div style={{ flex: 1, padding: '4px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', minWidth: 0 }}>
                   <span style={{
                     fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: config?.toledo_fonte_descricao || '18px', lineHeight: 1.1,
                     color: COLORS.text, textTransform: 'uppercase',
@@ -406,24 +426,24 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
                   {isOferta && (
                     <span style={{
                       display: 'inline-block', width: 'fit-content', marginTop: 2,
-                      fontSize: 9, fontWeight: 700, background: '#fef2f2', color: '#dc2626',
-                      padding: '1px 5px', borderRadius: 3, textTransform: 'uppercase', letterSpacing: 1
+                      fontSize: 'clamp(8px, calc(var(--desc-font) * 0.55), 28px)', fontWeight: 700, background: '#fef2f2', color: '#dc2626',
+                      padding: '1px 5px', borderRadius: 3, textTransform: 'uppercase' as const, letterSpacing: 1
                     }}>🔥 Oferta</span>
                   )}
                 </div>
                 {/* Price */}
                 <div style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center',
+                  display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', justifyContent: 'center',
                   padding: '0 14px', flexShrink: 0
                 }}>
-                  <div>
-                    <sup style={{ fontWeight: 800, fontSize: 16, color: isOferta ? '#dc2626' : COLORS.amber, top: '-0.3em' }}>R$</sup>
+                  <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                    <sup style={{ fontWeight: 800, color: isOferta ? '#dc2626' : COLORS.amber, marginRight: 2, position: 'relative' as const, top: '-0.3em', fontSize: 'clamp(0.5rem, calc(var(--price-font) * 0.35), 3rem)' }}>R$</sup>
                     <span style={{
-                      fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, fontSize: config?.toledo_fonte_preco || '36px', lineHeight: 1,
+                      fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, fontSize: 'var(--price-font)', lineHeight: 1,
                       color: isOferta ? '#dc2626' : COLORS.amber
                     }}>{formatPreco(p.preco)}</span>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 2, color: COLORS.muted, textTransform: 'uppercase' }}>por kg</span>
+                  <span style={{ fontSize: 'clamp(8px, calc(var(--price-font) * 0.25), 28px)', fontWeight: 600, letterSpacing: 2, color: COLORS.muted, textTransform: 'uppercase' as const, marginTop: 2 }}>por kg</span>
                 </div>
               </div>
             );

@@ -28,7 +28,7 @@ export default function ToledoConfig() {
   const [activeTab, setActiveTab] = useState<'produtos' | 'categorias' | 'logs' | 'ordenar'>('produtos');
   const [searchQuery, setSearchQuery] = useState('');
   const [novoPlu, setNovoPlu] = useState('');
-  const [novaCategoria, setNovaCategoria] = useState('Laticínios');
+  const [novaCategoria, setNovaCategoria] = useState('Queijos e Laticínios');
   const API_URL = getApiUrl();
   const [categoriasOrdem, setCategoriasOrdem] = useState<string[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -55,18 +55,16 @@ export default function ToledoConfig() {
   };
 
   const CATEGORIAS_PADRAO = [
-    { id: 'Laticínios', icon: '🧀' },
-    { id: 'Cereais e Grãos', icon: '🌾' },
+    { id: 'Queijos e Laticínios', icon: '🧀' },
+    { id: 'Embutidos, Frios e Carnes', icon: '🥩' },
     { id: 'Peixes e Frutos do Mar', icon: '🐟' },
-    { id: 'Nuts e Castanhas', icon: '🥜' },
-    { id: 'Frutas Secas', icon: '🍇' },
-    { id: 'Temperos e Ervas', icon: '🌿' },
-    { id: 'Carnes', icon: '🥩' },
-    { id: 'Frios', icon: '🧊' },
-    { id: 'Doces e Chocolates', icon: '🍫' },
-    { id: 'Padaria', icon: '🍞' },
-    { id: 'Hortifruti', icon: '🍎' },
-    { id: 'Outros', icon: '📦' },
+    { id: 'Oleaginosas e Castanhas', icon: '🥜' },
+    { id: 'Frutas Secas e Desidratadas', icon: '🍇' },
+    { id: 'Farinhas, Amidos e Polvilhos', icon: '🌾' },
+    { id: 'Grãos, Cereais e Sementes', icon: '🌱' },
+    { id: 'Temperos, Especiarias e Conservas', icon: '🌿' },
+    { id: 'Suplementos, Chás e Produtos Naturais', icon: '🍵' },
+    { id: 'Outros e Utilidades', icon: '📦' },
   ];
 
   const safeFetchJson = async (url: string, fallback: any = []) => {
@@ -433,13 +431,35 @@ export default function ToledoConfig() {
             <select
               value={config.toledo_fonte_descricao || '1.25rem'}
               onChange={(e) => handleSaveConfig('toledo_fonte_descricao', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none"
+              className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
             >
-              <option value="0.9rem">0.9rem (Pequeno)</option>
-              <option value="1rem">1rem (Médio)</option>
-              <option value="1.1rem">1.1rem</option>
-              <option value="1.25rem">1.25rem (Padrão)</option>
-              <option value="1.5rem">1.5rem (Grande)</option>
+              <optgroup label="Tamanhos Padrão (rem)">
+                <option value="0.9rem">0.9rem (Muito Pequeno)</option>
+                <option value="1rem">1.0rem (Pequeno)</option>
+                <option value="1.15rem">1.15rem (Médio)</option>
+                <option value="1.3rem">1.3rem (Padrão)</option>
+                <option value="1.5rem">1.5rem (Médio-Grande)</option>
+                <option value="1.8rem">1.8rem (Grande)</option>
+                <option value="2.2rem">2.2rem (Muito Grande)</option>
+                <option value="2.6rem">2.6rem (Gigante)</option>
+                <option value="3rem">3.0rem (Super Gigante)</option>
+                <option value="3.5rem">3.5rem (Telão TV)</option>
+                <option value="4rem">4.0rem (Telão TV Extra)</option>
+                <option value="4.5rem">4.5rem (Telão TV Gigante)</option>
+                <option value="5rem">5.0rem (Telão TV Super)</option>
+                <option value="6rem">6.0rem (Telão TV Hiper)</option>
+                <option value="7rem">7.0rem (Telão TV Mega)</option>
+                <option value="8rem">8.0rem (Telão TV Max)</option>
+              </optgroup>
+              <optgroup label="Auto-Escalonável (Tela Inteira / vw)">
+                <option value="1.5vw">1.5vw (Escalonável Pequeno)</option>
+                <option value="2vw">2.0vw (Escalonável Médio)</option>
+                <option value="2.5vw">2.5vw (Escalonável Grande)</option>
+                <option value="3vw">3.0vw (Escalonável Gigante)</option>
+                <option value="3.5vw">3.5vw (Escalonável Super)</option>
+                <option value="4vw">4.0vw (Escalonável Hiper)</option>
+                <option value="5vw">5.0vw (Escalonável Máximo)</option>
+              </optgroup>
             </select>
             <p className="text-[10px] text-ink-secondary mt-2 text-center">Tamanho do texto do produto</p>
           </div>
@@ -452,13 +472,43 @@ export default function ToledoConfig() {
             <select
               value={config.toledo_fonte_preco || '1.75rem'}
               onChange={(e) => handleSaveConfig('toledo_fonte_preco', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none"
+              className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
             >
-              <option value="1.25rem">1.25rem (Pequeno)</option>
-              <option value="1.5rem">1.5rem (Médio)</option>
-              <option value="1.75rem">1.75rem (Padrão)</option>
-              <option value="2rem">2rem (Grande)</option>
-              <option value="2.5rem">2.5rem (Extra Grande)</option>
+              <optgroup label="Tamanhos Padrão (rem)">
+                <option value="1.25rem">1.25rem (Pequeno)</option>
+                <option value="1.5rem">1.5rem (Médio)</option>
+                <option value="1.75rem">1.75rem (Padrão)</option>
+                <option value="2rem">2.0rem (Grande)</option>
+                <option value="2.5rem">2.5rem (Muito Grande)</option>
+                <option value="3rem">3.0rem (Extra Grande)</option>
+                <option value="3.5rem">3.5rem (Gigante)</option>
+                <option value="4rem">4.0rem (Super Gigante)</option>
+                <option value="4.5rem">4.5rem (Telão TV)</option>
+                <option value="5rem">5.0rem (Telão TV Grande)</option>
+                <option value="6rem">6.0rem (Telão TV Imponente)</option>
+                <option value="7rem">7.0rem (Telão TV Máximo)</option>
+                <option value="8rem">8.0rem (Telão TV Absoluto)</option>
+                <option value="9rem">9.0rem (Telão TV Colossal)</option>
+                <option value="10rem">10.0rem (Telão TV Titan)</option>
+                <option value="12rem">12.0rem (Telão TV Monstruoso)</option>
+                <option value="14rem">14.0rem (Telão TV Extremo)</option>
+                <option value="16rem">16.0rem (Telão TV Lendário)</option>
+                <option value="18rem">18.0rem (Telão TV Supremo)</option>
+                <option value="20rem">20.0rem (Telão TV Infinito)</option>
+              </optgroup>
+              <optgroup label="Auto-Escalonável (Tela Inteira / vw)">
+                <option value="3vw">3.0vw (Escalonável Pequeno)</option>
+                <option value="4vw">4.0vw (Escalonável Médio)</option>
+                <option value="5vw">5.0vw (Escalonável Padrão)</option>
+                <option value="6vw">6.0vw (Escalonável Grande)</option>
+                <option value="8vw">8.0vw (Escalonável Gigante)</option>
+                <option value="10vw">10.0vw (Escalonável Super)</option>
+                <option value="12vw">12.0vw (Escalonável Hiper)</option>
+                <option value="14vw">14.0vw (Escalonável Máximo)</option>
+                <option value="16vw">16.0vw (Escalonável Extremo)</option>
+                <option value="18vw">18.0vw (Escalonável Lendário)</option>
+                <option value="20vw">20.0vw (Escalonável Supremo)</option>
+              </optgroup>
             </select>
             <p className="text-[10px] text-ink-secondary mt-2 text-center">Tamanho do preço no encarte</p>
           </div>

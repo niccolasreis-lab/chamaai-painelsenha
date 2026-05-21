@@ -19,6 +19,7 @@ import * as path from 'path';
 import { getDb } from '../electron/services/database';
 import { parseFileContent, ParsedItem } from './file-parsers';
 import { syncProdutos } from './supabase-sync';
+import { getCategoryFromDescription } from './categorizador';
 
 // Broadcast function injected by server to avoid circular dependency
 let broadcastEvent: (event: string, data: any) => void = () => {};
@@ -263,7 +264,7 @@ async function processFile(filePath: string) {
       const cleanPlu = item.plu.replace(/^0+/, '');
       return {
         ...item,
-        categoria: categorias[cleanPlu] || categorias[item.plu] || 'Outros'
+        categoria: categorias[cleanPlu] || categorias[item.plu] || getCategoryFromDescription(item.descricao)
       };
     });
     
