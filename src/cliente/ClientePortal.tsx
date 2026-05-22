@@ -992,7 +992,7 @@ export default function ClientePortal() {
       )}
 
       {/* Bottom Bar Carrinho */}
-      {totalItens > 0 && (
+      {totalItens > 0 && !selectedProduct && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/5 to-transparent z-50 pointer-events-none">
           <div className="pointer-events-auto bg-surface rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-outline-variant overflow-hidden">
             {showCarrinho ? (
