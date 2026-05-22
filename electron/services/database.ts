@@ -14,14 +14,30 @@ export function initDatabase() {
     }
   
     const dbPath = path.join(userDataPath, 'database.sqlite');
-    db = new Database(dbPath);
-    
-    // Create schema if it doesn't exist
-    const schemaPath = path.join(__dirname, '../../server/db/schema.sql');
-    if (fs.existsSync(schemaPath)) {
-      const schema = fs.readFileSync(schemaPath, 'utf8');
-      db.exec(schema);
+
+    const initializeDb = () => {
+      db = new Database(dbPath);
+      // Create schema if it doesn't exist
+      const schemaPath = path.join(__dirname, '../../server/db/schema.sql');
+      if (fs.existsSync(schemaPath)) {
+        const schema = fs.readFileSync(schemaPath, 'utf8');
+        db.exec(schema);
+      }
+    };
+
+    try {
+      initializeDb();
+    } catch (err: any) {
+      if (err.code === 'SQLITE_NOTADB') {
+        console.warn('Banco de dados corrompido detectado (SQLITE_NOTADB). Renomeando e recriando...');
+        try { if (db) db.close(); } catch(e) {}
+        fs.renameSync(dbPath, dbPath + '.corrompido.' + Date.now());
+        initializeDb(); // Retry
+      } else {
+        throw err;
+      }
     }
+
 
     // ── Inline migrations (run safely on every startup) ──────────────────────
     // Configurações
