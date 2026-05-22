@@ -767,7 +767,7 @@ export function startServer() {
   // EXCLUIR BACKUP
   app.delete('/api/admin/backups/:filename', requireMaster, (req, res) => {
     try {
-      const filename = req.params.filename;
+      const filename = req.params.filename as string;
       // Validação rígida contra Path Traversal
       if (!filename || !filename.startsWith('backup_') || !filename.endsWith('.zip') || filename.includes('..') || filename.includes('/')) {
         return res.status(400).json({ error: 'Nome de arquivo inválido.' });
@@ -791,7 +791,7 @@ export function startServer() {
   // RESTAURAR BACKUP LOCAL
   app.post('/api/admin/backups/:filename/restore', requireMaster, async (req, res) => {
     try {
-      const filename = req.params.filename;
+      const filename = req.params.filename as string;
       // Validação rígida contra Path Traversal
       if (!filename || !filename.startsWith('backup_') || !filename.endsWith('.zip') || filename.includes('..') || filename.includes('/')) {
         return res.status(400).json({ error: 'Nome de arquivo inválido.' });
