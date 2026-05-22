@@ -1,6 +1,28 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
 import { getApiUrl } from '../shared/apiConfig';
+import { AlertTriangle } from 'lucide-react';
+
+const CATEGORY_RULES: { pattern: RegExp; category: string }[] = [
+  { pattern: /mussarela|queijo|requeijão|ricota|provolone/i, category: 'Queijos e Laticínios' },
+  { pattern: /linguiça|salame|presunto|apresuntado|mortadela|bacon|salsicha|carne/i, category: 'Embutidos, Frios e Carnes' },
+  { pattern: /peixe|bacalhau|camarão|salmão|merluza|atum/i, category: 'Peixes e Frutos do Mar' },
+  { pattern: /castanha|nozes|amendoim|amêndoa|pistache|avelã/i, category: 'Oleaginosas e Castanhas' },
+  { pattern: /uva passa|ameixa|tâmara|damasco|fruta seca|cranberry/i, category: 'Frutas Secas e Desidratadas' },
+  { pattern: /farinha|polvilho|amido|tapioca|fubá/i, category: 'Farinhas, Amidos e Polvilhos' },
+  { pattern: /feijão|arroz|grão de bico|lentilha|soja|aveia|quinoa/i, category: 'Grãos, Cereais e Sementes' },
+  { pattern: /tempero|orégano|pimenta|azeitona|alcaparra|conserva|alho/i, category: 'Temperos, Especiarias e Conservas' },
+  { pattern: /chá|suplemento|whey|creatina|ômega|vitamina/i, category: 'Suplementos, Chás e Produtos Naturais' },
+];
+
+export function sugerirCategoria(descricao: string): string | null {
+  for (const rule of CATEGORY_RULES) {
+    if (rule.pattern.test(descricao)) {
+      return rule.category;
+    }
+  }
+  return null;
+}
 
 interface ToledoProduto {
   plu: string;
@@ -25,6 +47,7 @@ export default function ToledoConfig() {
   const [config, setConfig] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isMasterServer, setIsMasterServer] = useState(true);
   const [activeTab, setActiveTab] = useState<'produtos' | 'categorias' | 'logs' | 'ordenar'>('produtos');
   const [searchQuery, setSearchQuery] = useState('');
   const [novoPlu, setNovoPlu] = useState('');
@@ -107,7 +130,20 @@ export default function ToledoConfig() {
     }
   };
 
+  const fetchAdminStatus = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setIsMasterServer(data.isMaster);
+      }
+    } catch (err) {
+      console.error('Erro ao verificar status de admin:', err);
+    }
+  };
+
   useEffect(() => {
+    fetchAdminStatus();
     fetchAll();
   }, []);
 
@@ -263,27 +299,43 @@ export default function ToledoConfig() {
             </div>
           </div>
 
-          <div className="flex space-x-4">
-            <button
-              onClick={handleSaveAllConfigs}
-              className="bg-primary text-white px-8 py-4 rounded-xl font-bold shadow-lg hover:bg-primary-dark transition-all active:scale-95 flex items-center space-x-2 outline-none uppercase tracking-widest text-sm"
-            >
-              <span className="material-symbols-outlined">save</span>
-              <span>Salvar</span>
-            </button>
-
+          <div className="flex gap-4">
             <button
               onClick={handleForceRefresh}
-              disabled={refreshing}
-              className={`bg-emerald-600 text-white px-8 py-4 rounded-xl font-bold shadow-lg hover:bg-emerald-500 transition-all active:scale-95 flex items-center space-x-2 outline-none uppercase tracking-widest text-sm ${refreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={refreshing || !isMasterServer}
+              className={`px-6 py-4 bg-ink text-white rounded-xl font-bold shadow-xl transition-all outline-none uppercase tracking-widest text-sm flex items-center gap-2 ${refreshing || !isMasterServer ? 'opacity-50 cursor-not-allowed' : 'hover:bg-ink-light active:scale-95'}`}
             >
-              <span className={`material-symbols-outlined ${refreshing ? 'animate-spin' : ''}`}>
-                {refreshing ? 'sync' : 'refresh'}
-              </span>
-              <span>{refreshing ? 'Processando...' : 'Forçar Leitura'}</span>
+              <span className={`material-symbols-outlined ${refreshing ? 'animate-spin' : ''}`}>sync</span>
+              {refreshing ? 'Lendo...' : 'Forçar Leitura'}
+            </button>
+            <button
+              onClick={handleSaveAllConfigs}
+              disabled={!isMasterServer}
+              className={`px-8 py-4 bg-primary text-white rounded-xl font-bold shadow-xl transition-all outline-none uppercase tracking-widest text-sm ${!isMasterServer ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-hover active:scale-95'}`}
+            >
+              Salvar Alterações
             </button>
           </div>
         </div>
+
+        {/* Master Server Banner */}
+        {!isMasterServer && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-xl shadow-sm">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="h-6 w-6 text-red-500" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-lg font-bold text-red-800 uppercase tracking-wider">Acesso Restrito: Modo Leitura</h3>
+                <div className="mt-1 text-sm text-red-700">
+                  <p>Você está acessando as configurações do Toledo a partir de um dispositivo cliente. Alterações administrativas (como mudar layouts, atualizar mapeamento ou forçar leitura) só podem ser realizadas no <b>Servidor Master</b> da loja.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <fieldset disabled={!isMasterServer} className="contents">
 
         {/* Settings Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -660,11 +712,28 @@ export default function ToledoConfig() {
                                 <select 
                                   value={p.categoria}
                                   onChange={(e) => handleChangeCategoria(p, e.target.value)}
-                                  className="text-xs font-bold bg-surface border border-outline-variant rounded-lg px-2 py-1.5 outline-none focus:border-primary"
+                                  disabled={!isMasterServer}
+                                  className="text-xs font-bold bg-surface border border-outline-variant rounded-lg px-2 py-1.5 outline-none focus:border-primary disabled:opacity-50"
                                 >
                                   {CATEGORIAS_PADRAO.map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
                                   {!CATEGORIAS_PADRAO.find(c => c.id === p.categoria) && <option value={p.categoria}>{p.categoria}</option>}
                                 </select>
+                                {(() => {
+                                  const sugestao = sugerirCategoria(p.descricao);
+                                  if (sugestao && sugestao !== p.categoria) {
+                                    return (
+                                      <button
+                                        onClick={() => handleChangeCategoria(p, sugestao)}
+                                        disabled={!isMasterServer}
+                                        title="Atribuir Categoria Sugerida"
+                                        className="ml-2 px-2 py-1 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-md hover:bg-amber-200 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                      >
+                                        💡 Sugestão: {sugestao}
+                                      </button>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                               <div className="flex items-center gap-6">
                                 <div className="text-right">
@@ -727,12 +796,37 @@ export default function ToledoConfig() {
                     </div>
                     <button
                       onClick={handleAddCategoria}
-                      className="bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary-hover transition-all active:scale-95 flex items-center space-x-2 outline-none uppercase tracking-widest text-sm"
+                      disabled={!isMasterServer}
+                      className="bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary-hover transition-all active:scale-95 flex items-center space-x-2 outline-none uppercase tracking-widest text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <span className="material-symbols-outlined text-sm">add</span>
                       <span>Adicionar</span>
                     </button>
                   </div>
+                  {/* Sugestão baseada no PLU digitado */}
+                  {novoPlu && (() => {
+                    const prodMatch = produtos.find(p => p.plu === novoPlu);
+                    if (prodMatch) {
+                      const sugestao = sugerirCategoria(prodMatch.descricao);
+                      return (
+                        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          <div className="text-sm flex flex-col">
+                            <span className="font-bold text-blue-900">{prodMatch.descricao}</span>
+                            {sugestao && <span className="text-blue-700 mt-1">💡 Categoria Sugerida: <b>{sugestao}</b></span>}
+                          </div>
+                          {sugestao && novaCategoria !== sugestao && isMasterServer && (
+                            <button
+                              onClick={() => setNovaCategoria(sugestao)}
+                              className="text-xs font-bold bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
+                            >
+                              Aplicar Sugestão
+                            </button>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 {/* Existing mappings */}
@@ -892,6 +986,7 @@ export default function ToledoConfig() {
             )}
           </>
         )}
+        </fieldset>
       </div>
     </AdminLayout>
   );

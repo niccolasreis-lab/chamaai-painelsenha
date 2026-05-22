@@ -3,6 +3,7 @@ import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import cron from 'node-cron';
 import { getDb } from '../electron/services/database';
 import { startToledoWatcher, forceToledoRefresh, reloadCategorias, setBroadcastFn } from './toledo-watcher';
@@ -10,7 +11,64 @@ import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSu
 import { migrateDatabaseAndConfigs } from './categorizador';
 
 const app = express();
-app.use(cors());
+
+// --- MASTER SERVER DETECTION (cache com TTL de 30s) ---
+let cachedLocalIPs: Set<string> | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL_MS = 30_000; // 30 segundos
+
+function getLocalIPs(): Set<string> {
+  const now = Date.now();
+  if (cachedLocalIPs && (now - cacheTimestamp) < CACHE_TTL_MS) {
+    return cachedLocalIPs;
+  }
+  const ips = new Set<string>(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]!) {
+      // Adiciona tanto IPv4 quanto IPv6 e suas formas mapeadas
+      ips.add(iface.address);
+      if (iface.family === 'IPv4') {
+        ips.add(`::ffff:${iface.address}`);
+      }
+    }
+  }
+  cachedLocalIPs = ips;
+  cacheTimestamp = now;
+  return ips;
+}
+
+function isRequestLocal(req: express.Request): boolean {
+  const localIPs = getLocalIPs();
+  const clientIP = req.ip || req.socket.remoteAddress || '';
+  return localIPs.has(clientIP);
+}
+
+// Middleware: injeta header X-Is-Master em todas as respostas
+function injectMasterHeader(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const isMaster = isRequestLocal(req);
+  res.setHeader('X-Is-Master', isMaster ? 'true' : 'false');
+  next();
+}
+
+// Middleware guard: bloqueia escrita administrativa de clientes remotos
+function requireMaster(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!isRequestLocal(req)) {
+    console.warn(`[SECURITY] ⛔ Tentativa de escrita admin bloqueada do IP: ${req.ip}`);
+    return res.status(403).json({ 
+      error: 'Acesso negado. Alterações administrativas só podem ser feitas no Servidor Master.',
+      isMaster: false 
+    });
+  }
+  next();
+}
+
+app.use(cors({
+  origin: true,
+  credentials: true,
+  exposedHeaders: ['X-Is-Master']
+}));
+app.use(injectMasterHeader);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -100,13 +158,18 @@ export function startServer() {
   });
   // -----------------
 
+  // --- Admin Status Endpoint ---
+  app.get('/api/admin/status', (req, res) => {
+    const isMaster = isRequestLocal(req);
+    res.json({ isMaster, clientIP: req.ip });
+  });
+
   app.get('/api/network-info', (req, res) => {
-    const { networkInterfaces } = require('os');
-    const nets = networkInterfaces();
+    const nets = os.networkInterfaces();
     const results: string[] = [];
 
     for (const name of Object.keys(nets)) {
-      for (const net of nets[name]) {
+      for (const net of nets[name]!) {
         // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
         if (net.family === 'IPv4' && !net.internal) {
           results.push(net.address);
@@ -262,7 +325,7 @@ export function startServer() {
     }
   });
 
-  app.post('/api/operadores', (req, res) => {
+  app.post('/api/operadores', requireMaster, (req, res) => {
     try {
       const { nome, login, senha, perfil } = req.body;
       const db = getDb();
@@ -274,7 +337,7 @@ export function startServer() {
     }
   });
 
-  app.delete('/api/operadores/:id', (req, res) => {
+  app.delete('/api/operadores/:id', requireMaster, (req, res) => {
     try {
       const { id } = req.params;
       const db = getDb();
@@ -297,7 +360,7 @@ export function startServer() {
     }
   });
 
-  app.post('/api/balcoes', (req, res) => {
+  app.post('/api/balcoes', requireMaster, (req, res) => {
     try {
       const { nome, prefixo_senha } = req.body;
       const db = getDb();
@@ -309,7 +372,7 @@ export function startServer() {
     }
   });
 
-  app.delete('/api/balcoes/:id', (req, res) => {
+  app.delete('/api/balcoes/:id', requireMaster, (req, res) => {
     try {
       const { id } = req.params;
       const db = getDb();
@@ -451,7 +514,7 @@ export function startServer() {
     }
   });
 
-  app.post('/api/midias', upload.single('file'), (req, res) => {
+  app.post('/api/midias', requireMaster, upload.single('file'), (req, res) => {
     try {
       if (!req.file) {
         console.error('Upload failed: No file provided');
@@ -483,7 +546,7 @@ export function startServer() {
     }
   });
 
-  app.delete('/api/midias/:id', (req, res) => {
+  app.delete('/api/midias/:id', requireMaster, (req, res) => {
     try {
       const { id } = req.params;
       const db = getDb();
@@ -532,7 +595,7 @@ export function startServer() {
     }
   });
 
-  app.post('/api/configuracoes', (req: express.Request, res: express.Response) => {
+  app.post('/api/configuracoes', requireMaster, (req: express.Request, res: express.Response) => {
     try {
       const configuracoes = req.body;
       const db = getDb();
@@ -580,7 +643,7 @@ export function startServer() {
   });
 
   // LOGO UPLOAD
-  app.post('/api/configuracoes/logo', upload.single('logo'), (req, res) => {
+  app.post('/api/configuracoes/logo', requireMaster, upload.single('logo'), (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'Nenhum logo enviado' });
       
@@ -611,7 +674,7 @@ export function startServer() {
   });
 
   // SOM UPLOAD
-  app.post('/api/configuracoes/som', upload.single('som'), (req, res) => {
+  app.post('/api/configuracoes/som', requireMaster, upload.single('som'), (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo de som enviado' });
       
@@ -702,7 +765,7 @@ export function startServer() {
   });
 
   // EXCLUIR BACKUP
-  app.delete('/api/admin/backups/:filename', (req, res) => {
+  app.delete('/api/admin/backups/:filename', requireMaster, (req, res) => {
     try {
       const filename = req.params.filename;
       // Validação rígida contra Path Traversal
@@ -726,7 +789,7 @@ export function startServer() {
   });
 
   // RESTAURAR BACKUP LOCAL
-  app.post('/api/admin/backups/:filename/restore', async (req, res) => {
+  app.post('/api/admin/backups/:filename/restore', requireMaster, async (req, res) => {
     try {
       const filename = req.params.filename;
       // Validação rígida contra Path Traversal
@@ -754,7 +817,7 @@ export function startServer() {
   });
 
   // RESTORE MANUAL (Upload)
-  app.post('/api/admin/restore', backupUpload.single('backupFile'), async (req, res) => {
+  app.post('/api/admin/restore', requireMaster, backupUpload.single('backupFile'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
@@ -846,7 +909,7 @@ export function startServer() {
   });
 
   // POST force refresh from file
-  app.post('/api/toledo/refresh', async (req, res) => {
+  app.post('/api/toledo/refresh', requireMaster, async (req, res) => {
     try {
       const result = await forceToledoRefresh();
 
@@ -872,7 +935,7 @@ export function startServer() {
   const PERSISTENT_ORDEM_PATH = path.join(PERSISTENT_DIR, 'categorias-ordem.json');
 
   // POST update categories mapping
-  app.post('/api/toledo/categorias', (req, res) => {
+  app.post('/api/toledo/categorias', requireMaster, (req, res) => {
     try {
       const novasCategorias = req.body;
       
@@ -993,7 +1056,7 @@ export function startServer() {
     }
   });
 
-  app.post('/api/toledo/categorias-ordem', async (req: express.Request, res: express.Response) => {
+  app.post('/api/toledo/categorias-ordem', requireMaster, async (req: express.Request, res: express.Response) => {
     try {
       const ordem: string[] = req.body;
       
@@ -1078,7 +1141,7 @@ export function startServer() {
   }
 
   // Rota para resetar as senhas manualmente
-  app.post('/api/reset-senhas', (req, res) => {
+  app.post('/api/reset-senhas', requireMaster, (req, res) => {
     try {
       const db = getDb();
       // 1. Reseta os contadores de todos os balcões

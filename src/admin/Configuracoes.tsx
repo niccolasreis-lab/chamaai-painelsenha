@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
 import { getApiUrl } from '../shared/apiConfig';
 import { SOUND_OPTIONS, playNotificationSound } from '../shared/sounds';
+import { AlertTriangle } from 'lucide-react';
 
 export default function Configuracoes() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [printers, setPrinters] = useState<any[]>([]);
   const [backups, setBackups] = useState<any[]>([]);
+  const [isMasterServer, setIsMasterServer] = useState(true);
   const API_URL = getApiUrl();
   const [config, setConfig] = useState<Record<string, string>>({
     tempo_destaque_senha: '5',
@@ -45,6 +47,7 @@ export default function Configuracoes() {
   });
 
   useEffect(() => {
+    fetchAdminStatus();
     fetchConfig();
     fetchBackups();
     if ((window as any).api?.getPrinters) {
@@ -53,6 +56,18 @@ export default function Configuracoes() {
       });
     }
   }, []);
+
+  const fetchAdminStatus = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setIsMasterServer(data.isMaster);
+      }
+    } catch (err) {
+      console.error('Erro ao verificar status de admin:', err);
+    }
+  };
 
   const fetchBackups = async () => {
     try {
@@ -245,23 +260,40 @@ export default function Configuracoes() {
   return (
     <AdminLayout>
       <div className="max-w-6xl mx-auto font-sans space-y-8">
-        
-        {/* Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h1 className="font-sans text-[48px] font-bold text-ink leading-tight uppercase tracking-widest">Configurações</h1>
-            <p className="text-ink-secondary mt-2 text-lg font-semibold uppercase tracking-wider">Gestão do Sistema ChamaAí</p>
+        {/* Master Server Banner */}
+        {!isMasterServer && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-xl shadow-sm">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="h-6 w-6 text-red-500" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-lg font-bold text-red-800 uppercase tracking-wider">Acesso Restrito: Modo Leitura</h3>
+                <div className="mt-1 text-sm text-red-700">
+                  <p>Você está acessando as configurações a partir de um dispositivo cliente. Alterações administrativas só podem ser realizadas no <b>Servidor Master</b> da loja para garantir a integridade dos dados e evitar conflitos de sincronização.</p>
+                </div>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className={`px-8 py-4 bg-primary text-white rounded-xl font-bold shadow-xl transition-all outline-none uppercase tracking-widest text-sm ${saving ? 'opacity-50' : 'hover:bg-primary-hover active:scale-95'}`}
-          >
-            {saving ? 'Salvando...' : 'Salvar Alterações'}
-          </button>
-        </div>
+        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <fieldset disabled={!isMasterServer} className="contents">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <h1 className="font-sans text-[48px] font-bold text-ink leading-tight uppercase tracking-widest">Configurações</h1>
+              <p className="text-ink-secondary mt-2 text-lg font-semibold uppercase tracking-wider">Gestão do Sistema ChamaAí</p>
+            </div>
+            <button
+              onClick={handleSave}
+              disabled={saving || !isMasterServer}
+              className={`px-8 py-4 bg-primary text-white rounded-xl font-bold shadow-xl transition-all outline-none uppercase tracking-widest text-sm ${saving || !isMasterServer ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-hover active:scale-95'}`}
+            >
+              {saving ? 'Salvando...' : 'Salvar Alterações'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Coluna Esquerda: Estabelecimento */}
           <div className="lg:col-span-2 space-y-8">
@@ -836,8 +868,9 @@ export default function Configuracoes() {
               </div>
             </div>
           </div>
+          </div>
 
-        </div>
+        </fieldset>
       </div>
     </AdminLayout>
   );
