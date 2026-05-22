@@ -76,6 +76,18 @@ export default function ClientePortal() {
   const [drawerQuantidade, setDrawerQuantidade] = useState<number>(250);
   const [drawerInputManual, setDrawerInputManual] = useState<string>('250');
 
+  // Impede rolagem da tela de fundo enquanto a gaveta do produto está aberta
+  useEffect(() => {
+    if (selectedProduct) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [selectedProduct]);
+
   // Carrega configurações da loja
   useEffect(() => {
     const fetchConfig = async () => {
