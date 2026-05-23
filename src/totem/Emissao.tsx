@@ -239,19 +239,35 @@ export default function Emissao() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center p-6 gap-10 overflow-hidden">
-        <div className="text-center shrink-0">
-          <h2 className="font-sans text-4xl font-semibold text-ink mb-2 uppercase">
+        <div className="text-center shrink-0 flex flex-col items-center">
+          <h2 className="font-sans text-7xl font-black text-ink mb-4 uppercase tracking-wide">
             Bem-vindo(a)
           </h2>
-          <p className="text-2xl text-ink-secondary font-medium">
+          <p className="text-3xl text-ink-secondary font-bold tracking-wide">
             Toque na tela para retirar sua senha
           </p>
           
-          <div className="mt-8 inline-flex items-center gap-4 bg-surface-variant/20 px-8 py-4 rounded-full border border-outline-variant/30">
-            <span className="material-symbols-outlined text-primary text-[2.5rem]">group</span>
-            <div className="flex flex-col items-start leading-tight">
-              <span className="font-sans text-sm font-bold uppercase tracking-widest text-ink-secondary">Pessoas Aguardando</span>
-              <span className="font-sans text-5xl font-black text-primary">{pessoasAguardando}</span>
+          <div className="mt-10 inline-flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-2 border-primary/20 px-10 py-6 rounded-[32px] shadow-[0_20px_50px_rgba(37,99,235,0.06)] relative overflow-hidden group">
+            {/* Blinking live indicator at the top right */}
+            <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-emerald-600">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-[10px] font-black tracking-widest uppercase">FILA AO VIVO</span>
+            </div>
+            
+            <div className="flex items-center gap-5 mt-2">
+              <div className="w-16 h-16 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/30">
+                <span className="material-symbols-outlined text-[2.5rem]">group</span>
+              </div>
+              <div className="flex flex-col items-start leading-none gap-2">
+                <span className="font-sans text-[11px] font-black uppercase tracking-widest text-ink-secondary">Pessoas Aguardando</span>
+                <span className="font-sans text-6xl font-black text-primary flex items-baseline gap-1 tracking-tighter">
+                  {pessoasAguardando}
+                  <span className="text-sm font-semibold text-ink-secondary/70 font-sans tracking-normal lowercase">clientes</span>
+                </span>
+              </div>
             </div>
           </div>
         </div>

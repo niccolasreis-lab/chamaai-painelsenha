@@ -205,7 +205,10 @@ function processToledoItems(items: ToledoItem[]): number {
   const existingCheck = db.prepare('SELECT plu, descricao, preco, categoria FROM toledo_produtos WHERE plu = ?');
 
   const transaction = db.transaction((toledoItems: ToledoItem[]) => {
+    const importedPlus = new Set<string>();
+
     for (const item of toledoItems) {
+      importedPlus.add(item.plu);
       const existing = existingCheck.get(item.plu) as any;
 
       if (!existing) {
@@ -225,6 +228,18 @@ function processToledoItems(items: ToledoItem[]): number {
         `).run(item.preco, item.descricao, item.categoria, item.plu);
         updatedCount++;
       }
+    }
+
+    // Remove produtos antigos/deletados que não constam na carga atual
+    const allExisting = db.prepare('SELECT plu FROM toledo_produtos').all() as any[];
+    const toDelete = allExisting.filter(row => !importedPlus.has(row.plu));
+    if (toDelete.length > 0) {
+      const deleteStmt = db.prepare('DELETE FROM toledo_produtos WHERE plu = ?');
+      for (const row of toDelete) {
+        deleteStmt.run(row.plu);
+        updatedCount++; // Conta como atualização para forçar o broadcast e sincronização
+      }
+      console.log(`[TOLEDO] 🗑️ Removidos ${toDelete.length} produtos da base local que não constavam na última carga.`);
     }
   });
 
