@@ -1081,19 +1081,10 @@ export function startServer() {
 
       // Sync: grava a ordem no Supabase para o portal cliente (Vercel) ler
       try {
-        const { createClient } = await import('@supabase/supabase-js');
-        const sb = createClient(
-          'https://npfqnsgjicmxwmurwosu.supabase.co',
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5wZnFuc2dqaWNteHdtdXJ3b3N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3ODQyNDQsImV4cCI6MjA5MjM2MDI0NH0.wLIFMxZkE9rjGQjZF7eFi0dyDioOGQfg1jfhRy32O90'
-        );
-        await sb.from('configuracoes_publicas').upsert({
-          chave: 'categorias_ordem',
-          valor: JSON.stringify(ordem),
-          updated_at: new Date().toISOString()
-        });
-        console.log('[SYNC] ✅ Ordem de categorias sincronizada com Supabase');
+        syncConfiguracaoPublica('categorias_ordem', JSON.stringify(ordem));
+        console.log('[SYNC] ✅ Ordem de categorias enfileirada para sincronização');
       } catch (syncErr) {
-        console.error('[SYNC] ⚠️ Erro ao sincronizar ordem (não crítico):', syncErr);
+        console.error('[SYNC] ⚠️ Erro ao enfileirar ordem (não crítico):', syncErr);
       }
 
       res.json({ success: true });
@@ -1196,6 +1187,32 @@ export function startServer() {
       if (cfg['toledo_encarte_ativo'] !== undefined) {
         syncConfiguracaoPublica('toledo_encarte_ativo', cfg['toledo_encarte_ativo']);
       }
+
+      // Sincroniza a ordem das categorias no startup
+      try {
+        let ordemCategorias: string[] = [];
+        if (fs.existsSync(PERSISTENT_ORDEM_PATH)) {
+          ordemCategorias = JSON.parse(fs.readFileSync(PERSISTENT_ORDEM_PATH, 'utf-8'));
+        } else {
+          const possiblePaths = [
+            path.join(__dirname, '../../server/categorias-ordem.json'),
+            path.join(__dirname, 'categorias-ordem.json'),
+            path.join(process.cwd(), 'server', 'categorias-ordem.json'),
+          ];
+          for (const orderPath of possiblePaths) {
+            if (fs.existsSync(orderPath)) {
+              ordemCategorias = JSON.parse(fs.readFileSync(orderPath, 'utf-8'));
+              break;
+            }
+          }
+        }
+        if (ordemCategorias && ordemCategorias.length > 0) {
+          syncConfiguracaoPublica('categorias_ordem', JSON.stringify(ordemCategorias));
+          console.log('[STARTUP] ✅ Ordem de categorias sincronizada com Supabase:', ordemCategorias.length, 'categorias');
+        }
+      } catch (errOrdem) {
+        console.error('[STARTUP] Erro ao sincronizar ordem das categorias no startup:', errOrdem);
+      }
       if (cfg['logo_cliente']) {
         const logoRelPath = cfg['logo_cliente'].replace(/^\//, ''); // remove leading slash
         const fullLogoPath = path.join(userDataPath, logoRelPath);
@@ -1207,6 +1224,19 @@ export function startServer() {
           syncConfiguracaoPublica('logo_cliente_base64', dataUrl);
           console.log('[STARTUP] ✅ Logo do estabelecimento sincronizada em base64 com Supabase');
         }
+      }
+
+      // Sincroniza todos os produtos Toledo ativos no startup para garantir que a nuvem esteja atualizada
+      try {
+        const produtosCloud = db.prepare(
+          'SELECT plu, descricao, preco, categoria FROM toledo_produtos WHERE preco > 0'
+        ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string }>;
+        if (produtosCloud.length > 0) {
+          syncProdutos(produtosCloud);
+          console.log('[STARTUP] ✅ Enfileirada sincronização de', produtosCloud.length, 'produtos Toledo com o Supabase');
+        }
+      } catch (errProd) {
+        console.error('[STARTUP] Erro ao sincronizar produtos no startup:', errProd);
       }
 
       // 2. Perform daily reset if the server was off at reset time
@@ -1417,12 +1447,22 @@ async function restoreBackupZip(zipFilePath: string): Promise<void> {
   const uploadsDir = path.join(dataDir, 'uploads');
   const tempDir = path.join(dataDir, 'Backups', `_extract_${Date.now()}`);
 
+  let actualZipPath = zipFilePath;
+  const needsRename = !zipFilePath.toLowerCase().endsWith('.zip');
+
+  if (needsRename) {
+    actualZipPath = zipFilePath + '.zip';
+    if (fs.existsSync(zipFilePath)) {
+      fs.renameSync(zipFilePath, actualZipPath);
+    }
+  }
+
   try {
     fs.mkdirSync(tempDir, { recursive: true });
     
-    // Extrai o ZIP via PowerShell nativo
+    // Extrai o ZIP via PowerShell nativo (protegendo caminhos contra aspas simples)
     execSync(
-      `powershell -NoProfile -Command "Expand-Archive -Path '${zipFilePath}' -DestinationPath '${tempDir}' -Force"`,
+      `powershell -NoProfile -Command "Expand-Archive -Path '${actualZipPath.replace(/'/g, "''")}' -DestinationPath '${tempDir.replace(/'/g, "''")}' -Force"`,
       { timeout: 120000 }
     );
 
@@ -1489,6 +1529,14 @@ async function restoreBackupZip(zipFilePath: string): Promise<void> {
     }
 
   } finally {
+    // Restaura o nome original para que o caller possa deletar/gerenciar o arquivo corretamente
+    if (needsRename && fs.existsSync(actualZipPath)) {
+      try {
+        fs.renameSync(actualZipPath, zipFilePath);
+      } catch (e) {
+        console.error('[RESTORE] Erro ao restaurar nome do arquivo original:', e);
+      }
+    }
     // Limpeza da extração
     try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
   }

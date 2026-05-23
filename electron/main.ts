@@ -267,6 +267,27 @@ ipcMain.handle('install-update', async () => {
   }
 });
 
+ipcMain.handle('kill-zombie-processes', async () => {
+  try {
+    console.log('[SYSTEM] Iniciando limpeza manual de instâncias zumbis...');
+    const { execSync } = require('child_process');
+    const currentPid = process.pid;
+    
+    // Mata qualquer processo ChamaA* ou chamaai* zumbi na máquina (menos o atual)
+    const cmd1 = `powershell -NoProfile -Command "Get-Process | Where-Object { (($_.ProcessName -like '*ChamaA*') -or ($_.ProcessName -like '*chamaai*')) -and ($_.Id -ne ${currentPid}) } | Stop-Process -Force -EA 0"`;
+    // Libera a porta 3000 (onde roda o servidor Express) matando o processo zumbi que estiver usando ela (menos o atual)
+    const cmd2 = `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | Where-Object { $_ -ne ${currentPid} } | Get-Process -ErrorAction SilentlyContinue | Stop-Process -Force -EA 0"`;
+    
+    try { execSync(cmd1, { windowsHide: true }); } catch (e) {}
+    try { execSync(cmd2, { windowsHide: true }); } catch (e) {}
+    
+    return { success: true, message: 'Processos zumbis e travas de porta foram finalizados com sucesso!' };
+  } catch (err: any) {
+    console.error('[SYSTEM] Erro ao limpar processos zumbis:', err);
+    return { success: false, message: `Erro ao limpar processos: ${err.message}` };
+  }
+});
+
 ipcMain.handle('test-printer', async () => {
   return await printerService.printTicket({
     numero: '000',

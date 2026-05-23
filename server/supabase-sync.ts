@@ -90,6 +90,9 @@ export function syncLimparSenhas() {
 export function syncProdutos(produtos: Array<{ plu: string; descricao: string; preco: number; categoria: string }>) {
   if (!produtos || produtos.length === 0) return;
 
+  // Enfileira a limpeza de produtos para garantir sincronização limpa (apenas itens locais ativos)
+  enqueueSyncOp('toledo_produtos_publicos', 'delete_all', {});
+
   // Enfileira em lotes de 500 para respeitar limites do Supabase
   const BATCH_SIZE = 500;
   for (let i = 0; i < produtos.length; i += BATCH_SIZE) {
@@ -102,7 +105,7 @@ export function syncProdutos(produtos: Array<{ plu: string; descricao: string; p
     }));
     enqueueSyncOp('toledo_produtos_publicos', 'upsert', batch);
   }
-  console.log(`[SYNC QUEUE] 📥 ${produtos.length} produtos enfileirados para sync`);
+  console.log(`[SYNC QUEUE] 📥 ${produtos.length} produtos enfileirados para sync (com limpeza prévia)`);
 }
 
 /**
@@ -156,7 +159,12 @@ async function processSyncQueue() {
           const result = await supabase.from(item.tabela).update(updateData).eq('id', id);
           error = result.error;
         } else if (item.acao === 'delete_all') {
-          const result = await supabase.from(item.tabela).delete().gte('id', 0);
+          let result;
+          if (item.tabela === 'toledo_produtos_publicos') {
+            result = await supabase.from(item.tabela).delete().neq('plu', '');
+          } else {
+            result = await supabase.from(item.tabela).delete().gte('id', 0);
+          }
           error = result.error;
         }
 

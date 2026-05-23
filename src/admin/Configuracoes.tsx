@@ -706,6 +706,52 @@ export default function Configuracoes() {
                   </div>
                   <span className="material-symbols-outlined opacity-50 group-hover:opacity-100 transition-opacity">system_update_alt</span>
                 </button>
+
+                <button 
+                  onClick={async (e) => {
+                    if (!confirm('Esta ação encerrará todas as outras instâncias zumbis do ChamaAí e liberará portas de rede presas. Deseja continuar?')) return;
+                    
+                    const btn = e.currentTarget;
+                    const originalHTML = btn.innerHTML;
+                    btn.innerHTML = `
+                      <div class="flex items-center gap-3 text-left">
+                        <span class="material-symbols-outlined animate-spin text-error group-hover:text-white">autorenew</span>
+                        <div>
+                          <span class="font-bold text-xs uppercase tracking-widest block text-error group-hover:text-white">Limpando Atividades Zumbis...</span>
+                          <span class="text-[10px] opacity-70 block font-normal normal-case mt-0.5 text-error group-hover:text-white">Aguarde enquanto os processos do Windows são finalizados de forma limpa.</span>
+                        </div>
+                      </div>
+                    `;
+                    btn.setAttribute('disabled', 'true');
+                    btn.style.opacity = '0.7';
+
+                    try {
+                      const api = (window as any).api;
+                      if (api?.killZombieProcesses) {
+                        const res = await api.killZombieProcesses();
+                        alert(res.message);
+                      } else {
+                        alert('⚠️ Esta função só está disponível no App Desktop (.exe).');
+                      }
+                    } catch (err) {
+                      alert('Erro ao executar limpeza: ' + (err instanceof Error ? err.message : String(err)));
+                    } finally {
+                      btn.innerHTML = originalHTML;
+                      btn.removeAttribute('disabled');
+                      btn.style.opacity = '';
+                    }
+                  }}
+                  className="w-full flex items-center justify-between p-4 bg-error/10 rounded-xl border border-error/20 hover:bg-error hover:text-white transition-all group cursor-pointer text-error active:scale-[0.98] outline-none"
+                >
+                  <div className="flex items-center gap-3 text-left">
+                    <span className="material-symbols-outlined">cleaning_services</span>
+                    <div>
+                      <span className="font-bold text-xs uppercase tracking-widest block">Matar Atividades & Destravar Instâncias</span>
+                      <span className="text-[10px] opacity-70 block font-normal normal-case mt-0.5">Destrava arquivos e encerra outros processos zumbis rodando em segundo plano.</span>
+                    </div>
+                  </div>
+                  <span className="material-symbols-outlined opacity-50 group-hover:opacity-100 transition-opacity">dangerous</span>
+                </button>
               </div>
             </div>
 
