@@ -633,6 +633,8 @@ export function startServer() {
       // Sync public configs to Supabase
       if (configuracoes.nome_estabelecimento) syncConfiguracaoPublica('nome_estabelecimento', configuracoes.nome_estabelecimento);
       if (configuracoes.portal_voz_alerta) syncConfiguracaoPublica('portal_voz_alerta', configuracoes.portal_voz_alerta);
+      if (configuracoes.portal_som_sua_vez !== undefined) syncConfiguracaoPublica('portal_som_sua_vez', configuracoes.portal_som_sua_vez);
+      if (configuracoes.portal_som_prestes_chamar !== undefined) syncConfiguracaoPublica('portal_som_prestes_chamar', configuracoes.portal_som_prestes_chamar);
       if (configuracoes.toledo_encarte_ativo !== undefined) syncConfiguracaoPublica('toledo_encarte_ativo', String(configuracoes.toledo_encarte_ativo));
       
       res.json({ success: true });
@@ -1183,6 +1185,12 @@ export function startServer() {
       }
       if (cfg['portal_voz_alerta']) {
         syncConfiguracaoPublica('portal_voz_alerta', cfg['portal_voz_alerta']);
+      }
+      if (cfg['portal_som_sua_vez']) {
+        syncConfiguracaoPublica('portal_som_sua_vez', cfg['portal_som_sua_vez']);
+      }
+      if (cfg['portal_som_prestes_chamar']) {
+        syncConfiguracaoPublica('portal_som_prestes_chamar', cfg['portal_som_prestes_chamar']);
       }
       if (cfg['toledo_encarte_ativo'] !== undefined) {
         syncConfiguracaoPublica('toledo_encarte_ativo', cfg['toledo_encarte_ativo']);

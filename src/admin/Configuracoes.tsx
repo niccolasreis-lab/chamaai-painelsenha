@@ -22,6 +22,8 @@ export default function Configuracoes() {
     logo_cliente: '',
     nome_estabelecimento: 'ChamaAí - Atendimento',
     portal_voz_alerta: 'Feminina',
+    portal_som_sua_vez: '',
+    portal_som_prestes_chamar: '',
     som_personalizado: '',
     ocultar_tipo_senha: '0',
     texto_rodape: 'ChamaAí - Atendimento de Segunda a Sexta, 8h às 18h',
@@ -165,6 +167,27 @@ export default function Configuracoes() {
     } catch (err) {
       alert('Erro ao enviar logo.');
     }
+  };
+
+  const handleAudioUpload = (key: 'portal_som_sua_vez' | 'portal_som_prestes_chamar') => async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 250 * 1024) {
+      alert('⚠️ O arquivo de áudio é muito grande! Escolha um áudio com menos de 250 KB (ex: MP3 compacto de poucos segundos).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setConfig(prev => ({ ...prev, [key]: base64 }));
+      alert('Áudio carregado! Clique em "Salvar Alterações" no final da página para salvar e enviar ao portal de clientes.');
+    };
+    reader.onerror = () => {
+      alert('Erro ao processar arquivo de áudio.');
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleTestSound = () => {
@@ -440,8 +463,89 @@ export default function Configuracoes() {
                     <option value="Feminina">Voz Feminina (Padrão)</option>
                     <option value="Masculina">Voz Masculina</option>
                     <option value="Apenas Beep">Apenas Som (Beep)</option>
+                    <option value="AudioGravado">Áudio Gravado (.mp3)</option>
                   </select>
                 </div>
+
+                {config.portal_voz_alerta === 'AudioGravado' && (
+                  <div className="col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 bg-primary/5 p-6 rounded-2xl border border-primary/10">
+                    <div className="flex flex-col gap-2">
+                      <label className="block font-bold tracking-widest text-ink-secondary uppercase text-[10px]">
+                        Áudio "Sua Vez Chegou"
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="file"
+                          id="audio-suavez-input"
+                          className="hidden"
+                          accept="audio/mp3,audio/mpeg,audio/wav,audio/ogg"
+                          onChange={handleAudioUpload('portal_som_sua_vez')}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => document.getElementById('audio-suavez-input')?.click()}
+                          className="px-4 py-2 bg-white border border-outline-variant rounded-xl text-xs font-bold uppercase tracking-wider text-ink hover:border-primary transition-all"
+                        >
+                          {config.portal_som_sua_vez ? 'Alterar Áudio' : 'Escolher Áudio'}
+                        </button>
+                        {config.portal_som_sua_vez && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const audio = new Audio(config.portal_som_sua_vez);
+                              audio.play();
+                            }}
+                            className="p-2 bg-primary/10 text-primary rounded-lg flex items-center justify-center"
+                            title="Testar Áudio"
+                          >
+                            <span className="material-symbols-outlined text-sm leading-none">play_arrow</span>
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-ink-secondary/60">
+                        {config.portal_som_sua_vez ? '✅ Áudio configurado' : '⚠️ Nenhum áudio enviado (usa TTS como fallback)'}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <label className="block font-bold tracking-widest text-ink-secondary uppercase text-[10px]">
+                        Áudio "Senha Próxima"
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="file"
+                          id="audio-prestes-input"
+                          className="hidden"
+                          accept="audio/mp3,audio/mpeg,audio/wav,audio/ogg"
+                          onChange={handleAudioUpload('portal_som_prestes_chamar')}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => document.getElementById('audio-prestes-input')?.click()}
+                          className="px-4 py-2 bg-white border border-outline-variant rounded-xl text-xs font-bold uppercase tracking-wider text-ink hover:border-primary transition-all"
+                        >
+                          {config.portal_som_prestes_chamar ? 'Alterar Áudio' : 'Escolher Áudio'}
+                        </button>
+                        {config.portal_som_prestes_chamar && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const audio = new Audio(config.portal_som_prestes_chamar);
+                              audio.play();
+                            }}
+                            className="p-2 bg-primary/10 text-primary rounded-lg flex items-center justify-center"
+                            title="Testar Áudio"
+                          >
+                            <span className="material-symbols-outlined text-sm leading-none">play_arrow</span>
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-ink-secondary/60">
+                        {config.portal_som_prestes_chamar ? '✅ Áudio configurado' : '⚠️ Nenhum áudio enviado (usa TTS como fallback)'}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 <div className="col-span-2">
                   <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">URL DO PORTAL DO CLIENTE (QR CODE)</label>
                   <input
