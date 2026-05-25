@@ -247,9 +247,9 @@ export default function Emissao() {
             Toque na tela para retirar sua senha
           </p>
           
-          <div className="mt-10 inline-flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-2 border-primary/20 px-10 py-6 rounded-[32px] shadow-[0_20px_50px_rgba(37,99,235,0.06)] relative overflow-hidden group">
-            {/* Blinking live indicator at the top right */}
-            <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-emerald-600">
+          <div className="mt-10 inline-flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-2 border-primary/20 px-10 py-6 rounded-[32px] shadow-[0_20px_50px_rgba(37,99,235,0.06)] overflow-hidden group gap-4">
+            {/* Blinking live indicator - now centered in the flex column flow */}
+            <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-emerald-600">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -257,7 +257,7 @@ export default function Emissao() {
               <span className="text-[10px] font-black tracking-widest uppercase">FILA AO VIVO</span>
             </div>
             
-            <div className="flex items-center gap-5 mt-2">
+            <div className="flex items-center gap-5">
               <div className="w-16 h-16 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/30">
                 <span className="material-symbols-outlined text-[2.5rem]">group</span>
               </div>
