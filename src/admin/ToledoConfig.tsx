@@ -356,6 +356,23 @@ export default function ToledoConfig() {
             </button>
           </div>
 
+          {/* Ocultar em Falta Toggle */}
+          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
+            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
+              Produtos em Falta
+            </label>
+            <button
+              onClick={() => handleSaveConfig('toledo_ocultar_em_falta', config.toledo_ocultar_em_falta === '1' ? '0' : '1')}
+              className={`w-full py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-all ${
+                config.toledo_ocultar_em_falta === '1'
+                  ? 'bg-error/10 text-error border border-error/20 hover:bg-error/20'
+                  : 'bg-success/10 text-success border border-success/20 hover:bg-success/20'
+              }`}
+            >
+              {config.toledo_ocultar_em_falta === '1' ? '✕ Ocultar' : '✓ Mostrar'}
+            </button>
+          </div>
+
           {/* Duração */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
             <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
@@ -737,7 +754,9 @@ export default function ToledoConfig() {
                               </div>
                               <div className="flex items-center gap-6">
                                 <div className="text-right">
-                                  <span className="font-black text-emerald-600 text-lg block">{formatPreco(p.preco)}/kg</span>
+                                  <span className={`font-black text-lg block ${p.preco === 0 ? 'text-error' : 'text-emerald-600'}`}>
+                                    {p.preco === 0 ? 'PRODUTO EM FALTA 🥲' : `${formatPreco(p.preco)}/kg`}
+                                  </span>
                                   <span className="text-[10px] text-ink-secondary/50 font-bold block">{formatDate(p.atualizado_em)}</span>
                                 </div>
                                 <button 

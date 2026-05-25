@@ -19,8 +19,12 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
     fetch(`${API_URL}/api/toledo/produtos`)
       .then(r => r.json())
       .then(data => {
+        // Filter out items with price = 0 if configured to do so
+        const ocultarEmFalta = config.toledo_ocultar_em_falta === '1' || config.toledo_ocultar_em_falta === true;
+        const filteredData = ocultarEmFalta ? data.filter((p: any) => p.preco > 0) : data;
+
         // Group by category
-        const grouped = data.reduce((acc: any, p: any) => {
+        const grouped = filteredData.reduce((acc: any, p: any) => {
           const cat = p.categoria || 'Outros';
           if (!acc[cat]) acc[cat] = { nome: cat, produtos: [] };
           acc[cat].produtos.push(p);
@@ -85,7 +89,7 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
         setSlides(newSlides);
       })
       .catch(console.error);
-  }, [API_URL, itensPorSlide]);
+  }, [API_URL, itensPorSlide, config.toledo_ocultar_em_falta]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -261,19 +265,32 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
                   {group.produtos.map((produto: any, idx: number) => (
                     <div
                       key={produto.plu}
-                      className={`flex items-center justify-between px-5 py-3 rounded-lg transition-colors break-inside-avoid ${group.isOferta
+                      className={`flex items-center justify-between px-5 py-3 rounded-lg transition-colors break-inside-avoid ${
+                        produto.preco === 0
+                          ? 'bg-white/[0.02] border border-white/5 opacity-50'
+                          : group.isOferta
                           ? 'bg-gradient-to-r from-red-500/20 to-orange-500/10 border border-red-500/30 shadow-lg'
                           : (idx % 2 === 0 ? 'bg-white/[0.04]' : 'bg-white/[0.08]')
-                        }`}
+                      }`}
                     >
-                      <span className={`font-bold line-clamp-2 pr-4 flex-1 leading-tight tracking-wide ${group.isOferta ? 'text-red-100' : 'text-white'}`} style={{ fontSize: config.toledo_fonte_descricao || '1.25rem' }}>
+                      <span className={`font-bold line-clamp-2 pr-4 flex-1 leading-tight tracking-wide ${
+                        produto.preco === 0 ? 'text-white/40' : group.isOferta ? 'text-red-100' : 'text-white'
+                      }`} style={{ fontSize: config.toledo_fonte_descricao || '1.25rem' }}>
                         {produto.descricao.replace(/\*|OFERTA/gi, '').trim()}
                       </span>
                       <div className="flex items-baseline gap-1 shrink-0">
-                        <span className={`${group.isOferta ? 'text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.8)]' : accentClass} font-black tracking-tighter drop-shadow-sm`} style={{ fontSize: 'var(--price-font)' }}>
-                          {formatPreco(produto.preco)}
-                        </span>
-                        <span className={`${group.isOferta ? 'text-red-400' : accentClass} opacity-60 font-bold uppercase`} style={{ fontSize: 'clamp(0.7rem, calc(var(--price-font) * 0.3), 3rem)' }}>/kg</span>
+                        {produto.preco === 0 ? (
+                          <span className="text-gray-400 font-extrabold tracking-tight drop-shadow-sm uppercase" style={{ fontSize: 'clamp(0.8rem, calc(var(--price-font) * 0.55), 2.5rem)' }}>
+                            PRODUTO EM FALTA 🥲
+                          </span>
+                        ) : (
+                          <>
+                            <span className={`${group.isOferta ? 'text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.8)]' : accentClass} font-black tracking-tighter drop-shadow-sm`} style={{ fontSize: 'var(--price-font)' }}>
+                              {formatPreco(produto.preco)}
+                            </span>
+                            <span className={`${group.isOferta ? 'text-red-400' : accentClass} opacity-60 font-bold uppercase`} style={{ fontSize: 'clamp(0.7rem, calc(var(--price-font) * 0.3), 3rem)' }}>/kg</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}

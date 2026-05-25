@@ -317,7 +317,7 @@ async function processFile(filePath: string) {
       // Sync: envia todos os produtos atualizados para a nuvem (Portal do Cliente)
       const db = getDb();
       const produtosCloud = db.prepare(
-        'SELECT plu, descricao, preco, categoria FROM toledo_produtos WHERE preco > 0'
+        'SELECT plu, descricao, preco, categoria FROM toledo_produtos'
       ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string }>;
       syncProdutos(produtosCloud);
     }

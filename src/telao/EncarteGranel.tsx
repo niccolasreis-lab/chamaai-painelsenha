@@ -240,9 +240,13 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
     fetch(`${API_URL}/api/toledo/produtos`)
       .then(r => r.json())
       .then((data: any[]) => {
+        // Filter out items with price = 0 if configured to do so
+        const ocultarEmFalta = config?.toledo_ocultar_em_falta === '1' || config?.toledo_ocultar_em_falta === true;
+        const filteredData = ocultarEmFalta ? data.filter((p: any) => p.preco > 0) : data;
+
         // Group by category
         const groups: Record<string, any[]> = {};
-        data.forEach(p => {
+        filteredData.forEach(p => {
           const cat = p.categoria || 'Outros';
           if (!groups[cat]) groups[cat] = [];
           groups[cat].push(p);
@@ -270,7 +274,7 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
         setCategorySlides(slides);
       })
       .catch(console.error);
-  }, [API_URL]);
+  }, [API_URL, itemsLimit, config?.toledo_ocultar_em_falta]);
 
   // ── Auto-advance ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -395,16 +399,17 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
                 style={{
                   minHeight: 'clamp(68px, calc(var(--price-font) * 1.4), 180px)',
                   height: 'auto',
-                  background: COLORS.paper,
-                  border: `1px solid rgba(0,0,0,0.07)`, borderRadius: 8,
+                  background: p.preco === 0 ? 'rgba(0,0,0,0.02)' : COLORS.paper,
+                  border: p.preco === 0 ? '1px dashed rgba(0,0,0,0.1)' : '1px solid rgba(0,0,0,0.07)', borderRadius: 8,
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                   display: 'flex', overflow: 'hidden', position: 'relative' as const,
                   animationDelay: `${idx * 45}ms`,
                   padding: '6px 0',
+                  opacity: p.preco === 0 ? 0.5 : 1,
                 }}
               >
                 <div style={{
-                  width: 4, background: isOferta ? '#e53e3e' : stripe, flexShrink: 0
+                  width: 4, background: p.preco === 0 ? '#a1a1aa' : (isOferta ? '#e53e3e' : stripe), flexShrink: 0
                 }} />
                 {/* Icon area */}
                 <div style={{
@@ -418,7 +423,7 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
                 <div style={{ flex: 1, padding: '4px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', minWidth: 0 }}>
                   <span style={{
                     fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: config?.toledo_fonte_descricao || '18px', lineHeight: 1.1,
-                    color: COLORS.text, textTransform: 'uppercase',
+                    color: p.preco === 0 ? '#9f9f9f' : COLORS.text, textTransform: 'uppercase',
                     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                   }}>
                     {cleanName}
@@ -436,14 +441,26 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
                   display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', justifyContent: 'center',
                   padding: '0 14px', flexShrink: 0
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                    <sup style={{ fontWeight: 800, color: isOferta ? '#dc2626' : COLORS.amber, marginRight: 2, position: 'relative' as const, top: '-0.3em', fontSize: 'clamp(0.5rem, calc(var(--price-font) * 0.35), 3rem)' }}>R$</sup>
+                  {p.preco === 0 ? (
                     <span style={{
-                      fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, fontSize: 'var(--price-font)', lineHeight: 1,
-                      color: isOferta ? '#dc2626' : COLORS.amber
-                    }}>{formatPreco(p.preco)}</span>
-                  </div>
-                  <span style={{ fontSize: 'clamp(8px, calc(var(--price-font) * 0.25), 28px)', fontWeight: 600, letterSpacing: 2, color: COLORS.muted, textTransform: 'uppercase' as const, marginTop: 2 }}>por kg</span>
+                      fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800,
+                      fontSize: 'clamp(0.7rem, calc(var(--price-font) * 0.45), 2.5rem)',
+                      color: '#a1a1aa', textTransform: 'uppercase'
+                    }}>
+                      PRODUTO EM FALTA 🥲
+                    </span>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                        <sup style={{ fontWeight: 800, color: isOferta ? '#dc2626' : COLORS.amber, marginRight: 2, position: 'relative' as const, top: '-0.3em', fontSize: 'clamp(0.5rem, calc(var(--price-font) * 0.35), 3rem)' }}>R$</sup>
+                        <span style={{
+                          fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, fontSize: 'var(--price-font)', lineHeight: 1,
+                          color: isOferta ? '#dc2626' : COLORS.amber
+                        }}>{formatPreco(p.preco)}</span>
+                      </div>
+                      <span style={{ fontSize: 'clamp(8px, calc(var(--price-font) * 0.25), 28px)', fontWeight: 600, letterSpacing: 2, color: COLORS.muted, textTransform: 'uppercase' as const, marginTop: 2 }}>por kg</span>
+                    </>
+                  )}
                 </div>
               </div>
             );

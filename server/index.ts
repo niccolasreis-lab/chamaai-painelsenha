@@ -636,6 +636,7 @@ export function startServer() {
       if (configuracoes.portal_som_sua_vez !== undefined) syncConfiguracaoPublica('portal_som_sua_vez', configuracoes.portal_som_sua_vez);
       if (configuracoes.portal_som_prestes_chamar !== undefined) syncConfiguracaoPublica('portal_som_prestes_chamar', configuracoes.portal_som_prestes_chamar);
       if (configuracoes.toledo_encarte_ativo !== undefined) syncConfiguracaoPublica('toledo_encarte_ativo', String(configuracoes.toledo_encarte_ativo));
+      if (configuracoes.toledo_ocultar_em_falta !== undefined) syncConfiguracaoPublica('toledo_ocultar_em_falta', String(configuracoes.toledo_ocultar_em_falta));
       
       res.json({ success: true });
     } catch (err: any) {
@@ -888,7 +889,7 @@ export function startServer() {
     try {
       const db = getDb();
       const produtos = db.prepare(
-        'SELECT plu, descricao, preco, categoria, atualizado_em FROM toledo_produtos WHERE preco > 0 ORDER BY categoria ASC, descricao ASC'
+        'SELECT plu, descricao, preco, categoria, atualizado_em FROM toledo_produtos ORDER BY categoria ASC, descricao ASC'
       ).all();
       res.json(produtos);
     } catch (err: any) {
@@ -919,7 +920,7 @@ export function startServer() {
       try {
         const db = getDb();
         const produtosCloud = db.prepare(
-          'SELECT plu, descricao, preco, categoria FROM toledo_produtos WHERE preco > 0'
+          'SELECT plu, descricao, preco, categoria FROM toledo_produtos'
         ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string }>;
         syncProdutos(produtosCloud);
       } catch (syncErr) {
@@ -981,7 +982,7 @@ export function startServer() {
 
       // Sync: envia produtos com categorias atualizadas para a nuvem
       const produtosCloud = db.prepare(
-        'SELECT plu, descricao, preco, categoria FROM toledo_produtos WHERE preco > 0'
+        'SELECT plu, descricao, preco, categoria FROM toledo_produtos'
       ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string }>;
       syncProdutos(produtosCloud);
 
@@ -1195,6 +1196,9 @@ export function startServer() {
       if (cfg['toledo_encarte_ativo'] !== undefined) {
         syncConfiguracaoPublica('toledo_encarte_ativo', cfg['toledo_encarte_ativo']);
       }
+      if (cfg['toledo_ocultar_em_falta'] !== undefined) {
+        syncConfiguracaoPublica('toledo_ocultar_em_falta', cfg['toledo_ocultar_em_falta']);
+      }
 
       // Sincroniza a ordem das categorias no startup
       try {
@@ -1237,7 +1241,7 @@ export function startServer() {
       // Sincroniza todos os produtos Toledo ativos no startup para garantir que a nuvem esteja atualizada
       try {
         const produtosCloud = db.prepare(
-          'SELECT plu, descricao, preco, categoria FROM toledo_produtos WHERE preco > 0'
+          'SELECT plu, descricao, preco, categoria FROM toledo_produtos'
         ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string }>;
         if (produtosCloud.length > 0) {
           syncProdutos(produtosCloud);
