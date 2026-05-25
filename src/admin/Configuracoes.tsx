@@ -688,21 +688,55 @@ export default function Configuracoes() {
                 </button>
 
                 <button 
-                  onClick={async () => {
-                    if (!confirm('O sistema será fechado imediatamente para aplicar a atualização. Deseja continuar?')) return;
-                    const api = (window as any).api;
-                    if (api?.installUpdate) {
-                      const res = await api.installUpdate();
-                      if (!res.success) alert(res.message);
-                    } else {
-                      alert('⚠️ Use o App Desktop (.exe) para instalar atualizações.');
+                  onClick={async (e) => {
+                    if (!confirm('O sistema encerrará processos travados, liberará a rede e aplicará a atualização imediatamente. Deseja continuar?')) return;
+                    
+                    const btn = e.currentTarget;
+                    const originalHTML = btn.innerHTML;
+                    btn.innerHTML = `
+                      <div class="flex items-center gap-3 text-left">
+                        <span class="material-symbols-outlined animate-spin text-primary group-hover:text-white">autorenew</span>
+                        <div>
+                          <span class="font-bold text-xs uppercase tracking-widest block text-primary group-hover:text-white">Destravando & Instalando...</span>
+                          <span class="text-[10px] opacity-70 block font-normal normal-case mt-0.5 text-primary group-hover:text-white">Encerrando instâncias zumbis e executando o instalador.</span>
+                        </div>
+                      </div>
+                    `;
+                    btn.setAttribute('disabled', 'true');
+                    btn.style.opacity = '0.7';
+
+                    try {
+                      const api = (window as any).api;
+                      
+                      // 1. Limpa processos zumbis e libera a porta 3000
+                      if (api?.killZombieProcesses) {
+                        console.log('[UPDATE] Executando limpeza de processos zumbis pré-instalação...');
+                        await api.killZombieProcesses();
+                      }
+                      
+                      // 2. Instala a atualização
+                      if (api?.installUpdate) {
+                        const res = await api.installUpdate();
+                        if (!res.success) alert(res.message);
+                      } else {
+                        alert('⚠️ Use o App Desktop (.exe) para instalar atualizações.');
+                      }
+                    } catch (err) {
+                      alert('Erro ao processar atualização: ' + (err instanceof Error ? err.message : String(err)));
+                    } finally {
+                      btn.innerHTML = originalHTML;
+                      btn.removeAttribute('disabled');
+                      btn.style.opacity = '';
                     }
                   }}
-                  className="w-full flex items-center justify-between p-4 bg-primary/10 rounded-xl border border-primary/20 hover:bg-primary hover:text-white transition-all group cursor-pointer text-primary"
+                  className="w-full flex items-center justify-between p-4 bg-primary/10 rounded-xl border border-primary/20 hover:bg-primary hover:text-white transition-all group cursor-pointer text-primary active:scale-[0.98] outline-none"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 text-left">
                     <span className="material-symbols-outlined">install_desktop</span>
-                    <span className="font-bold text-xs uppercase tracking-widest">Instalar Atualização Agora</span>
+                    <div>
+                      <span className="font-bold text-xs uppercase tracking-widest block">Destravar & Instalar Agora</span>
+                      <span className="text-[10px] opacity-70 block font-normal normal-case mt-0.5">Mata processos zumbis, libera arquivos travados e instala a nova versão imediatamente.</span>
+                    </div>
                   </div>
                   <span className="material-symbols-outlined opacity-50 group-hover:opacity-100 transition-opacity">system_update_alt</span>
                 </button>
