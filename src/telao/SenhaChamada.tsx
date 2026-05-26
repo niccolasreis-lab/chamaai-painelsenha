@@ -65,11 +65,16 @@ export default function SenhaChamada({ ultimaSenha = null }: { ultimaSenha?: any
         </div>
 
         {config.telao_ocultar_guiche !== '1' && (
-          <div className="mt-8 flex justify-center">
-            <div className="bg-white px-12 py-5 rounded-[32px] shadow-2xl flex items-center justify-center gap-6 border-b-[8px] border-outline-variant/30">
+          <div className="mt-8 flex flex-col items-center justify-center gap-4">
+            <div className="bg-white px-12 py-5 rounded-[32px] shadow-2xl flex flex-col items-center justify-center gap-2 border-b-[8px] border-outline-variant/30">
+              {ultimaSenha.balcao_nome && (
+                <span className="font-sans text-[2.5rem] font-black text-primary uppercase tracking-widest leading-none mb-1">
+                  {ultimaSenha.balcao_nome}
+                </span>
+              )}
               <span className="font-sans text-[5rem] font-bold text-ink uppercase leading-none tracking-tighter text-center">
-                {config.rotulo_local ? `${config.rotulo_local} ` : ''}
-                {ultimaSenha.guiche.replace(/guichê[:\s]*/gi, '').trim()}
+                {config.rotulo_local ? `${config.rotulo_local} ` : 'Guichê '}
+                {ultimaSenha.guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
               </span>
             </div>
           </div>

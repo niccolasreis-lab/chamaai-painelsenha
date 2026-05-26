@@ -503,6 +503,7 @@ export default function ToledoConfig() {
               className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
             >
               <optgroup label="Tamanhos Padrão (rem)">
+                <option value="auto">Automático (Ajustar ao Texto)</option>
                 <option value="0.9rem">0.9rem (Muito Pequeno)</option>
                 <option value="1rem">1.0rem (Pequeno)</option>
                 <option value="1.15rem">1.15rem (Médio)</option>
@@ -544,6 +545,7 @@ export default function ToledoConfig() {
               className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
             >
               <optgroup label="Tamanhos Padrão (rem)">
+                <option value="auto">Automático (Ajustar ao Texto)</option>
                 <option value="1.25rem">1.25rem (Pequeno)</option>
                 <option value="1.5rem">1.5rem (Médio)</option>
                 <option value="1.75rem">1.75rem (Padrão)</option>

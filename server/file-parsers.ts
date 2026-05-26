@@ -53,7 +53,7 @@ function parseGenericTXT(lines: string[]): ParsedItem[] {
       const desc = parts.length >= 3 ? parts[1] : `Item ${plu}`;
       const precoStr = parts[parts.length - 1].replace(',', '.');
       const preco = parseFloat(precoStr);
-      if (!isNaN(preco) && preco > 0) {
+      if (!isNaN(preco) && preco >= 0) {
         items.push({ plu, descricao: desc, preco: Math.round(preco * 100) });
       }
     }
@@ -73,7 +73,7 @@ function parseToledoMGV6(lines: string[]): ParsedItem[] {
     const descricao = line.length >= 66 ? line.substring(18, 66).trimEnd() : line.substring(18).trimEnd();
     
     const preco = parseInt(precoStr, 10);
-    if (!isNaN(preco) && preco > 0) {
+    if (!isNaN(preco) && preco >= 0) {
       items.push({ plu, descricao, preco });
     }
   }
@@ -96,7 +96,7 @@ function parseToledoMGV5(lines: string[]): ParsedItem[] {
     const descricao = line.substring(19, 41).trimEnd();
     
     const preco = parseInt(precoStr, 10);
-    if (!isNaN(preco) && preco > 0) {
+    if (!isNaN(preco) && preco >= 0) {
       items.push({ plu, descricao, preco });
     }
   }
@@ -120,7 +120,7 @@ function parseFilizola(lines: string[]): ParsedItem[] {
     const descricao = line.substring(17, 39).trimEnd();
     
     const preco = parseInt(precoStr, 10);
-    if (!isNaN(preco) && preco > 0) {
+    if (!isNaN(preco) && preco >= 0) {
       items.push({ plu, descricao, preco });
     }
   }
@@ -151,7 +151,7 @@ function parseGenericCSV(lines: string[]): ParsedItem[] {
       let precoStr = cols[2].replace(/"/g, '').replace(',', '.').trim();
       
       const precoFloat = parseFloat(precoStr);
-      if (!isNaN(precoFloat) && precoFloat > 0) {
+      if (!isNaN(precoFloat) && precoFloat >= 0) {
         items.push({ plu, descricao, preco: Math.round(precoFloat * 100) });
       }
     }

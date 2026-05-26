@@ -2,11 +2,23 @@ import { useState, useEffect, useCallback } from 'react';
 import SenhaChamada from './SenhaChamada';
 import EncartePrecos from './EncartePrecos';
 import EncarteGranel from './EncarteGranel';
+import TelaoEspera from './TelaoEspera';
 import { useSSE } from '../shared/useSSE';
 import { getApiUrl } from '../shared/apiConfig';
 import { playNotificationSound } from '../shared/sounds';
 
 export default function MediaIndoor() {
+  // Session / Pairing state
+  const [telaoCode, setTelaoCode] = useState<string | null>(localStorage.getItem('telao_code'));
+  const [perfil, setPerfil] = useState<any>(null);
+  const [perfilLoading, setPerfilLoading] = useState(true);
+
+  // Active view state
+  const [activeModules, setActiveModules] = useState<string[]>([]);
+  const [showingEncarte, setShowingEncarte] = useState(false);
+  const [encarteRefreshKey, setEncarteRefreshKey] = useState(0);
+
+  // Normal ticket and media state
   const [historico, setHistorico] = useState<any[]>([]);
   const [ultimaSenha, setUltimaSenha] = useState<any>(null);
   const [showMedia, setShowMedia] = useState(true);
@@ -15,23 +27,61 @@ export default function MediaIndoor() {
   const [activeMidiaIndex, setActiveMidiaIndex] = useState(0);
   const [config, setConfig] = useState<any>({});
   const [pessoasAguardando, setPessoasAguardando] = useState(0);
-  // Toledo Encarte state
-  const [showingEncarte, setShowingEncarte] = useState(false);
-  const [encarteEnabled, setEncarteEnabled] = useState(false);
-  const [encarteDuracao, setEncarteDuracao] = useState(15);
-  const [encarteItensPorSlide, setEncarteItensPorSlide] = useState(12);
-  const [encarteRefreshKey, setEncarteRefreshKey] = useState(0);
+
   const API_URL = getApiUrl();
+
+  // Initialize display session
+  const initTelaoSession = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/telao/init`);
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('telao_code', data.code);
+        setTelaoCode(data.code);
+        setPerfilLoading(false);
+      }
+    } catch (e) {
+      console.error('Erro ao inicializar telão:', e);
+      setTimeout(initTelaoSession, 5000);
+    }
+  };
+
+  // Fetch device pairing configuration profile
+  const fetchPerfil = async (code: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/telao/profile/${code}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPerfil(data);
+        
+        // Resolve which modules are currently enabled
+        const modules: string[] = [];
+        if (data.modulo_painel) modules.push('painel');
+        if (data.modulo_encarte) modules.push('encarte');
+        if (data.modulo_midia) modules.push('midia');
+        setActiveModules(modules);
+        setShowingEncarte(modules.includes('encarte') && !modules.includes('midia'));
+      } else if (res.status === 404) {
+        // DB got reset or this device got deleted/desvinculado
+        localStorage.removeItem('telao_code');
+        setTelaoCode(null);
+        setPerfil(null);
+        initTelaoSession();
+      }
+    } catch (e) {
+      console.error('Erro ao buscar perfil do telão:', e);
+    } finally {
+      setPerfilLoading(false);
+    }
+  };
 
   const fetchConfig = async () => {
     try {
       const res = await fetch(`${API_URL}/api/configuracoes`);
-      const data = await res.json();
-      setConfig(data);
-      // Update encarte settings from config
-      setEncarteEnabled(data.toledo_encarte_ativo === '1');
-      setEncarteDuracao(parseInt(data.toledo_encarte_duracao || '15', 10));
-      setEncarteItensPorSlide(parseInt(data.toledo_itens_por_slide || '12', 10));
+      if (res.ok) {
+        const data = await res.json();
+        setConfig(data);
+      }
     } catch (err) {
       console.error('Erro ao buscar configs', err);
     }
@@ -40,8 +90,10 @@ export default function MediaIndoor() {
   const fetchMidias = async () => {
     try {
       const res = await fetch(`${API_URL}/api/midias`);
-      const data = await res.json();
-      setMidias(data);
+      if (res.ok) {
+        const data = await res.json();
+        setMidias(data);
+      }
     } catch (err) {
       console.error('Erro ao buscar mídias', err);
     }
@@ -50,25 +102,37 @@ export default function MediaIndoor() {
   const fetchAguardando = async () => {
     try {
       const res = await fetch(`${API_URL}/api/fila`);
-      const data = await res.json();
-      setPessoasAguardando(Array.isArray(data) ? data.length : 0);
+      if (res.ok) {
+        const data = await res.json();
+        setPessoasAguardando(Array.isArray(data) ? data.length : 0);
+      }
     } catch (err) {}
   };
 
+  // Run initializations
   useEffect(() => {
-    fetchMidias();
     fetchConfig();
+    fetchMidias();
     fetchAguardando();
+
+    if (telaoCode) {
+      fetchPerfil(telaoCode);
+    } else {
+      initTelaoSession();
+    }
+
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    // Refresh aguardando count periodically as well
     const queueTimer = setInterval(fetchAguardando, 30000);
     return () => {
       clearInterval(timer);
       clearInterval(queueTimer);
     };
-  }, []);
+  }, [telaoCode]);
 
-  const { data: sseEvent } = useSSE(`${API_URL}/events`);
+  // Connect to correct SSE channel
+  const sseUrl = telaoCode ? `${API_URL}/api/telao/sse/${telaoCode}` : null;
+  const { data: telaoSseEvent } = useSSE(sseUrl);
+  const { data: globalSseEvent } = useSSE(`${API_URL}/events`);
 
   const playBell = () => {
     try {
@@ -80,14 +144,14 @@ export default function MediaIndoor() {
     }
   };
 
+  // Watch global events (ticket calling, config modifications, etc.)
   useEffect(() => {
-    if (!sseEvent) return;
+    if (!globalSseEvent) return;
 
-    if (sseEvent.event === 'NOVA_SENHA_CHAMADA') {
-      const payload = sseEvent.data;
+    if (globalSseEvent.event === 'NOVA_SENHA_CHAMADA') {
+      const payload = globalSseEvent.data;
       setUltimaSenha(payload);
       
-      // Atualiza histórico (remove se já existe para não duplicar, e coloca no topo)
       setHistorico(prev => {
         const filtered = prev.filter(s => s.id !== payload.id);
         return [payload, ...filtered].slice(0, 5);
@@ -96,100 +160,139 @@ export default function MediaIndoor() {
       playBell();
       fetchAguardando();
       
-      // DESTAQUE VISUAL: Esconde a mídia e mostra a senha em tela cheia
+      // Focus called ticket in full screen
       setShowMedia(false);
       
-      // Limpa timer anterior se houver (para repetições rápidas)
       const existingTimer = (window as any)._mediaTimer;
       if (existingTimer) clearTimeout(existingTimer);
       
-      // Volta para a mídia após 6 segundos
       (window as any)._mediaTimer = setTimeout(() => {
         setShowMedia(true);
       }, 6000);
 
-    } else if (sseEvent.event === 'NOVA_SENHA_EMITIDA' || sseEvent.event === 'SENHA_ESTORNADA') {
+    } else if (globalSseEvent.event === 'NOVA_SENHA_EMITIDA' || globalSseEvent.event === 'SENHA_ESTORNADA') {
       fetchAguardando();
-      if (sseEvent.event === 'SENHA_ESTORNADA') {
-        setHistorico(prev => prev.filter(s => s.id !== sseEvent.data?.id));
+      if (globalSseEvent.event === 'SENHA_ESTORNADA') {
+        setHistorico(prev => prev.filter(s => s.id !== globalSseEvent.data?.id));
       }
-    } else if (sseEvent.event === 'CONFIG_ATUALIZADA') {
+    } else if (globalSseEvent.event === 'CONFIG_ATUALIZADA') {
       fetchConfig();
-    } else if (sseEvent.event === 'MIDIAS_ATUALIZADAS') {
+    } else if (globalSseEvent.event === 'MIDIAS_ATUALIZADAS') {
       fetchMidias();
-    } else if (sseEvent.event === 'TOLEDO_PRECOS_ATUALIZADOS') {
-      // Force re-render of the encarte by bumping a key
+    } else if (globalSseEvent.event === 'TOLEDO_PRECOS_ATUALIZADOS') {
       setEncarteRefreshKey(prev => prev + 1);
-    } else if (sseEvent.event === 'RECARREGAR_PAGINA') {
+    } else if (globalSseEvent.event === 'RECARREGAR_PAGINA') {
       window.location.reload();
-    } else if (sseEvent.event === 'SISTEMA_RESETADO') {
+    } else if (globalSseEvent.event === 'SISTEMA_RESETADO') {
       setUltimaSenha(null);
       setHistorico([]);
       setShowMedia(true);
       fetchAguardando();
     }
-  }, [sseEvent]);
+  }, [globalSseEvent]);
 
+  // Watch telao-specific SSE pairing events
+  useEffect(() => {
+    if (!telaoSseEvent) return;
+
+    if (telaoSseEvent.event === 'TELAO_VINCULADO' || telaoSseEvent.event === 'TELAO_ATUALIZADO') {
+      const data = telaoSseEvent.data;
+      setPerfil(data);
+      
+      const modules: string[] = [];
+      if (data.modulo_painel) modules.push('painel');
+      if (data.modulo_encarte) modules.push('encarte');
+      if (data.modulo_midia) modules.push('midia');
+      setActiveModules(modules);
+      setShowingEncarte(modules.includes('encarte') && !modules.includes('midia'));
+    } else if (telaoSseEvent.event === 'TELAO_DESVINCULADO') {
+      localStorage.removeItem('telao_code');
+      setTelaoCode(null);
+      setPerfil(null);
+      setActiveModules([]);
+    } else if (telaoSseEvent.event === 'RECARREGAR_PAGINA') {
+      window.location.reload();
+    }
+  }, [telaoSseEvent]);
+
+  // Rotate between media and active modules
   const nextMedia = useCallback(() => {
     if (midias.length > 0) {
       const nextIndex = (activeMidiaIndex + 1) % midias.length;
-      
-      // Check if we should show the encarte at this transition point
-      // The encarte position config determines after which media index it appears
       const encartePos = parseInt(config.toledo_encarte_posicao || '0', 10);
       
-      if (encarteEnabled && !showingEncarte && activeMidiaIndex === encartePos) {
-        // Show the encarte instead of advancing to next media
+      if (activeModules.includes('encarte') && !showingEncarte && activeMidiaIndex === encartePos) {
         setShowingEncarte(true);
         return;
       }
       
       setActiveMidiaIndex(nextIndex);
-    } else if (encarteEnabled && !showingEncarte) {
-      // No regular media but encarte is enabled → show it
+    } else if (activeModules.includes('encarte') && !showingEncarte) {
       setShowingEncarte(true);
     }
-  }, [midias.length, activeMidiaIndex, encarteEnabled, showingEncarte, config.toledo_encarte_posicao]);
+  }, [midias.length, activeMidiaIndex, activeModules, showingEncarte, config.toledo_encarte_posicao]);
 
-  // Called when the encarte finishes all its slides
   const onEncarteComplete = useCallback(() => {
     setShowingEncarte(false);
-    // Advance to next regular media
     if (midias.length > 0) {
       setActiveMidiaIndex(prev => (prev + 1) % midias.length);
     }
-  }, [midias.length]);
+    // If multiple modules, we alternate Encarte and Midia
+    if (activeModules.includes('midia') && activeModules.includes('encarte')) {
+      // Completed encarte slide, now switch to midia carousel
+    }
+  }, [midias.length, activeModules]);
 
-  // Handle Image timer & Video Watchdog safety timer
+  // Handle transition timers
   useEffect(() => {
-    if (midias.length > 0 && showMedia && !showingEncarte) {
+    if (midias.length > 0 && showMedia && !showingEncarte && activeModules.includes('midia')) {
       const current = midias[activeMidiaIndex];
       if (current.tipo === 'imagem') {
-        const timer = setTimeout(nextMedia, 10000); // 10s for images
+        const timer = setTimeout(nextMedia, 10000);
         return () => clearTimeout(timer);
       } else if (current.tipo === 'video') {
-        // Watchdog: Se o vídeo travar ou demorar mais de 60s, força a transição para evitar telas congeladas no cliente
         const watchdogTimer = setTimeout(() => {
-          console.warn('[MEDIA WATCHDOG] Vídeo travou ou excedeu tempo limite. Avançando...');
+          console.warn('[MEDIA WATCHDOG] Vídeo travou. Avançando...');
           nextMedia();
-        }, 60000); // 60 segundos de limite
+        }, 60000);
         return () => clearTimeout(watchdogTimer);
       }
-    } else if (midias.length === 0 && encarteEnabled && !showingEncarte && showMedia) {
-      // No media at all but encarte is enabled — show it after a brief delay
+    } else if (midias.length === 0 && activeModules.includes('encarte') && !showingEncarte && showMedia) {
       const timer = setTimeout(() => setShowingEncarte(true), 2000);
       return () => clearTimeout(timer);
     }
-  }, [activeMidiaIndex, midias, showMedia, showingEncarte, encarteEnabled, nextMedia]);
+  }, [activeMidiaIndex, midias, showMedia, showingEncarte, activeModules, nextMedia]);
 
+  // Apply real-time consolidated waiting count
   useEffect(() => {
-    // Atualiza o contador de aguardando se vier no evento consolidado
-    if (sseEvent?.aguardando_count !== undefined) {
-      setPessoasAguardando(sseEvent.aguardando_count);
+    if (globalSseEvent?.aguardando_count !== undefined) {
+      setPessoasAguardando(globalSseEvent.aguardando_count);
     }
-  }, [sseEvent]);
+  }, [globalSseEvent]);
+
+  if (perfilLoading) {
+    return (
+      <div className="h-screen w-screen bg-[#041a14] flex flex-col items-center justify-center text-white font-sans uppercase tracking-[0.2em] text-sm gap-4">
+        <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-emerald-400 animate-spin"></div>
+        <span>Carregando interface...</span>
+      </div>
+    );
+  }
+
+  // Not paired -> Show wait waiting screen
+  if (!perfil || perfil.status !== 'vinculado') {
+    return <TelaoEspera code={telaoCode || ''} />;
+  }
+
+  // Resolve filters for price list categories
+  const parsedCategories = perfil.encarte_categorias
+    ? perfil.encarte_categorias.split(';').map((c: string) => c.trim()).filter(Boolean)
+    : [];
 
   const activeMidia = midias[activeMidiaIndex];
+
+  // Resolve Toledo Config style overrides based on paired profile status
+  const showingPriceEncarte = activeModules.includes('encarte') && showingEncarte;
 
   return (
     <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-sans text-ink">
@@ -211,7 +314,11 @@ export default function MediaIndoor() {
           )}
         </div>
         <div className="flex items-center gap-8">
-
+          {/* Active paired screen indicator */}
+          <div className="hidden lg:flex items-center gap-2 bg-[#041a14]/5 border border-emerald-500/10 px-4 py-2 rounded-2xl">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-xs font-bold text-ink-secondary uppercase tracking-widest leading-none">{perfil.nome}</span>
+          </div>
 
           {/* Aguardando Badge */}
           <div className="flex items-center gap-6 bg-blue-500/5 px-8 py-3 rounded-3xl">
@@ -229,41 +336,40 @@ export default function MediaIndoor() {
         {/* Media / Call Focus Area (78%) */}
         <div className="flex-[78] relative bg-[#041a14] overflow-hidden border-r border-outline-variant/20">
           <div className="h-full w-full">
-            {activeMidia ? (
+            {showingPriceEncarte ? (
+              config.toledo_encarte_estilo === 'granel' ? (
+                <EncarteGranel
+                  key={`encarte-granel-${encarteRefreshKey}`}
+                  duracao={parseInt(config.toledo_encarte_duracao || '15', 10)}
+                  itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
+                  onComplete={onEncarteComplete}
+                  config={config}
+                  categoriasFiltro={parsedCategories}
+                />
+              ) : (
+                <EncartePrecos
+                  key={`encarte-${encarteRefreshKey}`}
+                  duracao={parseInt(config.toledo_encarte_duracao || '15', 10)}
+                  itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
+                  onComplete={onEncarteComplete}
+                  config={config}
+                  categoriasFiltro={parsedCategories}
+                />
+              )
+            ) : activeModules.includes('midia') && activeMidia ? (
               <div className="h-full w-full animate-fade-in relative">
-                {showingEncarte ? (
-                  config.toledo_encarte_estilo === 'granel' ? (
-                    <EncarteGranel
-                      key={`encarte-granel-${encarteRefreshKey}`}
-                      duracao={encarteDuracao}
-                      itensPorSlide={encarteItensPorSlide}
-                      onComplete={onEncarteComplete}
-                      config={config}
-                    />
-                  ) : (
-                    <EncartePrecos
-                      key={`encarte-${encarteRefreshKey}`}
-                      duracao={encarteDuracao}
-                      itensPorSlide={encarteItensPorSlide}
-                      onComplete={onEncarteComplete}
-                      config={config}
-                    />
-                  )
-                ) : activeMidia.tipo === 'video' ? (
+                {activeMidia.tipo === 'video' ? (
                   <video 
                     key={`${activeMidia.id}-${activeMidiaIndex}`}
                     src={`${API_URL}${activeMidia.caminho}`} 
                     className="w-full h-full object-contain"
                     autoPlay
                     muted
-                    loop={midias.length === 1 && !encarteEnabled}
+                    loop={midias.length === 1 && !activeModules.includes('encarte')}
                     onEnded={nextMedia}
                     onError={(e) => {
                       console.error('[MEDIA ERROR] Erro na reprodução do vídeo. Pulando...', e);
                       nextMedia();
-                    }}
-                    onStalled={() => {
-                      console.warn('[MEDIA STALL] Reprodução do vídeo estagnada.');
                     }}
                     playsInline
                     preload="auto"
@@ -281,29 +387,8 @@ export default function MediaIndoor() {
                   />
                 )}
               </div>
-            ) : showingEncarte && encarteEnabled ? (
-              /* Encarte shown when there are no regular media */
-              <div className="h-full w-full animate-fade-in">
-                {config.toledo_encarte_estilo === 'granel' ? (
-                  <EncarteGranel
-                    key={`encarte-granel-only-${encarteRefreshKey}`}
-                    duracao={encarteDuracao}
-                    itensPorSlide={encarteItensPorSlide}
-                    onComplete={onEncarteComplete}
-                    config={config}
-                  />
-                ) : (
-                  <EncartePrecos
-                    key={`encarte-only-${encarteRefreshKey}`}
-                    duracao={encarteDuracao}
-                    itensPorSlide={encarteItensPorSlide}
-                    onComplete={onEncarteComplete}
-                    config={config}
-                  />
-                )}
-              </div>
             ) : (
-              /* Background Branding when no media */
+              /* Branding default screen if no other visual module is selected */
               <div className="h-full w-full flex flex-col items-center justify-center p-20">
                 <div className="text-center">
                   {config.logo_cliente ? (
@@ -319,64 +404,64 @@ export default function MediaIndoor() {
                 </div>
               </div>
             )}
-
-
           </div>
         </div>
 
-        {/* Sidebar History Area (28%) */}
-        <div className="flex-[28] flex flex-col bg-surface shadow-[-10px_0_30px_rgba(0,0,0,0.05)] border-l border-outline-variant/30">
-          {/* Recent Calls Section */}
-          <div className="p-8 flex-1 overflow-hidden">
-            <div className="flex items-center gap-3 mb-8 border-b border-outline-variant/30 pb-4">
-              <span className="material-symbols-outlined text-primary text-3xl font-bold">history</span>
-              <h2 className="font-sans text-2xl font-bold text-ink uppercase tracking-widest">Histórico</h2>
-            </div>
-            
-            <div className="space-y-5">
-              {historico.length > 0 ? (
-                historico.slice(0, 5).map((senha, idx) => (
-                  <div key={senha.id} className={`flex items-center gap-6 px-8 py-5 bg-white rounded-[2rem] border shadow-sm transition-all ${idx === 0 ? 'border-primary ring-4 ring-primary/10 bg-primary/5 scale-[1.03] mb-6' : 'border-outline-variant/50 opacity-60'}`}>
-                    {/* Número da senha */}
-                    <span className={`font-sans text-[5.5rem] font-black leading-none tracking-tighter ${idx === 0 ? 'text-primary' : 'text-ink'}`}>
-                      {String(senha.numero).padStart(3, '0')}
-                    </span>
-                    
-                    {/* Separador */}
-                    <div className="w-[4px] h-16 bg-primary/20 rounded-full shrink-0"></div>
+        {/* Sidebar History Area (28%) - Displayed only if painel module is active */}
+        {activeModules.includes('painel') && (
+          <div className="flex-[28] flex flex-col bg-surface shadow-[-10px_0_30px_rgba(0,0,0,0.05)] border-l border-outline-variant/30">
+            {/* Recent Calls Section */}
+            <div className="p-8 flex-1 overflow-hidden">
+              <div className="flex items-center gap-3 mb-8 border-b border-outline-variant/30 pb-4">
+                <span className="material-symbols-outlined text-primary text-3xl font-bold">history</span>
+                <h2 className="font-sans text-2xl font-bold text-ink uppercase tracking-widest">Histórico</h2>
+              </div>
+              
+              <div className="space-y-5">
+                {historico.length > 0 ? (
+                  historico.slice(0, 5).map((senha, idx) => (
+                    <div key={senha.id} className={`flex items-center gap-6 px-8 py-5 bg-white rounded-[2rem] border shadow-sm transition-all ${idx === 0 ? 'border-primary ring-4 ring-primary/10 bg-primary/5 scale-[1.03] mb-6' : 'border-outline-variant/50 opacity-60'}`}>
+                      {/* Número da senha */}
+                      <span className={`font-sans text-[5.5rem] font-black leading-none tracking-tighter ${idx === 0 ? 'text-primary' : 'text-ink'}`}>
+                        {String(senha.numero).padStart(3, '0')}
+                      </span>
+                      
+                      {/* Separador */}
+                      <div className="w-[4px] h-16 bg-primary/20 rounded-full shrink-0"></div>
 
-                    {/* Nome do setor */}
-                    <div className="flex flex-col leading-tight">
-                      <span className="font-sans text-[1.3rem] font-bold text-ink-secondary uppercase tracking-widest">
-                        {config.rotulo_local || 'Balcão'}
-                      </span>
-                      <span className="font-sans text-[2.5rem] font-bold text-ink uppercase leading-none">
-                        {senha.guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
-                      </span>
+                      {/* Nome do setor */}
+                      <div className="flex flex-col leading-tight">
+                        <span className="font-sans text-[1.3rem] font-bold text-ink-secondary uppercase tracking-widest">
+                          {senha.balcao_nome || config.rotulo_local || 'Balcão'}
+                        </span>
+                        <span className="font-sans text-[2.5rem] font-bold text-ink uppercase leading-none">
+                          {senha.guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
+                        </span>
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 opacity-20">
+                    <span className="material-symbols-outlined text-[6rem]">pending_actions</span>
+                    <p className="text-sm font-bold uppercase tracking-[0.3em] mt-4">Aguardando Chamada</p>
                   </div>
-                ))
-              ) : (
-                <div className="flex flex-col items-center justify-center py-20 opacity-20">
-                  <span className="material-symbols-outlined text-[6rem]">pending_actions</span>
-                  <p className="text-sm font-bold uppercase tracking-[0.3em] mt-4">Aguardando Chamada</p>
-                </div>
-              )}
+                )}
+              </div>
+            </div>
+
+            {/* Footer Sidebar (Status) */}
+            <div className="mt-auto p-10 flex flex-col items-center text-center gap-6 border-t border-outline-variant/20">
+               <div className={`p-6 rounded-full ${!showMedia ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-ink-secondary/30'}`}>
+                  <span className="material-symbols-outlined text-[4rem]">
+                     {showMedia ? 'confirmation_number' : 'campaign'}
+                  </span>
+               </div>
+               <p className={`font-sans text-2xl font-bold uppercase tracking-widest ${showMedia ? 'text-ink-secondary/40' : 'text-primary animate-pulse'}`}>
+                  {showMedia ? 'Aguardando chamada...' : 'Senha Chamada!'}
+               </p>
             </div>
           </div>
-
-          {/* Footer Sidebar (Status) */}
-          <div className="mt-auto p-10 flex flex-col items-center text-center gap-6 border-t border-outline-variant/20">
-             <div className={`p-6 rounded-full ${!showMedia ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-ink-secondary/30'}`}>
-                <span className="material-symbols-outlined text-[4rem]">
-                   {showMedia ? 'confirmation_number' : 'campaign'}
-                </span>
-             </div>
-             <p className={`font-sans text-2xl font-bold uppercase tracking-widest ${showMedia ? 'text-ink-secondary/40' : 'text-primary animate-pulse'}`}>
-                {showMedia ? 'Aguardando chamada...' : 'Senha Chamada!'}
-             </p>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Bottom Footer Area (Letreiro Digital) */}
@@ -405,8 +490,9 @@ export default function MediaIndoor() {
           100% { transform: translateX(-100%); }
         }
       `}</style>
-      {/* Fullscreen Call Overlay */}
-      {!showMedia && ultimaSenha && (
+      
+      {/* Fullscreen Call Overlay (Only if ticket calling is enabled in profile modules) */}
+      {!showMedia && ultimaSenha && activeModules.includes('painel') && (
         <div className="absolute inset-0 z-50">
           <SenhaChamada ultimaSenha={ultimaSenha} />
         </div>

@@ -6,6 +6,7 @@ interface EncarteGranelProps {
   itensPorSlide: number;
   onComplete: () => void;
   config: any;
+  categoriasFiltro?: string[];
 }
 
 // ── Paleta ────────────────────────────────────────────────────────────────────
@@ -225,7 +226,7 @@ function getProductIcon(desc: string) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function EncarteGranel({ duracao, itensPorSlide, onComplete, config }: EncarteGranelProps) {
+export default function EncarteGranel({ duracao, itensPorSlide, onComplete, config, categoriasFiltro }: EncarteGranelProps) {
   const [categorySlides, setCategorySlides] = useState<any[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [animKey, setAnimKey] = useState(0);
@@ -235,6 +236,8 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
   const colunas = parseInt(config?.toledo_encarte_colunas || '4', 10);
   const itemsLimit = itensPorSlide || (colunas * 2); // Default to 2 rows based on columns if not set
 
+  const filterKey = JSON.stringify(categoriasFiltro);
+
   // ── Fetch products and build slides ──────────────────────────────────────────
   useEffect(() => {
     fetch(`${API_URL}/api/toledo/produtos`)
@@ -242,7 +245,18 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
       .then((data: any[]) => {
         // Filter out items with price = 0 if configured to do so
         const ocultarEmFalta = config?.toledo_ocultar_em_falta === '1' || config?.toledo_ocultar_em_falta === true;
-        const filteredData = ocultarEmFalta ? data.filter((p: any) => p.preco > 0) : data;
+        let filteredData = ocultarEmFalta ? data.filter((p: any) => p.preco > 0) : data;
+
+        // Apply category filter if provided
+        if (categoriasFiltro && categoriasFiltro.length > 0) {
+          filteredData = filteredData.filter((p: any) => {
+            const productCat = (p.categoria || '').trim().toLowerCase();
+            return categoriasFiltro.some(filterCat => {
+              const fCat = filterCat.trim().toLowerCase();
+              return productCat === fCat || productCat.includes(fCat) || fCat.includes(productCat);
+            });
+          });
+        }
 
         // Group by category
         const groups: Record<string, any[]> = {};
@@ -274,7 +288,7 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
         setCategorySlides(slides);
       })
       .catch(console.error);
-  }, [API_URL, itemsLimit, config?.toledo_ocultar_em_falta]);
+  }, [API_URL, itemsLimit, config?.toledo_ocultar_em_falta, filterKey]);
 
   // ── Auto-advance ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -420,11 +434,18 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
                   <span style={{ fontSize: 'clamp(1.2rem, calc(var(--desc-font) * 1.5), 4rem)' }}>{pIcon}</span>
                 </div>
                 {/* Body */}
-                <div style={{ flex: 1, padding: '4px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', minWidth: 0 }}>
+                <div style={{ flex: 1, padding: '4px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', minWidth: 0 }} className={config?.toledo_fonte_descricao === 'auto' ? '@container' : ''}>
                   <span style={{
-                    fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: config?.toledo_fonte_descricao || '18px', lineHeight: 1.1,
+                    fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, 
+                    fontSize: config?.toledo_fonte_descricao === 'auto'
+                        ? `clamp(0.9rem, calc(280cqi / ${Math.max(12, cleanName.length)}), 3rem)`
+                        : config?.toledo_fonte_descricao || '18px', 
+                    lineHeight: 1.1,
                     color: p.preco === 0 ? '#9f9f9f' : COLORS.text, textTransform: 'uppercase',
-                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                    display: config?.toledo_fonte_descricao === 'auto' ? 'block' : '-webkit-box', 
+                    WebkitLineClamp: config?.toledo_fonte_descricao === 'auto' ? undefined : 2, 
+                    WebkitBoxOrient: config?.toledo_fonte_descricao === 'auto' ? undefined : 'vertical', 
+                    overflow: 'hidden',
                   }}>
                     {cleanName}
                   </span>
@@ -440,7 +461,7 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
                 <div style={{
                   display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', justifyContent: 'center',
                   padding: '0 14px', flexShrink: 0
-                }}>
+                }} className={config?.toledo_fonte_preco === 'auto' ? '@container' : ''}>
                   {p.preco === 0 ? (
                     <span style={{
                       fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800,
@@ -454,7 +475,11 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
                       <div style={{ display: 'flex', alignItems: 'baseline' }}>
                         <sup style={{ fontWeight: 800, color: isOferta ? '#dc2626' : COLORS.amber, marginRight: 2, position: 'relative' as const, top: '-0.3em', fontSize: 'clamp(0.5rem, calc(var(--price-font) * 0.35), 3rem)' }}>R$</sup>
                         <span style={{
-                          fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, fontSize: 'var(--price-font)', lineHeight: 1,
+                          fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, 
+                          fontSize: config?.toledo_fonte_preco === 'auto'
+                             ? `clamp(1rem, calc(180cqi / ${Math.max(5, formatPreco(p.preco).length)}), 4rem)`
+                             : 'var(--price-font)', 
+                          lineHeight: 1,
                           color: isOferta ? '#dc2626' : COLORS.amber
                         }}>{formatPreco(p.preco)}</span>
                       </div>

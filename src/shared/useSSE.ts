@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 
-export function useSSE(url: string, eventType?: string) {
+export function useSSE(url: string | null, eventType?: string) {
   const [data, setData] = useState<any>(null);
   const [connected, setConnected] = useState(false);
   const reconnectTimeout = useRef<any>(null);
 
   const connect = useCallback(() => {
+    if (!url) return null;
     const eventSource = new EventSource(url);
 
     eventSource.onopen = () => {
@@ -45,7 +46,9 @@ export function useSSE(url: string, eventType?: string) {
   useEffect(() => {
     const es = connect();
     return () => {
-      es.close();
+      if (es) {
+        es.close();
+      }
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }

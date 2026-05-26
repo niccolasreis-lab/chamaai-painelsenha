@@ -73,6 +73,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 let sseClients: express.Response[] = [];
+const telaoSseClients: Record<string, express.Response[]> = {};
 
 export function startServer() {
   const PORT = 3000;
@@ -197,6 +198,126 @@ export function startServer() {
       sseClients = sseClients.filter(client => client !== res);
     });
   });
+
+  // --- TELÕES (Musardos) ---
+  app.get('/api/telao/sse/:code', (req, res) => {
+    const code = req.params.code.toUpperCase();
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    if (!telaoSseClients[code]) {
+      telaoSseClients[code] = [];
+    }
+    telaoSseClients[code].push(res);
+
+    req.on('close', () => {
+      telaoSseClients[code] = telaoSseClients[code].filter(client => client !== res);
+      if (telaoSseClients[code].length === 0) {
+        delete telaoSseClients[code];
+      }
+    });
+  });
+
+  const broadcastToTelao = (code: string, event: string, data: any) => {
+    const payload = `data: ${JSON.stringify({ event, data })}\n\n`;
+    if (telaoSseClients[code]) {
+      telaoSseClients[code].forEach(client => client.write(payload));
+    }
+  };
+
+  app.get('/api/telao/init', (req, res) => {
+    try {
+      const db = getDb();
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      db.prepare("INSERT INTO teloes (code, status) VALUES (?, 'pendente')").run(code);
+      res.json({ code });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/telao/profile/:code', (req, res) => {
+    try {
+      const db = getDb();
+      const code = (req.params.code as string).toUpperCase();
+      const telao = db.prepare('SELECT * FROM teloes WHERE code = ?').get(code) as any;
+      if (!telao) return res.status(404).json({ error: 'Telão não encontrado' });
+      res.json(telao);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/telao/list', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const teloes = db.prepare('SELECT * FROM teloes ORDER BY criado_em DESC').all();
+      res.json(teloes);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/telao/vincular', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const { code, nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias } = req.body;
+      const stmt = db.prepare(`
+        UPDATE teloes 
+        SET nome = ?, status = 'vinculado', modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, vinculado_em = datetime('now')
+        WHERE code = ?
+      `);
+      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', code.toUpperCase());
+      
+      const perfil = db.prepare('SELECT * FROM teloes WHERE code = ?').get(code.toUpperCase());
+      broadcastToTelao(code.toUpperCase(), 'TELAO_VINCULADO', perfil);
+      res.json({ success: true, perfil });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put('/api/telao/:code', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const code = (req.params.code as string).toUpperCase();
+      const { nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias } = req.body;
+      const stmt = db.prepare(`
+        UPDATE teloes 
+        SET nome = ?, modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?
+        WHERE code = ?
+      `);
+      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', code);
+      
+      const perfil = db.prepare('SELECT * FROM teloes WHERE code = ?').get(code);
+      broadcastToTelao(code, 'TELAO_ATUALIZADO', perfil);
+      res.json({ success: true, perfil });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/telao/:code', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const code = (req.params.code as string).toUpperCase();
+      // Remove from DB so it's a completely clean state (the telao will request /init again if it reloads, or we just tell it to DESVINCULADO)
+      db.prepare('DELETE FROM teloes WHERE code = ?').run(code);
+      broadcastToTelao(code, 'TELAO_DESVINCULADO', { code });
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/telao/:code/reiniciar', requireMaster, (req, res) => {
+    const code = (req.params.code as string).toUpperCase();
+    broadcastToTelao(code, 'RECARREGAR_PAGINA', { reason: 'admin_command' });
+    res.json({ success: true });
+  });
+  // -------------------------
 
   app.get('/api/senhas', (req, res) => {
     try {
@@ -678,6 +799,26 @@ export function startServer() {
       res.json({ success: true, logoPath });
     } catch (err: any) {
       console.error('Error uploading logo:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ARTE TELAO UPLOAD
+  app.post('/api/configuracoes/telao-arte', requireMaster, upload.single('arte'), (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'Nenhuma arte enviada' });
+      
+      const db = getDb();
+      const artePath = `/uploads/${req.file.filename}`;
+      
+      db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES (?, ?, datetime('now'))")
+        .run('telao_arte_espera', artePath);
+        
+      broadcastEvent('CONFIG_ATUALIZADA', { telao_arte_espera: artePath });
+
+      res.json({ success: true, artePath });
+    } catch (err: any) {
+      console.error('Error uploading telão arte:', err);
       res.status(500).json({ error: err.message });
     }
   });

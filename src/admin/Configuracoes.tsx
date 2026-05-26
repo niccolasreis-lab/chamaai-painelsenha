@@ -20,6 +20,7 @@ export default function Configuracoes() {
     fila_preferencial_ativa: '1',
     prefixo_preferencial: 'P',
     logo_cliente: '',
+    telao_arte_espera: '',
     nome_estabelecimento: 'ChamaAí - Atendimento',
     portal_voz_alerta: 'Feminina',
     portal_som_sua_vez: '',
@@ -166,6 +167,26 @@ export default function Configuracoes() {
       }
     } catch (err) {
       alert('Erro ao enviar logo.');
+    }
+  };
+
+  const handleArteUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('arte', file);
+    try {
+      const res = await fetch(`${API_URL}/api/configuracoes/telao-arte`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setConfig(prev => ({ ...prev, telao_arte_espera: data.artePath }));
+        alert('Arte do Telão atualizada com sucesso!');
+      }
+    } catch (err) {
+      alert('Erro ao enviar arte.');
     }
   };
 
@@ -427,6 +448,35 @@ export default function Configuracoes() {
                       <input type="checkbox" name="ocultar_tipo_senha" checked={config.ocultar_tipo_senha === '1'} onChange={handleChange} className="sr-only peer" />
                       <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
                     </label>
+                  </div>
+                </div>
+
+                <div className="col-span-2 border-t border-outline-variant/30 pt-6 mt-2">
+                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">ARTE DE ESPERA DO TELÃO (PRÉ-VÍNCULO)</label>
+                  <div className="flex items-center gap-4">
+                    {config.telao_arte_espera && (
+                      <div className="w-32 h-20 bg-black rounded-lg overflow-hidden shrink-0 flex items-center justify-center border border-outline-variant/50">
+                        <img src={`${API_URL}${config.telao_arte_espera}`} alt="Arte de Espera" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <input 
+                        type="file" 
+                        id="arte-espera-input"
+                        accept="image/png, image/jpeg, image/webp"
+                        className="hidden"
+                        onChange={handleArteUpload}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById('arte-espera-input')?.click()}
+                        className="px-6 py-3 bg-surface-variant border border-outline-variant/50 hover:border-primary transition-all rounded-xl font-bold uppercase tracking-widest text-xs text-ink flex items-center gap-2"
+                      >
+                        <span className="material-symbols-outlined">upload</span>
+                        {config.telao_arte_espera ? 'Alterar Arte' : 'Fazer Upload (Rec: 1920x1080)'}
+                      </button>
+                      <p className="text-[10px] text-ink-secondary/60 mt-2 font-medium">Exibida nos telões enquanto aguardam a vinculação por código.</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -793,7 +843,7 @@ export default function Configuracoes() {
 
                 <button 
                   onClick={async (e) => {
-                    if (!confirm('O sistema encerrará processos travados, liberará a rede e aplicará a atualização imediatamente. Deseja continuar?')) return;
+                    if (!confirm('O sistema aplicará a atualização agora. Ele vai preparar o ambiente, baixar a nova versão e reiniciar automaticamente. Deseja continuar?')) return;
                     
                     const btn = e.currentTarget;
                     const originalHTML = btn.innerHTML;
@@ -801,8 +851,8 @@ export default function Configuracoes() {
                       <div class="flex items-center gap-3 text-left">
                         <span class="material-symbols-outlined animate-spin text-primary group-hover:text-white">autorenew</span>
                         <div>
-                          <span class="font-bold text-xs uppercase tracking-widest block text-primary group-hover:text-white">Destravando & Instalando...</span>
-                          <span class="text-[10px] opacity-70 block font-normal normal-case mt-0.5 text-primary group-hover:text-white">Encerrando instâncias zumbis e executando o instalador.</span>
+                          <span class="font-bold text-xs uppercase tracking-widest block text-primary group-hover:text-white">Preparando Instalação...</span>
+                          <span class="text-[10px] opacity-70 block font-normal normal-case mt-0.5 text-primary group-hover:text-white">Aguarde, a interface do instalador será aberta em instantes.</span>
                         </div>
                       </div>
                     `;
@@ -812,13 +862,6 @@ export default function Configuracoes() {
                     try {
                       const api = (window as any).api;
                       
-                      // 1. Limpa processos zumbis e libera a porta 3000
-                      if (api?.killZombieProcesses) {
-                        console.log('[UPDATE] Executando limpeza de processos zumbis pré-instalação...');
-                        await api.killZombieProcesses();
-                      }
-                      
-                      // 2. Instala a atualização
                       if (api?.installUpdate) {
                         const res = await api.installUpdate();
                         if (!res.success) alert(res.message);
@@ -838,57 +881,11 @@ export default function Configuracoes() {
                   <div className="flex items-center gap-3 text-left">
                     <span className="material-symbols-outlined">install_desktop</span>
                     <div>
-                      <span className="font-bold text-xs uppercase tracking-widest block">Destravar & Instalar Agora</span>
-                      <span className="text-[10px] opacity-70 block font-normal normal-case mt-0.5">Mata processos zumbis, libera arquivos travados e instala a nova versão imediatamente.</span>
+                      <span className="font-bold text-xs uppercase tracking-widest block">Instalar Atualização Agora</span>
+                      <span className="text-[10px] opacity-70 block font-normal normal-case mt-0.5">Executa o instalador da nova versão e reinicia o aplicativo automaticamente.</span>
                     </div>
                   </div>
                   <span className="material-symbols-outlined opacity-50 group-hover:opacity-100 transition-opacity">system_update_alt</span>
-                </button>
-
-                <button 
-                  onClick={async (e) => {
-                    if (!confirm('Esta ação encerrará todas as outras instâncias zumbis do ChamaAí e liberará portas de rede presas. Deseja continuar?')) return;
-                    
-                    const btn = e.currentTarget;
-                    const originalHTML = btn.innerHTML;
-                    btn.innerHTML = `
-                      <div class="flex items-center gap-3 text-left">
-                        <span class="material-symbols-outlined animate-spin text-error group-hover:text-white">autorenew</span>
-                        <div>
-                          <span class="font-bold text-xs uppercase tracking-widest block text-error group-hover:text-white">Limpando Atividades Zumbis...</span>
-                          <span class="text-[10px] opacity-70 block font-normal normal-case mt-0.5 text-error group-hover:text-white">Aguarde enquanto os processos do Windows são finalizados de forma limpa.</span>
-                        </div>
-                      </div>
-                    `;
-                    btn.setAttribute('disabled', 'true');
-                    btn.style.opacity = '0.7';
-
-                    try {
-                      const api = (window as any).api;
-                      if (api?.killZombieProcesses) {
-                        const res = await api.killZombieProcesses();
-                        alert(res.message);
-                      } else {
-                        alert('⚠️ Esta função só está disponível no App Desktop (.exe).');
-                      }
-                    } catch (err) {
-                      alert('Erro ao executar limpeza: ' + (err instanceof Error ? err.message : String(err)));
-                    } finally {
-                      btn.innerHTML = originalHTML;
-                      btn.removeAttribute('disabled');
-                      btn.style.opacity = '';
-                    }
-                  }}
-                  className="w-full flex items-center justify-between p-4 bg-error/10 rounded-xl border border-error/20 hover:bg-error hover:text-white transition-all group cursor-pointer text-error active:scale-[0.98] outline-none"
-                >
-                  <div className="flex items-center gap-3 text-left">
-                    <span className="material-symbols-outlined">cleaning_services</span>
-                    <div>
-                      <span className="font-bold text-xs uppercase tracking-widest block">Matar Atividades & Destravar Instâncias</span>
-                      <span className="text-[10px] opacity-70 block font-normal normal-case mt-0.5">Destrava arquivos e encerra outros processos zumbis rodando em segundo plano.</span>
-                    </div>
-                  </div>
-                  <span className="material-symbols-outlined opacity-50 group-hover:opacity-100 transition-opacity">dangerous</span>
                 </button>
               </div>
             </div>

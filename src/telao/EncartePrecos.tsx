@@ -6,14 +6,17 @@ interface EncarteProps {
   itensPorSlide: number;
   onComplete: () => void;
   config: any;
+  categoriasFiltro?: string[];
 }
 
-export default function EncartePrecos({ duracao, itensPorSlide, onComplete, config }: EncarteProps) {
+export default function EncartePrecos({ duracao, itensPorSlide, onComplete, config, categoriasFiltro }: EncarteProps) {
   const [slides, setSlides] = useState<any[][]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const API_URL = getApiUrl();
+
+  const filterKey = JSON.stringify(categoriasFiltro);
 
   useEffect(() => {
     fetch(`${API_URL}/api/toledo/produtos`)
@@ -21,7 +24,18 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
       .then(data => {
         // Filter out items with price = 0 if configured to do so
         const ocultarEmFalta = config.toledo_ocultar_em_falta === '1' || config.toledo_ocultar_em_falta === true;
-        const filteredData = ocultarEmFalta ? data.filter((p: any) => p.preco > 0) : data;
+        let filteredData = ocultarEmFalta ? data.filter((p: any) => p.preco > 0) : data;
+
+        // Apply category filter if provided
+        if (categoriasFiltro && categoriasFiltro.length > 0) {
+          filteredData = filteredData.filter((p: any) => {
+            const productCat = (p.categoria || '').trim().toLowerCase();
+            return categoriasFiltro.some(filterCat => {
+              const fCat = filterCat.trim().toLowerCase();
+              return productCat === fCat || productCat.includes(fCat) || fCat.includes(productCat);
+            });
+          });
+        }
 
         // Group by category
         const grouped = filteredData.reduce((acc: any, p: any) => {
@@ -89,7 +103,7 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
         setSlides(newSlides);
       })
       .catch(console.error);
-  }, [API_URL, itensPorSlide, config.toledo_ocultar_em_falta]);
+  }, [API_URL, itensPorSlide, config.toledo_ocultar_em_falta, filterKey]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -273,19 +287,29 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
                           : (idx % 2 === 0 ? 'bg-white/[0.04]' : 'bg-white/[0.08]')
                       }`}
                     >
-                      <span className={`font-bold line-clamp-2 pr-4 flex-1 leading-tight tracking-wide ${
-                        produto.preco === 0 ? 'text-white/40' : group.isOferta ? 'text-red-100' : 'text-white'
-                      }`} style={{ fontSize: config.toledo_fonte_descricao || '1.25rem' }}>
-                        {produto.descricao.replace(/\*|OFERTA/gi, '').trim()}
-                      </span>
-                      <div className="flex items-baseline gap-1 shrink-0">
+                      <div className={`flex-1 pr-4 ${config.toledo_fonte_descricao === 'auto' ? '@container' : ''}`}>
+                        <span className={`font-bold leading-tight tracking-wide block ${
+                          produto.preco === 0 ? 'text-white/40' : group.isOferta ? 'text-red-100' : 'text-white'
+                        } ${config.toledo_fonte_descricao === 'auto' ? '' : 'line-clamp-2'}`} style={{ 
+                          fontSize: config.toledo_fonte_descricao === 'auto' 
+                            ? `clamp(0.85rem, calc(300cqi / ${Math.max(12, produto.descricao.length)}), 2.5rem)` 
+                            : config.toledo_fonte_descricao || '1.25rem' 
+                        }}>
+                          {produto.descricao.replace(/\*|OFERTA/gi, '').trim()}
+                        </span>
+                      </div>
+                      <div className={`flex items-baseline gap-1 shrink-0 ${config.toledo_fonte_preco === 'auto' ? '@container' : ''}`}>
                         {produto.preco === 0 ? (
                           <span className="text-gray-400 font-extrabold tracking-tight drop-shadow-sm uppercase" style={{ fontSize: 'clamp(0.8rem, calc(var(--price-font) * 0.55), 2.5rem)' }}>
                             PRODUTO EM FALTA 🥲
                           </span>
                         ) : (
                           <>
-                            <span className={`${group.isOferta ? 'text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.8)]' : accentClass} font-black tracking-tighter drop-shadow-sm`} style={{ fontSize: 'var(--price-font)' }}>
+                            <span className={`${group.isOferta ? 'text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.8)]' : accentClass} font-black tracking-tighter drop-shadow-sm`} style={{ 
+                                fontSize: config.toledo_fonte_preco === 'auto' 
+                                  ? `clamp(1rem, calc(150cqi / ${Math.max(5, formatPreco(produto.preco).length)}), 4rem)`
+                                  : 'var(--price-font)' 
+                            }}>
                               {formatPreco(produto.preco)}
                             </span>
                             <span className={`${group.isOferta ? 'text-red-400' : accentClass} opacity-60 font-bold uppercase`} style={{ fontSize: 'clamp(0.7rem, calc(var(--price-font) * 0.3), 3rem)' }}>/kg</span>

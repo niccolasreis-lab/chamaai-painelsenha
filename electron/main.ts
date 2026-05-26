@@ -231,34 +231,23 @@ ipcMain.handle('install-update', async () => {
   try {
     console.log('[UPDATE] Iniciando procedimento de limpeza para instalação...');
     
-    // 1. Desliga graciosamente todos os processos, watchers e conexões de banco locais
+    // 1. Desliga graciosamente o servidor local e conexões de banco
     try { stopServer(); } catch(e) { console.error('Erro no stopServer:', e); }
 
-    // 2. Mata processos zumbis que possam travar arquivos (usando PowerShell para evitar o próprio PID)
+    // 2. Mata apenas processos Node.js zumbis que estejam prendendo a porta 3000 (Sem matar o renderer da UI!)
     const { execSync } = require('child_process');
     const currentPid = process.pid;
-    const commands = [
-      `powershell -NoProfile -Command "Get-Process | Where-Object { ($_.ProcessName -like '*ChamaA*') -and ($_.Id -ne ${currentPid}) } | Stop-Process -Force"`,
-      `powershell -NoProfile -Command "Get-Process | Where-Object { ($_.ProcessName -like '*chamaai-novo*') -and ($_.Id -ne ${currentPid}) } | Stop-Process -Force"`,
-      `powershell -NoProfile -Command "Get-Process | Where-Object { ($_.CommandLine -match 'chamaai') -and ($_.Id -ne ${currentPid}) } | Stop-Process -Force"`
-    ];
+    try { 
+      execSync(`powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | Where-Object { $_ -ne ${currentPid} } | Get-Process -ErrorAction SilentlyContinue | Stop-Process -Force -EA 0"`, { windowsHide: true }); 
+    } catch (e) {}
 
-    commands.forEach(cmd => {
-      try { execSync(cmd, { windowsHide: true }); } catch (e) { /* Silencioso se não encontrar */ }
-    });
-
-    // 3. Força o encerramento das janelas
-    app.removeAllListeners('window-all-closed');
-    BrowserWindow.getAllWindows().forEach(win => {
-      win.removeAllListeners('close');
-      win.destroy();
-    });
-
-    // 4. Pequeno delay para o SO liberar os descritores de arquivo (incluindo SQLite e SQLite WAL)
+    // 3. Chama o quitAndInstall
+    // false = não é silencioso (mostra a interface do instalador para o usuário ver o progresso)
+    // true = forceRunAfter (inicia o app automaticamente depois de instalar)
     setTimeout(() => {
       console.log('[UPDATE] Chamando quitAndInstall...');
-      autoUpdater.quitAndInstall(true, true);
-    }, 2500);
+      autoUpdater.quitAndInstall(false, true);
+    }, 1500);
     
     return { success: true };
   } catch (err: any) {

@@ -76,3 +76,18 @@ INSERT OR IGNORE INTO balcoes (id, nome, prefixo_senha, preferencial_ativo) VALU
 
 -- Admin Padrão (senha: admin)
 INSERT OR IGNORE INTO operadores (id, nome, login, senha_hash, perfil) VALUES (1, 'Administrador', 'admin', 'admin', 'admin');
+
+-- Telões configurados por código (Musardos)
+CREATE TABLE IF NOT EXISTS teloes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT UNIQUE NOT NULL,
+  nome TEXT,
+  status TEXT DEFAULT 'pendente',
+  modulo_painel INTEGER DEFAULT 0,
+  modulo_encarte INTEGER DEFAULT 0,
+  modulo_midia INTEGER DEFAULT 0,
+  encarte_categorias TEXT DEFAULT '',
+  criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+  vinculado_em DATETIME
+);
+
