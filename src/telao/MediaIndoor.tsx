@@ -160,13 +160,20 @@ export default function MediaIndoor() {
     }
   }, [midias.length]);
 
-  // Handle Image timer (Videos handle themselves via onEnded)
+  // Handle Image timer & Video Watchdog safety timer
   useEffect(() => {
     if (midias.length > 0 && showMedia && !showingEncarte) {
       const current = midias[activeMidiaIndex];
       if (current.tipo === 'imagem') {
         const timer = setTimeout(nextMedia, 10000); // 10s for images
         return () => clearTimeout(timer);
+      } else if (current.tipo === 'video') {
+        // Watchdog: Se o vídeo travar ou demorar mais de 60s, força a transição para evitar telas congeladas no cliente
+        const watchdogTimer = setTimeout(() => {
+          console.warn('[MEDIA WATCHDOG] Vídeo travou ou excedeu tempo limite. Avançando...');
+          nextMedia();
+        }, 60000); // 60 segundos de limite
+        return () => clearTimeout(watchdogTimer);
       }
     } else if (midias.length === 0 && encarteEnabled && !showingEncarte && showMedia) {
       // No media at all but encarte is enabled — show it after a brief delay
@@ -251,6 +258,13 @@ export default function MediaIndoor() {
                     muted
                     loop={midias.length === 1 && !encarteEnabled}
                     onEnded={nextMedia}
+                    onError={(e) => {
+                      console.error('[MEDIA ERROR] Erro na reprodução do vídeo. Pulando...', e);
+                      nextMedia();
+                    }}
+                    onStalled={() => {
+                      console.warn('[MEDIA STALL] Reprodução do vídeo estagnada.');
+                    }}
                     playsInline
                     preload="auto"
                   />
@@ -260,6 +274,10 @@ export default function MediaIndoor() {
                     src={`${API_URL}${activeMidia.caminho}`} 
                     alt={activeMidia.nome}
                     className="w-full h-full object-contain"
+                    onError={(e) => {
+                      console.error('[MEDIA ERROR] Erro ao carregar imagem. Pulando...', e);
+                      nextMedia();
+                    }}
                   />
                 )}
               </div>

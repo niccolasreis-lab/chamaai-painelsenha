@@ -105,8 +105,14 @@ export function startServer() {
     limits: { fileSize: 500 * 1024 * 1024 } // Limite rígido de 500MB
   });
 
-  // Serve static files from uploads folder
-  app.use('/uploads', express.static(UPLOADS_DIR));
+  // Serve static files from uploads folder with aggressive caching to avoid client media freezing
+  app.use('/uploads', express.static(UPLOADS_DIR, {
+    maxAge: 31536000000, // 1 year in milliseconds
+    immutable: true,
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  }));
 
   // Serve frontend static files from dist folder
   const DIST_DIR = path.join(__dirname, '../../dist');
