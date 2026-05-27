@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import SenhaChamada from './SenhaChamada';
 import EncartePrecos from './EncartePrecos';
 import EncarteGranel from './EncarteGranel';
@@ -28,6 +28,8 @@ export default function MediaIndoor() {
   const [config, setConfig] = useState<any>({});
   const [pessoasAguardando, setPessoasAguardando] = useState(0);
 
+  const videoRef = useRef<HTMLVideoElement>(null);
+  
   const API_URL = getApiUrl();
 
   // Initialize display session
@@ -251,10 +253,11 @@ export default function MediaIndoor() {
         const timer = setTimeout(nextMedia, 10000);
         return () => clearTimeout(timer);
       } else if (current.tipo === 'video') {
+        // Fallback watchdog case the video completely freezes and onEnded never fires
         const watchdogTimer = setTimeout(() => {
-          console.warn('[MEDIA WATCHDOG] Vídeo travou. Avançando...');
+          console.warn('[MEDIA WATCHDOG] Vídeo não completou no tempo esperado. Avançando...');
           nextMedia();
-        }, 60000);
+        }, 120000); // 2 minutos máximo por vídeo
         return () => clearTimeout(watchdogTimer);
       }
     } else if (midias.length === 0 && activeModules.includes('encarte') && !showingEncarte && showMedia) {
@@ -262,6 +265,15 @@ export default function MediaIndoor() {
       return () => clearTimeout(timer);
     }
   }, [activeMidiaIndex, midias, showMedia, showingEncarte, activeModules, nextMedia]);
+
+  // Ensure video element reloads and plays when src changes or when recovering from senha overlay
+  useEffect(() => {
+    if (showMedia && activeMidia && activeMidia.tipo === 'video' && videoRef.current) {
+      // We do not call load() blindly because it resets the video if it's the same src.
+      // But we always ensure it's playing if showMedia is true.
+      videoRef.current.play().catch(e => console.warn('Autoplay bloqueado pelo navegador:', e));
+    }
+  }, [activeMidia, showMedia]);
 
   // Apply real-time consolidated waiting count
   useEffect(() => {
@@ -360,13 +372,21 @@ export default function MediaIndoor() {
               <div className="h-full w-full animate-fade-in relative">
                 {activeMidia.tipo === 'video' ? (
                   <video 
-                    key={`${activeMidia.id}-${activeMidiaIndex}`}
+                    ref={videoRef}
                     src={`${API_URL}${activeMidia.caminho}`} 
                     className="w-full h-full object-contain"
                     autoPlay
                     muted
                     loop={midias.length === 1 && !activeModules.includes('encarte')}
                     onEnded={nextMedia}
+                    onPause={(e) => {
+                      // Se o vídeo for pausado pelo SO durante o toque da campainha e ainda não acabou
+                      const video = e.target as HTMLVideoElement;
+                      if (!video.ended && showMedia) {
+                        console.warn('[MEDIA] Vídeo pausado inesperadamente (provavelmente ducking de áudio). Forçando play...');
+                        video.play().catch(() => {});
+                      }
+                    }}
                     onError={(e) => {
                       console.error('[MEDIA ERROR] Erro na reprodução do vídeo. Pulando...', e);
                       nextMedia();
