@@ -268,12 +268,13 @@ export default function MediaIndoor() {
 
   // Ensure video element reloads and plays when src changes or when recovering from senha overlay
   useEffect(() => {
-    if (showMedia && activeMidia && activeMidia.tipo === 'video' && videoRef.current) {
+    const currentMidia = midias[activeMidiaIndex];
+    if (showMedia && currentMidia && currentMidia.tipo === 'video' && videoRef.current) {
       // We do not call load() blindly because it resets the video if it's the same src.
       // But we always ensure it's playing if showMedia is true.
       videoRef.current.play().catch(e => console.warn('Autoplay bloqueado pelo navegador:', e));
     }
-  }, [activeMidia, showMedia]);
+  }, [midias, activeMidiaIndex, showMedia]);
 
   // Apply real-time consolidated waiting count
   useEffect(() => {
