@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getApiUrl } from '../shared/apiConfig';
 
 interface TelaoEsperaProps {
@@ -7,6 +7,7 @@ interface TelaoEsperaProps {
 
 export default function TelaoEspera({ code }: TelaoEsperaProps) {
   const [config, setConfig] = useState<any>({});
+  const [copied, setCopied] = useState(false);
   const API_URL = getApiUrl();
 
   useEffect(() => {
@@ -23,6 +24,35 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
     };
     fetchConfig();
   }, [API_URL]);
+
+  const handleCopy = useCallback(async () => {
+    if (!code) return;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(code);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = code;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+          document.execCommand('copy');
+        } catch (error) {
+          console.error('Fallback copy failed', error);
+        } finally {
+          textArea.remove();
+        }
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Falha ao copiar código:', err);
+    }
+  }, [code]);
 
   return (
     <div className="h-screen w-screen bg-[#041a14] text-white flex flex-col items-center justify-center p-8 relative overflow-hidden font-sans select-none">
@@ -63,12 +93,18 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
 
         {/* Code Display Area */}
         <div className="flex flex-col items-center gap-3 w-full">
-          <span className="text-white/50 text-xs font-black uppercase tracking-[0.3em]">Código de Vinculação</span>
+          <span className={`text-xs font-black uppercase tracking-[0.3em] transition-all duration-300 ${copied ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'text-white/50'}`}>
+            {copied ? 'Código Copiado!' : 'Código de Vinculação'}
+          </span>
           
           {/* Giant Monospace Glowing Code */}
-          <div className="bg-black/40 border border-white/10 rounded-[32px] px-12 py-6 relative overflow-hidden shadow-inner group">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <span className="font-mono text-[7.5rem] font-black tracking-[0.1em] text-transparent bg-clip-text bg-gradient-to-b from-white to-white/90 drop-shadow-[0_0_30px_rgba(52,211,153,0.3)] pl-4">
+          <div 
+            onClick={handleCopy}
+            title="Clique para copiar o código"
+            className={`bg-black/40 border rounded-[32px] px-12 py-6 relative overflow-hidden shadow-inner group cursor-pointer transition-all duration-300 active:scale-[0.98] ${copied ? 'border-emerald-500/50 bg-black/60' : 'border-white/10 hover:border-emerald-500/30 hover:bg-black/60'}`}
+          >
+            <div className={`absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 transition-opacity duration-300 ${copied ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}></div>
+            <span className="font-mono text-[7.5rem] font-black tracking-[0.1em] text-transparent bg-clip-text bg-gradient-to-b from-white to-white/90 drop-shadow-[0_0_30px_rgba(52,211,153,0.3)] pl-4 pointer-events-none">
               {code}
             </span>
           </div>

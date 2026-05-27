@@ -9,8 +9,49 @@ import { getDb } from '../electron/services/database';
 import { startToledoWatcher, forceToledoRefresh, reloadCategorias, setBroadcastFn } from './toledo-watcher';
 import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica, startSyncWorker, stopSyncWorker } from './supabase-sync';
 import { migrateDatabaseAndConfigs } from './categorizador';
+import crypto from 'crypto';
 
 const app = express();
+
+// --- MASTER REMOTO: Rate Limiting (Anti-Brute Force) ---
+const loginAttempts = new Map<string, { count: number; blockedUntil: number }>();
+const MAX_LOGIN_ATTEMPTS = 5;
+const BLOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutos
+
+function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
+  const usedSalt = salt || crypto.randomBytes(32).toString('hex');
+  const derivedKey = crypto.scryptSync(password, usedSalt, 64);
+  return { hash: derivedKey.toString('hex'), salt: usedSalt };
+}
+
+function verifyPassword(password: string, storedHash: string, storedSalt: string): boolean {
+  const { hash } = hashPassword(password, storedSalt);
+  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(storedHash, 'hex'));
+}
+
+function isRateLimited(ip: string): boolean {
+  const record = loginAttempts.get(ip);
+  if (!record) return false;
+  if (Date.now() < record.blockedUntil) return true;
+  if (Date.now() >= record.blockedUntil && record.count >= MAX_LOGIN_ATTEMPTS) {
+    loginAttempts.delete(ip);
+    return false;
+  }
+  return false;
+}
+
+function recordFailedAttempt(ip: string): void {
+  const record = loginAttempts.get(ip) || { count: 0, blockedUntil: 0 };
+  record.count++;
+  if (record.count >= MAX_LOGIN_ATTEMPTS) {
+    record.blockedUntil = Date.now() + BLOCK_DURATION_MS;
+  }
+  loginAttempts.set(ip, record);
+}
+
+function clearFailedAttempts(ip: string): void {
+  loginAttempts.delete(ip);
+}
 
 // --- MASTER SERVER DETECTION (cache com TTL de 30s) ---
 let cachedLocalIPs: Set<string> | null = null;
@@ -46,27 +87,65 @@ function isRequestLocal(req: express.Request): boolean {
 
 // Middleware: injeta header X-Is-Master em todas as respostas
 function injectMasterHeader(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const isMaster = isRequestLocal(req);
+  let isMaster = isRequestLocal(req);
+  
+  // Also check remote token
+  if (!isMaster) {
+    const token = req.headers['x-master-token'] as string;
+    if (token) {
+      try {
+        const db = getDb();
+        const session = db.prepare(
+          "SELECT * FROM tokens_remotos WHERE token = ? AND expira_em > datetime('now', 'localtime')"
+        ).get(token) as any;
+        if (session) isMaster = true;
+      } catch (err) {}
+    }
+  }
+  
+  // Check if master password exists
+  let hasMasterPassword = false;
+  try {
+    const db = getDb();
+    const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'master_remoto_hash'").get() as any;
+    hasMasterPassword = !!(row && row.valor);
+  } catch (err) {}
+  
   res.setHeader('X-Is-Master', isMaster ? 'true' : 'false');
+  res.setHeader('X-Has-Master-Password', hasMasterPassword ? 'true' : 'false');
   next();
 }
 
 // Middleware guard: bloqueia escrita administrativa de clientes remotos
 function requireMaster(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!isRequestLocal(req)) {
-    console.warn(`[SECURITY] ⛔ Tentativa de escrita admin bloqueada do IP: ${req.ip}`);
-    return res.status(403).json({ 
-      error: 'Acesso negado. Alterações administrativas só podem ser feitas no Servidor Master.',
-      isMaster: false 
-    });
+  // Acesso local sempre permitido
+  if (isRequestLocal(req)) return next();
+  
+  // Verifica token remoto
+  const token = req.headers['x-master-token'] as string;
+  if (token) {
+    try {
+      const db = getDb();
+      const session = db.prepare(
+        "SELECT * FROM tokens_remotos WHERE token = ? AND expira_em > datetime('now', 'localtime')"
+      ).get(token) as any;
+      if (session) return next();
+    } catch (err) {
+      console.error('[MASTER REMOTO] Erro ao validar token:', err);
+    }
   }
-  next();
+  
+  console.warn(`[SECURITY] ⛔ Tentativa de escrita admin bloqueada do IP: ${req.ip}`);
+  return res.status(403).json({ 
+    error: 'Acesso negado. Alterações administrativas só podem ser feitas no Servidor Master.',
+    isMaster: false 
+  });
 }
 
 app.use(cors({
   origin: true,
   credentials: true,
-  exposedHeaders: ['X-Is-Master']
+  exposedHeaders: ['X-Is-Master', 'X-Has-Master-Password']
 }));
 app.use(injectMasterHeader);
 app.use(express.json({ limit: '50mb' }));
@@ -167,8 +246,157 @@ export function startServer() {
 
   // --- Admin Status Endpoint ---
   app.get('/api/admin/status', (req, res) => {
-    const isMaster = isRequestLocal(req);
-    res.json({ isMaster, clientIP: req.ip });
+    const isMasterLocal = isRequestLocal(req);
+    let isMasterRemote = false;
+    let hasMasterPassword = false;
+    
+    // Check if remote token is valid
+    const token = req.headers['x-master-token'] as string;
+    if (token) {
+      try {
+        const db = getDb();
+        const session = db.prepare(
+          "SELECT * FROM tokens_remotos WHERE token = ? AND expira_em > datetime('now', 'localtime')"
+        ).get(token) as any;
+        if (session) isMasterRemote = true;
+      } catch (err) {}
+    }
+    
+    // Check if master password has been configured
+    try {
+      const db = getDb();
+      const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'master_remoto_hash'").get() as any;
+      hasMasterPassword = !!(row && row.valor);
+    } catch (err) {}
+    
+    res.json({ 
+      isMaster: isMasterLocal || isMasterRemote, 
+      isMasterLocal,
+      isMasterRemote,
+      hasMasterPassword,
+      clientIP: req.ip 
+    });
+  });
+
+  // --- MASTER REMOTO: Autenticação ---
+  app.post('/api/admin/auth-master', (req, res) => {
+    const clientIP = req.ip || req.socket.remoteAddress || 'unknown';
+    
+    // Rate limiting check
+    if (isRateLimited(clientIP)) {
+      return res.status(429).json({ 
+        error: 'Muitas tentativas. Tente novamente em 15 minutos.',
+        blockedUntil: loginAttempts.get(clientIP)?.blockedUntil 
+      });
+    }
+    
+    const { senha } = req.body;
+    if (!senha || typeof senha !== 'string') {
+      return res.status(400).json({ error: 'Senha não informada.' });
+    }
+    
+    try {
+      const db = getDb();
+      const hashRow = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'master_remoto_hash'").get() as any;
+      const saltRow = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'master_remoto_salt'").get() as any;
+      
+      if (!hashRow || !saltRow || !hashRow.valor || !saltRow.valor) {
+        return res.status(403).json({ error: 'Senha de acesso remoto não configurada. Configure no Servidor Master.' });
+      }
+      
+      const valido = verifyPassword(senha, hashRow.valor, saltRow.valor);
+      if (!valido) {
+        recordFailedAttempt(clientIP);
+        const record = loginAttempts.get(clientIP);
+        const remaining = MAX_LOGIN_ATTEMPTS - (record?.count || 0);
+        return res.status(401).json({ 
+          error: `Senha incorreta. ${remaining > 0 ? `${remaining} tentativa(s) restante(s).` : 'IP bloqueado por 15 minutos.'}` 
+        });
+      }
+      
+      // Gera token de sessão
+      clearFailedAttempts(clientIP);
+      const token = crypto.randomBytes(48).toString('hex');
+      const TTL_HOURS = 12;
+      
+      // Cria tabela se não existir
+      db.exec(`CREATE TABLE IF NOT EXISTS tokens_remotos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        token TEXT UNIQUE NOT NULL,
+        ip_origem TEXT,
+        criado_em TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        expira_em TEXT NOT NULL
+      )`);
+      
+      // Limpa tokens expirados
+      db.prepare("DELETE FROM tokens_remotos WHERE expira_em <= datetime('now', 'localtime')").run();
+      
+      // Insere novo token
+      db.prepare(
+        "INSERT INTO tokens_remotos (token, ip_origem, expira_em) VALUES (?, ?, datetime('now', 'localtime', '+' || ? || ' hours'))"
+      ).run(token, clientIP, TTL_HOURS);
+      
+      console.log(`[MASTER REMOTO] ✅ Sessão criada para IP: ${clientIP}`);
+      res.json({ token, expiresInHours: TTL_HOURS });
+    } catch (err: any) {
+      console.error('[MASTER REMOTO] Erro na autenticação:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- MASTER REMOTO: Logout (Revogar Token) ---
+  app.post('/api/admin/logout-master', (req, res) => {
+    const token = req.headers['x-master-token'] as string;
+    if (!token) return res.status(400).json({ error: 'Token não informado.' });
+    
+    try {
+      const db = getDb();
+      db.prepare("DELETE FROM tokens_remotos WHERE token = ?").run(token);
+      console.log(`[MASTER REMOTO] 🔒 Token revogado pelo IP: ${req.ip}`);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- MASTER REMOTO: Definir/Alterar Senha ---
+  app.post('/api/admin/set-master-password', (req, res) => {
+    // Apenas localhost OU portador de token válido pode definir/alterar senha
+    const isLocal = isRequestLocal(req);
+    const token = req.headers['x-master-token'] as string;
+    let isRemoteAuth = false;
+    
+    if (token) {
+      try {
+        const db = getDb();
+        const session = db.prepare(
+          "SELECT * FROM tokens_remotos WHERE token = ? AND expira_em > datetime('now', 'localtime')"
+        ).get(token) as any;
+        if (session) isRemoteAuth = true;
+      } catch (err) {}
+    }
+    
+    if (!isLocal && !isRemoteAuth) {
+      return res.status(403).json({ error: 'Apenas o servidor master ou uma sessão autenticada pode alterar a senha.' });
+    }
+    
+    const { senha } = req.body;
+    if (!senha || typeof senha !== 'string' || senha.length < 6) {
+      return res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres.' });
+    }
+    
+    try {
+      const db = getDb();
+      const { hash, salt } = hashPassword(senha);
+      
+      db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('master_remoto_hash', ?, datetime('now'))").run(hash);
+      db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('master_remoto_salt', ?, datetime('now'))").run(salt);
+      
+      console.log(`[MASTER REMOTO] 🔐 Senha de acesso remoto ${isLocal ? 'definida' : 'alterada'} com sucesso.`);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.get('/api/network-info', (req, res) => {
@@ -1322,6 +1550,19 @@ export function startServer() {
         reloadCategorias();
       } catch (migErr: any) {
         console.error('[STARTUP] Erro ao executar migração de categorias:', migErr.message);
+      }
+
+      // Garante que a tabela de tokens remotos existe
+      try {
+        db.exec(`CREATE TABLE IF NOT EXISTS tokens_remotos (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          token TEXT UNIQUE NOT NULL,
+          ip_origem TEXT,
+          criado_em TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+          expira_em TEXT NOT NULL
+        )`);
+      } catch (e) {
+        console.error('[STARTUP] Erro ao criar tabela tokens_remotos:', e);
       }
       
       // 1. Sync public configuration options to Supabase

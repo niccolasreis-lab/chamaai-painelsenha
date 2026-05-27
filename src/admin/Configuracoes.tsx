@@ -10,6 +10,14 @@ export default function Configuracoes() {
   const [printers, setPrinters] = useState<any[]>([]);
   const [backups, setBackups] = useState<any[]>([]);
   const [isMasterServer, setIsMasterServer] = useState(true);
+  const [hasMasterPassword, setHasMasterPassword] = useState(false);
+  const [showMasterLogin, setShowMasterLogin] = useState(false);
+  const [masterPassword, setMasterPassword] = useState('');
+  const [masterLoginError, setMasterLoginError] = useState('');
+  const [masterLoginLoading, setMasterLoginLoading] = useState(false);
+  const [isMasterRemote, setIsMasterRemote] = useState(false);
+  const [newMasterPwd, setNewMasterPwd] = useState('');
+  const [masterPwdMsg, setMasterPwdMsg] = useState('');
   const API_URL = getApiUrl();
   const [config, setConfig] = useState<Record<string, string>>({
     tempo_destaque_senha: '5',
@@ -66,9 +74,72 @@ export default function Configuracoes() {
       if (res.ok) {
         const data = await res.json();
         setIsMasterServer(data.isMaster);
+        setHasMasterPassword(data.hasMasterPassword || false);
+        setIsMasterRemote(data.isMasterRemote || false);
       }
     } catch (err) {
       console.error('Erro ao verificar status de admin:', err);
+    }
+  };
+
+  const handleMasterLogin = async () => {
+    setMasterLoginLoading(true);
+    setMasterLoginError('');
+    try {
+      const res = await fetch(`${API_URL}/api/admin/auth-master`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha: masterPassword }),
+      });
+      const data = await res.json();
+      if (res.ok && data.token) {
+        localStorage.setItem('master_remote_token', data.token);
+        window.location.reload();
+      } else {
+        setMasterLoginError(data.error || 'Erro ao autenticar.');
+      }
+    } catch (err) {
+      setMasterLoginError('Erro de conexão com o servidor.');
+    } finally {
+      setMasterLoginLoading(false);
+    }
+  };
+
+  const handleMasterLogout = async () => {
+    try {
+      const token = localStorage.getItem('master_remote_token');
+      if (token) {
+        await fetch(`${API_URL}/api/admin/logout-master`, {
+          method: 'POST',
+          headers: { 'X-Master-Token': token },
+        });
+      }
+    } catch (err) {}
+    localStorage.removeItem('master_remote_token');
+    window.location.reload();
+  };
+
+  const handleSetMasterPassword = async () => {
+    if (!newMasterPwd || newMasterPwd.length < 6) {
+      setMasterPwdMsg('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/api/admin/set-master-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha: newMasterPwd }),
+      });
+      if (res.ok) {
+        setMasterPwdMsg('✅ Senha de acesso remoto definida com sucesso!');
+        setNewMasterPwd('');
+        setHasMasterPassword(true);
+      } else {
+        const data = await res.json();
+        setMasterPwdMsg(`❌ ${data.error}`);
+      }
+    } catch (err) {
+      setMasterPwdMsg('❌ Erro de conexão.');
     }
   };
 
@@ -311,12 +382,69 @@ export default function Configuracoes() {
               <div className="flex-shrink-0">
                 <AlertTriangle className="h-6 w-6 text-red-500" />
               </div>
-              <div className="ml-3">
+              <div className="ml-3 flex-1">
                 <h3 className="text-lg font-bold text-red-800 uppercase tracking-wider">Acesso Restrito: Modo Leitura</h3>
                 <div className="mt-1 text-sm text-red-700">
                   <p>Você está acessando as configurações a partir de um dispositivo cliente. Alterações administrativas só podem ser realizadas no <b>Servidor Master</b> da loja para garantir a integridade dos dados e evitar conflitos de sincronização.</p>
                 </div>
+                {hasMasterPassword && !showMasterLogin ? (
+                  <button
+                    onClick={() => setShowMasterLogin(true)}
+                    className="mt-3 px-4 py-2 bg-red-100 border border-red-300 rounded-xl text-red-800 font-bold text-xs uppercase tracking-widest hover:bg-red-200 transition-all"
+                  >
+                    🔓 Desbloquear Acesso Remoto
+                  </button>
+                ) : hasMasterPassword && showMasterLogin ? (
+                  <div className="mt-3 flex flex-col gap-2 max-w-sm">
+                    <input
+                      type="password"
+                      placeholder="Senha Master Remoto"
+                      value={masterPassword}
+                      onChange={(e) => setMasterPassword(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleMasterLogin()}
+                      className="w-full bg-white border border-red-300 rounded-xl px-4 py-3 focus:outline-none focus:border-red-500 text-ink font-semibold"
+                      autoFocus
+                    />
+                    {masterLoginError && <p className="text-red-600 text-xs font-bold">{masterLoginError}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleMasterLogin}
+                        disabled={masterLoginLoading || !masterPassword}
+                        className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-red-700 transition-all disabled:opacity-50"
+                      >
+                        {masterLoginLoading ? 'Verificando...' : 'Entrar'}
+                      </button>
+                      <button
+                        onClick={() => { setShowMasterLogin(false); setMasterLoginError(''); setMasterPassword(''); }}
+                        className="px-4 py-2 bg-red-100 border border-red-300 rounded-xl text-red-800 font-bold text-xs uppercase tracking-widest hover:bg-red-200 transition-all"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Remote Session Active Banner */}
+        {isMasterRemote && (
+          <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 mb-6 rounded-r-xl shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-emerald-600">verified_user</span>
+                <div>
+                  <h3 className="text-sm font-bold text-emerald-800 uppercase tracking-wider">Sessão Master Remota Ativa</h3>
+                  <p className="text-xs text-emerald-600">Você tem permissão de administrador via acesso remoto.</p>
+                </div>
+              </div>
+              <button
+                onClick={handleMasterLogout}
+                className="px-4 py-2 bg-emerald-100 border border-emerald-300 rounded-xl text-emerald-800 font-bold text-xs uppercase tracking-widest hover:bg-emerald-200 transition-all"
+              >
+                Encerrar Sessão
+              </button>
             </div>
           </div>
         )}
@@ -1050,6 +1178,46 @@ export default function Configuracoes() {
             </div>
           </div>
           </div>
+
+          {/* Acesso Remoto Master — só visível para quem é master */}
+          {isMasterServer && (
+            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+              <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-primary">admin_panel_settings</span>
+                Acesso Remoto Master
+              </h2>
+              <div className="space-y-4">
+                <p className="text-sm text-ink-secondary font-medium">
+                  Defina uma senha para permitir que outros dispositivos na rede acessem o painel administrativo como Master.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    placeholder={hasMasterPassword ? 'Nova senha (min. 6 caracteres)' : 'Criar senha (min. 6 caracteres)'}
+                    value={newMasterPwd}
+                    onChange={(e) => setNewMasterPwd(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSetMasterPassword()}
+                    className="flex-1 bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold"
+                  />
+                  <button
+                    onClick={handleSetMasterPassword}
+                    className="px-6 py-3 bg-primary text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary-hover transition-all"
+                  >
+                    {hasMasterPassword ? 'Alterar' : 'Definir'}
+                  </button>
+                </div>
+                {masterPwdMsg && (
+                  <p className={`text-xs font-bold ${masterPwdMsg.startsWith('✅') ? 'text-success' : 'text-error'}`}>{masterPwdMsg}</p>
+                )}
+                <div className="flex items-center gap-2 mt-2">
+                  <span className={`w-2 h-2 rounded-full ${hasMasterPassword ? 'bg-success' : 'bg-outline-variant'}`}></span>
+                  <span className="text-xs text-ink-secondary font-bold uppercase tracking-wider">
+                    {hasMasterPassword ? 'Senha de acesso remoto configurada' : 'Nenhuma senha definida — acesso remoto desabilitado'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
         </fieldset>
       </div>
