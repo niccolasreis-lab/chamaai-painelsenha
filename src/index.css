@@ -127,3 +127,38 @@
   scrollbar-width: none;  /* Firefox */
 }
 
+/* Container de controle adaptativo e rotativo (ControleTouch) */
+.touch-container {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #f8fafc; /* bg-slate-50 */
+  display: flex;
+  flex-direction: column;
+  color: #0f172a; /* text-slate-900 */
+  padding: 1rem;
+  gap: 1rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  user-select: none;
+  overflow-y: auto;
+  touch-action: auto;
+}
+
+@media (min-width: 768px) {
+  .touch-container {
+    padding: 1.5rem;
+    gap: 1.5rem;
+  }
+}
+
+/* Apenas trava a tela e esconde o scroll se a tela for grande o suficiente (Tablets deitados e TVs) */
+@media (min-width: 768px) and (min-height: 650px) {
+  .touch-container {
+    position: fixed;
+    inset: 0;
+    height: 100vh;
+    flex-direction: row;
+    overflow: hidden;
+    touch-action: none;
+  }
+}
+

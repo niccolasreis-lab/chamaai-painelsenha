@@ -144,6 +144,7 @@ async function processSyncQueue() {
 
     const processedIds: number[] = [];
     const failedIds: number[] = [];
+    let networkErrorOccurred = false;
 
     for (const item of items) {
       try {
@@ -173,8 +174,27 @@ async function processSyncQueue() {
         }
 
         processedIds.push(item.id);
-      } catch (err) {
-        // Falha de rede ou erro do Supabase — incrementa tentativas
+      } catch (err: any) {
+        const errMessage = err?.message || String(err);
+        const errCode = err?.code || '';
+        
+        // Detecta falhas de infraestrutura (rede, timeout, dns)
+        const isNetworkError = 
+          errMessage.includes('fetch failed') ||
+          errMessage.includes('NetworkError') ||
+          errMessage.includes('Failed to fetch') ||
+          errCode === 'UND_ERR_CONNECT_TIMEOUT' ||
+          errCode === 'ENOTFOUND' ||
+          errCode === 'ECONNREFUSED' ||
+          errCode === 'ETIMEDOUT';
+
+        if (isNetworkError) {
+          console.warn('[SYNC WORKER] 🌐 Falha de rede detectada. Pausando fila temporariamente...');
+          networkErrorOccurred = true;
+          break; // Sai do loop para não penalizar as outras mensagens e pausa a fila
+        }
+
+        // Outros erros (ex: erro de schema, permissão, etc) — incrementa tentativas do item específico
         failedIds.push(item.id);
       }
     }
@@ -193,13 +213,17 @@ async function processSyncQueue() {
       console.log(`[SYNC WORKER] ⚠️ ${failedIds.length} operações falharam (tentando novamente depois)`);
     }
 
-    // Remove itens que excederam o limite de tentativas (evita acúmulo infinito)
-    const expired = db.prepare(
-      'DELETE FROM supabase_sync_queue WHERE tentativas >= max_tentativas RETURNING id, tabela, acao'
-    ).all() as any[];
-    if (expired.length > 0) {
-      console.error(`[SYNC WORKER] ❌ ${expired.length} operações descartadas após exceder tentativas:`, 
-        expired.map((e: any) => `${e.tabela}/${e.acao}`).join(', '));
+    // Evita expirar itens se o problema for de rede, pois as tentativas falsamente aumentaram em sessões passadas.
+    // Assim que a rede voltar, networkErrorOccurred será false e os descartes corretos acontecerão.
+    if (!networkErrorOccurred) {
+      // Remove itens que excederam o limite de tentativas (evita acúmulo infinito)
+      const expired = db.prepare(
+        'DELETE FROM supabase_sync_queue WHERE tentativas >= max_tentativas RETURNING id, tabela, acao'
+      ).all() as any[];
+      if (expired.length > 0) {
+        console.error(`[SYNC WORKER] ❌ ${expired.length} operações descartadas após exceder tentativas:`, 
+          expired.map((e: any) => `${e.tabela}/${e.acao}`).join(', '));
+      }
     }
 
   } catch (err) {
@@ -347,12 +371,25 @@ export function startSupabaseCommandListener() {
 
 export function stopSupabaseCommandListener() {
   if (realtimeChannel) {
-    supabase.removeChannel(realtimeChannel);
+    try {
+      supabase.removeChannel(realtimeChannel);
+    } catch (e) {}
     realtimeChannel = null;
   }
   if (fallbackTimer) {
     clearInterval(fallbackTimer);
     fallbackTimer = null;
   }
+  
+  // Desconectar explicitamente o WebSocket do Supabase para evitar manter o event loop ativo
+  try {
+    if (supabase && supabase.realtime && typeof supabase.realtime.disconnect === 'function') {
+      supabase.realtime.disconnect();
+      console.log('[SUPABASE CMD] Conexão WebSocket Realtime desconectada.');
+    }
+  } catch (e) {
+    console.error('Erro ao desconectar Realtime do Supabase:', e);
+  }
+
   console.log('[SUPABASE CMD] Listener Realtime encerrado.');
 }

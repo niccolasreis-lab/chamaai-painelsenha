@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { app } from 'electron';
+import * as QRCode from 'qrcode';
 
 const execAsync = promisify(exec);
 
@@ -139,7 +140,7 @@ export class PrinterService {
   private async printReal(data: TicketData): Promise<{ success: boolean; error?: string }> {
     console.log(`[PrinterService] Preparando ticket (Modo Nativo) para: ${this.config.interface}`);
 
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       try {
         this.initPrintWindow();
 
@@ -213,7 +214,12 @@ export class PrinterService {
               ? portalBase + '#/?ticket=' + tId
               : portalBase + '/#/?ticket=' + tId;
           }
-          qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(portalComTicket)}`;
+          try {
+            // Gera o QR Code localmente e retorna como Data URL (base64)
+            qrCodeUrl = await QRCode.toDataURL(portalComTicket, { margin: 1, width: 100 });
+          } catch (e) {
+            console.error('[PrinterService] Erro ao gerar QR Code local:', e);
+          }
         }
 
         // Layout otimizado para Impressoras Térmicas (Custom K80, Epson, etc)

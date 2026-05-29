@@ -229,26 +229,11 @@ ipcMain.handle('check-for-updates', async () => {
 ipcMain.handle('install-update', async () => {
   if (!app.isPackaged) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
   try {
-    console.log('[UPDATE] Iniciando procedimento de limpeza para instalação...');
+    console.log('[UPDATE] Solicitando quitAndInstall silencioso...');
     
-    // 1. Desliga graciosamente o servidor local e conexões de banco
-    try { stopServer(); } catch(e) { console.error('Erro no stopServer:', e); }
-
-    // 2. Mata apenas processos Node.js zumbis que estejam prendendo a porta 3000 (Sem matar o renderer da UI!)
-    const { execSync } = require('child_process');
-    const currentPid = process.pid;
-    try { 
-      execSync(`powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | Where-Object { $_ -ne ${currentPid} } | Get-Process -ErrorAction SilentlyContinue | Stop-Process -Force -EA 0"`, { windowsHide: true }); 
-    } catch (e) {}
-
-    // 3. Chama o quitAndInstall
-    // false = não é silencioso (mostra a interface do instalador para o usuário ver o progresso)
-    // true = forceRunAfter (inicia o app automaticamente depois de instalar)
-    setTimeout(() => {
-      console.log('[UPDATE] Chamando quitAndInstall...');
-      autoUpdater.quitAndInstall(false, true);
-    }, 1500);
-    
+    // Chama o instalador silencioso (true) e força o reinício depois (true)
+    // O instalador NSIS em background vai chamar o taskkill se necessário.
+    autoUpdater.quitAndInstall(true, true);
     return { success: true };
   } catch (err: any) {
     console.error('[UPDATE] Erro crítico no install-update:', err);
@@ -256,9 +241,9 @@ ipcMain.handle('install-update', async () => {
   }
 });
 
-ipcMain.handle('kill-zombie-processes', async () => {
+async function cleanZombieProcesses() {
   try {
-    console.log('[SYSTEM] Iniciando limpeza manual de instâncias zumbis...');
+    console.log('[SYSTEM] Iniciando limpeza de instâncias zumbis...');
     const { execSync } = require('child_process');
     const currentPid = process.pid;
     
@@ -275,6 +260,10 @@ ipcMain.handle('kill-zombie-processes', async () => {
     console.error('[SYSTEM] Erro ao limpar processos zumbis:', err);
     return { success: false, message: `Erro ao limpar processos: ${err.message}` };
   }
+}
+
+ipcMain.handle('kill-zombie-processes', async () => {
+  return await cleanZombieProcesses();
 });
 
 ipcMain.handle('test-printer', async () => {
@@ -317,6 +306,9 @@ if (!gotTheLock) {
 
   app.whenReady().then(async () => {
     try {
+      console.log('Cleaning zombie processes...');
+      await cleanZombieProcesses();
+      
       console.log('Initializing system...');
       initDatabase();
       startServer();
@@ -334,12 +326,30 @@ if (!gotTheLock) {
         console.log('[AUTO-UPDATE] Iniciando configuração...');
         
         autoUpdater.on('checking-for-update', () => console.log('[AUTO-UPDATE] Verificando se há atualizações...'));
-        autoUpdater.on('update-available', (info) => console.log('[AUTO-UPDATE] Atualização disponível:', info.version));
+        autoUpdater.on('update-available', (info) => {
+          console.log('[AUTO-UPDATE] Atualização disponível:', info.version);
+          if (mainWindow) {
+            mainWindow.webContents.send('update-available', info);
+          }
+        });
         autoUpdater.on('update-not-available', () => console.log('[AUTO-UPDATE] Nenhuma atualização encontrada.'));
-        autoUpdater.on('error', (err) => console.error('[AUTO-UPDATE] Erro no autoUpdater:', err));
-        autoUpdater.on('download-progress', (progress) => console.log(`[AUTO-UPDATE] Download: ${progress.percent}%`));
-        autoUpdater.on('update-downloaded', () => {
+        autoUpdater.on('error', (err) => {
+          console.error('[AUTO-UPDATE] Erro no autoUpdater:', err);
+          if (mainWindow) {
+            mainWindow.webContents.send('update-error', err.message);
+          }
+        });
+        autoUpdater.on('download-progress', (progress) => {
+          console.log(`[AUTO-UPDATE] Download: ${progress.percent}%`);
+          if (mainWindow) {
+            mainWindow.webContents.send('download-progress', progress);
+          }
+        });
+        autoUpdater.on('update-downloaded', (info) => {
           console.log('[AUTO-UPDATE] Atualização baixada e pronta para instalar.');
+          if (mainWindow) {
+            mainWindow.webContents.send('update-downloaded', info);
+          }
         });
 
         autoUpdater.checkForUpdatesAndNotify();
@@ -362,6 +372,25 @@ app.on('window-all-closed', () => {
   const isServerOnly = process.argv.some(arg => arg.includes('--server'));
   if (process.platform !== 'darwin' && !isServerOnly) {
     app.quit();
+  }
+});
+
+let isQuitting = false;
+app.on('before-quit', async (event) => {
+  if (!isQuitting) {
+    event.preventDefault();
+    isQuitting = true;
+    console.log('[SYSTEM] Iniciando Graceful Shutdown...');
+    
+    globalShortcut.unregisterAll();
+    try { 
+      await stopServer(); 
+    } catch (e) { 
+      console.error('[SYSTEM] Erro no stopServer durante o desligamento:', e); 
+    }
+    
+    console.log('[SYSTEM] Cleanup finalizado. Encerrando processo.');
+    app.exit(0);
   }
 });
 

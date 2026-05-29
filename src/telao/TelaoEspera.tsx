@@ -8,7 +8,19 @@ interface TelaoEsperaProps {
 export default function TelaoEspera({ code }: TelaoEsperaProps) {
   const [config, setConfig] = useState<any>({});
   const [copied, setCopied] = useState(false);
+  const [showIpModal, setShowIpModal] = useState(false);
+  const [tempIp, setTempIp] = useState(localStorage.getItem('server_ip_override') || '');
   const API_URL = getApiUrl();
+
+  const handleSaveIp = () => {
+    if (tempIp.trim() === '') {
+      localStorage.removeItem('server_ip_override');
+    } else {
+      localStorage.setItem('server_ip_override', tempIp.trim());
+    }
+    setShowIpModal(false);
+    window.location.reload();
+  };
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -105,7 +117,7 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
           >
             <div className={`absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 transition-opacity duration-300 ${copied ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}></div>
             <span className="font-mono text-[7.5rem] font-black tracking-[0.1em] text-transparent bg-clip-text bg-gradient-to-b from-white to-white/90 drop-shadow-[0_0_30px_rgba(52,211,153,0.3)] pl-4 pointer-events-none">
-              {code}
+              {code || '------'}
             </span>
           </div>
         </div>
@@ -118,15 +130,25 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
           </p>
         </div>
 
-        {/* Real-time Listening Indicator */}
-        <div className="flex items-center gap-3 bg-emerald-500/10 px-6 py-3 rounded-full border border-emerald-500/20 mt-4 animate-pulse">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-          </span>
-          <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">
-            Aguardando vinculação em tempo real...
-          </span>
+        {/* Real-time Listening Indicator and Connection Setup */}
+        <div className="flex flex-col items-center gap-3 mt-4 w-full">
+          <div className="flex items-center gap-3 bg-emerald-500/10 px-6 py-3 rounded-full border border-emerald-500/20 animate-pulse">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </span>
+            <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">
+              Aguardando vinculação em tempo real...
+            </span>
+          </div>
+
+          <button
+            onClick={() => setShowIpModal(true)}
+            className="text-[10px] text-white/40 hover:text-white/80 font-bold uppercase tracking-widest mt-2 flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-xs">hub</span>
+            Configurar Conexão (Atual: {localStorage.getItem('server_ip_override') || 'Localhost'})
+          </button>
         </div>
       </div>
 
@@ -134,6 +156,50 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
       <div className="absolute bottom-6 left-0 right-0 text-center text-[10px] text-white/20 font-bold uppercase tracking-[0.3em] z-10">
         ChamaAí Screen Engine • v1.0.38
       </div>
+
+      {/* Connection IP Setup Modal */}
+      {showIpModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0b1612] border border-emerald-900/30 rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col gap-6 relative text-left">
+            <div>
+              <h3 className="font-sans text-2xl font-bold text-white uppercase mb-2">Conectar ao Servidor</h3>
+              <p className="text-sm font-sans text-white/60 font-medium">
+                Digite o endereço IP do computador onde está rodando o Servidor Principal (Telão) para que esta TV se comunique com ele.
+              </p>
+            </div>
+            <div>
+              <label className="block font-bold tracking-widest text-emerald-400 uppercase mb-2 text-xs">IP do Servidor (Telão)</label>
+              <input 
+                type="text" 
+                value={tempIp}
+                onChange={(e) => setTempIp(e.target.value)}
+                placeholder="Ex: 192.168.1.100"
+                className="w-full bg-[#050d0a] border border-emerald-950 rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 text-white font-bold text-lg placeholder:text-white/10"
+                autoFocus
+              />
+              <p className="text-[10px] text-white/40 mt-2 font-semibold uppercase tracking-wider">
+                Deixe em branco para conectar localmente (Localhost).
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <button 
+                type="button"
+                onClick={() => setShowIpModal(false)}
+                className="flex-1 py-4 bg-[#050d0a] hover:bg-white/5 text-white/60 border border-emerald-950 rounded-xl font-bold uppercase tracking-widest text-sm transition-all"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="button"
+                onClick={handleSaveIp}
+                className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl font-bold uppercase tracking-widest text-sm transition-all shadow-lg shadow-emerald-900/20"
+              >
+                Salvar IP
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

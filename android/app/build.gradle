@@ -16,10 +16,34 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    flavorDimensions = ["mode"]
+    productFlavors {
+        operador {
+            dimension "mode"
+            applicationId "com.chamaai.app.operador"
+            resValue "string", "app_name", "ChamaAi Operador"
+            resValue "string", "title_activity_main", "ChamaAi Operador"
+            buildConfigField "String", "APP_MODE", "\"operador\""
+        }
+        telao {
+            dimension "mode"
+            applicationId "com.chamaai.app.telao"
+            resValue "string", "app_name", "ChamaAi Telão"
+            resValue "string", "title_activity_main", "ChamaAi Telão"
+            buildConfigField "String", "APP_MODE", "\"telao\""
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
         }
     }
 }

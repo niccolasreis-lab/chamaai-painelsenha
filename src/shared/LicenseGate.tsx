@@ -44,7 +44,24 @@ export default function LicenseGate({ children }: LicenseGateProps) {
       if (result.isValid) {
         setIsLocked(false);
         localStorage.setItem('license_last_check', today);
+        localStorage.setItem('license_last_success', today);
       } else {
+        if (result.isNetworkError) {
+          const lastSuccess = localStorage.getItem('license_last_success');
+          if (lastSuccess) {
+            const lastSuccessDate = new Date(lastSuccess).getTime();
+            const todayDate = new Date(today).getTime();
+            const diffDays = Math.floor((todayDate - lastSuccessDate) / (1000 * 3600 * 24));
+            
+            if (diffDays <= 7) {
+              // Grace period: permite uso offline por até 7 dias sem internet
+              console.warn(`[LicenseGate] Offline. Grace period ativo. Última validação com sucesso: ${diffDays} dias atrás.`);
+              setIsLocked(false);
+              setIsValidating(false);
+              return;
+            }
+          }
+        }
         setError(result.message || 'Licença inválida.');
         localStorage.removeItem('app_license_key');
         localStorage.removeItem('license_last_check');
@@ -65,8 +82,10 @@ export default function LicenseGate({ children }: LicenseGateProps) {
     const result = await validateLicense(serialCode.trim());
 
     if (result.isValid) {
+      const today = new Date().toISOString().split('T')[0];
       localStorage.setItem('app_license_key', serialCode.trim());
-      localStorage.setItem('license_last_check', new Date().toISOString().split('T')[0]);
+      localStorage.setItem('license_last_check', today);
+      localStorage.setItem('license_last_success', today);
       setIsLocked(false);
     } else {
       setError(result.message || 'Falha na ativação da licença.');

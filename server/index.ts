@@ -1687,6 +1687,13 @@ export function startServer() {
 
   serverInstance = server;
 
+  server.on('connection', (socket: any) => {
+    serverSockets.add(socket);
+    socket.on('close', () => {
+      serverSockets.delete(socket);
+    });
+  });
+
   server.on('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`Port ${PORT} is already in use.`);
@@ -1968,43 +1975,75 @@ export function broadcastEvent(event: string, data: any) {
 }
 
 let serverInstance: any = null;
+const serverSockets = new Set<any>();
 let toledoWatcherCleanup: (() => void) | null | undefined = null;
 
-export function stopServer() {
-  console.log('[SERVER] Iniciando desligamento gracioso...');
-  
-  if (toledoWatcherCleanup) {
-    try {
-      toledoWatcherCleanup();
-      toledoWatcherCleanup = null;
-    } catch(e) {
-      console.error('Erro ao parar Toledo watcher', e);
+export function stopServer(): Promise<void> {
+  return new Promise((resolve) => {
+    console.log('[SERVER] Iniciando desligamento gracioso...');
+    
+    // Fechar todas as conexões SSE ativas
+    if (sseClients && sseClients.length > 0) {
+      console.log(`[SERVER] Fechando ${sseClients.length} conexões SSE ativas...`);
+      sseClients.forEach(client => {
+        try {
+          client.end();
+        } catch (e) {
+          console.error('Erro ao fechar conexão SSE:', e);
+        }
+      });
+      sseClients = [];
     }
-  }
 
-  try {
-    stopSupabaseCommandListener();
-  } catch(e) {
-    console.error('Erro ao parar Supabase listener', e);
-  }
+    // Fechar todos os sockets HTTP/TCP ativos
+    if (serverSockets.size > 0) {
+      console.log(`[SERVER] Destruindo ${serverSockets.size} sockets ativos...`);
+      for (const socket of serverSockets) {
+        try {
+          socket.destroy();
+        } catch (e) {
+          console.error('Erro ao destruir socket:', e);
+        }
+      }
+      serverSockets.clear();
+    }
 
-  try {
-    stopSyncWorker();
-  } catch(e) {
-    console.error('Erro ao parar Sync worker', e);
-  }
+    if (toledoWatcherCleanup) {
+      try {
+        toledoWatcherCleanup();
+        toledoWatcherCleanup = null;
+      } catch(e) {
+        console.error('Erro ao parar Toledo watcher', e);
+      }
+    }
 
-  try {
-    const db = getDb();
-    if (db) db.close();
-    console.log('[SERVER] SQLite fechado.');
-  } catch(e) {
-    console.error('Erro ao fechar DB', e);
-  }
+    try {
+      stopSupabaseCommandListener();
+    } catch(e) {
+      console.error('Erro ao parar Supabase listener', e);
+    }
 
-  if (serverInstance) {
-    serverInstance.close(() => {
-      console.log('[SERVER] Servidor HTTP Express encerrado.');
-    });
-  }
+    try {
+      stopSyncWorker();
+    } catch(e) {
+      console.error('Erro ao parar Sync worker', e);
+    }
+
+    try {
+      const db = getDb();
+      if (db) db.close();
+      console.log('[SERVER] SQLite fechado.');
+    } catch(e) {
+      console.error('Erro ao fechar DB', e);
+    }
+
+    if (serverInstance) {
+      serverInstance.close(() => {
+        console.log('[SERVER] Servidor HTTP Express encerrado.');
+        resolve();
+      });
+    } else {
+      resolve();
+    }
+  });
 }

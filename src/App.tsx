@@ -19,6 +19,7 @@ import Bridge from './operador/Bridge';
 import Login from './Login';
 import ClientePortal from './cliente/ClientePortal';
 import LicenseGate from './shared/LicenseGate';
+import GlobalUpdateNotification from './shared/GlobalUpdateNotification';
 
 function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) {
   const session = localStorage.getItem('user_session');
@@ -41,6 +42,14 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
 }
 
 function Home() {
+  const appMode = localStorage.getItem('app_mode');
+  if (appMode === 'touch') {
+    return <Navigate to="/operador-touch" replace />;
+  }
+  if (appMode === 'tv') {
+    return <Navigate to="/telao" replace />;
+  }
+
   const [showModal, setShowModal] = useState(false);
   const [tempIp, setTempIp] = useState(localStorage.getItem('server_ip_override') || '');
 
@@ -190,6 +199,7 @@ export default function App() {
   return (
     <LicenseGate>
       <HashRouter>
+        <GlobalUpdateNotification />
         <Routes>
           <Route path="/" element={<Home />} />
           

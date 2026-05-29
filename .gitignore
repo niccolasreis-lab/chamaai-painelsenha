@@ -37,4 +37,8 @@ uploads/
 # Mobile
 android/
 ios/
-.gradle/
+.gradle/.env
+
+.env
+*.apk
+*.bat

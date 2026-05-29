@@ -1,40 +1,17 @@
 !macro customInit
-  ; Mata processos do ChamaAí de forma robusta com wildcard (evita problemas de encoding com "í")
-  nsExec::ExecToStack 'cmd /c taskkill /F /IM "ChamaA*.exe" /T 2>nul'
-  Pop $0
-  nsExec::ExecToStack 'cmd /c taskkill /F /IM "chamaai*.exe" /T 2>nul'
-  Pop $0
+  ; Encoded PowerShell: Get-Process | Where-Object { $_.ProcessName -match '^ChamaA.$|^chamaai-novo$' -and $_.ProcessName -notmatch 'Setup|Uninstall|updater' } | ForEach-Object { taskkill /F /PID $_.Id /T >$null 2>&1 }
+  nsExec::ExecToStack 'powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand RwBlAHQALQBQAHIAbwBjAGUAcwBzACAAfAAgAFcAaABlAHIAZQAtAE8AYgBqAGUAYwB0ACAAewAgACQAXwAuAFAAcgBvAGMAZQBzAHMATgBhAG0AZQAgAC0AbQBhAHQAYwBoACAAJwBeAEMAaABhAG0AYQBBAC4AJAB8AF4AYwBoAGEAbQBhAGEAaQAtAG4AbwB2AG8AJAAnACAALQBhAG4AZAAgACQAXwAuAFAAcgBvAGMAZQBzAHMATgBhAG0AZQAgAC0AbgBvAHQAbQBhAHQAYwBoACAAJwBTAGUAdAB1AHAAfABVAG4AaQBuAHMAdABhAGwAbAB8AHUAcABkAGEAdABlAHIAJwAgAH0AIAB8ACAARgBvAHIARQBhAGMAaAAtAE8AYgBqAGUAYwB0ACAAewAgAHQAYQBzAGsAawBpAGwAbAAgAC8ARgAgAC8AUABJAEQAIAAkAF8ALgBJAGQAIAAvAFQAIAA+ACQAbgB1AGwAbAAgADIAPgAmADEAIAB9AA=='
   
-  ; Cria e executa script de limpeza temporário no diretório de plugins
-  InitPluginsDir
-  FileOpen $0 "$PLUGINSDIR\cleanup.ps1" w
-  FileWrite $0 "gp HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* -EA 0|?{ $$_.UninstallString -like '*Uninstall ChamaA*.exe*' }|%{$\r$\n"
-  FileWrite $0 "  $$u = $$_.UninstallString$\r$\n"
-  FileWrite $0 "  $$p = if ($$u -match '$\"([^$\"]+)$\"') { $$Matches[1] } else { $$u.Split(' ')[0] }$\r$\n"
-  FileWrite $0 "  if (test-path $$p) {$\r$\n"
-  FileWrite $0 "    $$d = Split-Path $$p$\r$\n"
-  FileWrite $0 "    $$n = 'Uninstall_ChamaAi.exe'$\r$\n"
-  FileWrite $0 "    ren $$p $$n -Force -EA 0$\r$\n"
-  FileWrite $0 "    Set-ItemProperty $$_.PSPath 'UninstallString' ($$u -replace [regex]::Escape($$p),(Join-Path $$d $$n)) -Force -EA 0$\r$\n"
-  FileWrite $0 "  } else {$\r$\n"
-  FileWrite $0 "    rm $$_.PSPath -Force -Recurse -EA 0$\r$\n"
-  FileWrite $0 "  }$\r$\n"
-  FileWrite $0 "}$\r$\n"
-  FileClose $0
+  ; Não vamos mais renomear o desinstalador, pois isso quebra o fluxo de update do NSIS (Erro 2)
+  
+  Sleep 1500
+!macroend
 
-  nsExec::ExecToStack 'powershell -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\cleanup.ps1"'
-  Pop $0
-
-  ; Espera o Windows liberar as travas de arquivo
-  Sleep 2000
+!macro customCheckAppRunning
+  ; Ignora a verificação padrão paranóica do NSIS
 !macroend
 
 !macro customUnInit
-  ; Mata processos do ChamaAí antes da desinstalação para evitar arquivos travados
-  nsExec::ExecToStack 'cmd /c taskkill /F /IM "ChamaA*.exe" /T 2>nul'
-  Pop $0
-  nsExec::ExecToStack 'cmd /c taskkill /F /IM "chamaai*.exe" /T 2>nul'
-  Pop $0
-  ; Espera o Windows liberar as travas de arquivo
-  Sleep 2000
+  nsExec::ExecToStack 'powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand RwBlAHQALQBQAHIAbwBjAGUAcwBzACAAfAAgAFcAaABlAHIAZQAtAE8AYgBqAGUAYwB0ACAAewAgACQAXwAuAFAAcgBvAGMAZQBzAHMATgBhAG0AZQAgAC0AbQBhAHQAYwBoACAAJwBeAEMAaABhAG0AYQBBAC4AJAB8AF4AYwBoAGEAbQBhAGEAaQAtAG4AbwB2AG8AJAAnACAALQBhAG4AZAAgACQAXwAuAFAAcgBvAGMAZQBzAHMATgBhAG0AZQAgAC0AbgBvAHQAbQBhAHQAYwBoACAAJwBTAGUAdAB1AHAAfABVAG4AaQBuAHMAdABhAGwAbAB8AHUAcABkAGEAdABlAHIAJwAgAH0AIAB8ACAARgBvAHIARQBhAGMAaAAtAE8AYgBqAGUAYwB0ACAAewAgAHQAYQBzAGsAawBpAGwAbAAgAC8ARgAgAC8AUABJAEQAIAAkAF8ALgBJAGQAIAAvAFQAIAA+ACQAbgB1AGwAbAAgADIAPgAmADEAIAB9AA=='
+  Sleep 1500
 !macroend

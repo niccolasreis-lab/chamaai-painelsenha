@@ -9,6 +9,7 @@ export interface LicenseValidationResult {
   isValid: boolean;
   message?: string;
   data?: any;
+  isNetworkError?: boolean;
 }
 
 export async function validateLicense(serialCode: string): Promise<LicenseValidationResult> {
@@ -19,7 +20,16 @@ export async function validateLicense(serialCode: string): Promise<LicenseValida
       .eq('code', serialCode)
       .single();
 
-    if (error || !data) {
+    if (error) {
+      const errMsg = error.message || '';
+      const isNetwork = errMsg.includes('fetch') || errMsg.includes('Network') || error.code === 'UND_ERR_CONNECT_TIMEOUT';
+      if (isNetwork) {
+        return { isValid: false, message: 'Falha de comunicação com o servidor. Verifique sua conexão com a internet.', isNetworkError: true };
+      }
+      return { isValid: false, message: 'Serial inválido ou inexistente.' };
+    }
+
+    if (!data) {
       return { isValid: false, message: 'Serial inválido ou inexistente.' };
     }
 
@@ -38,6 +48,6 @@ export async function validateLicense(serialCode: string): Promise<LicenseValida
     return { isValid: true, data };
   } catch (err) {
     console.error('Erro ao validar licença:', err);
-    return { isValid: false, message: 'Erro de comunicação com o servidor de licenças. Verifique sua conexão com a internet.' };
+    return { isValid: false, message: 'Erro de comunicação com o servidor de licenças. Verifique sua conexão com a internet.', isNetworkError: true };
   }
 }
