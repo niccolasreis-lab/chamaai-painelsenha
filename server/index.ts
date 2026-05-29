@@ -1401,34 +1401,14 @@ export function startServer() {
     }
   });
 
-  // ── Ordem das categorias no portal do cliente ──────────────────────────────
+  // ── Ordem das categorias no portal do cliente (totalmente dinâmico do banco) ──
 
   app.get('/api/toledo/categorias-ordem', (_req: express.Request, res: express.Response) => {
     try {
-      if (fs.existsSync(PERSISTENT_ORDEM_PATH)) {
-        const data = JSON.parse(fs.readFileSync(PERSISTENT_ORDEM_PATH, 'utf-8'));
-        return res.json(data);
-      }
-
-      // Check fallbacks if persistent doesn't exist
-      const possiblePaths = [
-        path.join(__dirname, '../../server/categorias-ordem.json'),
-        path.join(__dirname, 'categorias-ordem.json'),
-        path.join(process.cwd(), 'server', 'categorias-ordem.json'),
-      ];
-
-      for (const orderPath of possiblePaths) {
-        if (fs.existsSync(orderPath)) {
-          const data = JSON.parse(fs.readFileSync(orderPath, 'utf-8'));
-          try {
-            if (!fs.existsSync(PERSISTENT_DIR)) fs.mkdirSync(PERSISTENT_DIR, { recursive: true });
-            fs.writeFileSync(PERSISTENT_ORDEM_PATH, JSON.stringify(data, null, 2), 'utf-8');
-          } catch (e) {}
-          return res.json(data);
-        }
-      }
-
-      res.json([]);
+      const db = getDb();
+      const rows = db.prepare("SELECT nome FROM categorias WHERE ativo = 1 ORDER BY ordem ASC, id ASC").all() as any[];
+      const names = rows.map(r => r.nome);
+      res.json(names);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1437,25 +1417,15 @@ export function startServer() {
   app.post('/api/toledo/categorias-ordem', requireMaster, async (req: express.Request, res: express.Response) => {
     try {
       const ordem: string[] = req.body;
-      
-      if (!fs.existsSync(PERSISTENT_DIR)) {
-        fs.mkdirSync(PERSISTENT_DIR, { recursive: true });
-      }
+      const db = getDb();
 
-      // Write to persistent path
-      fs.writeFileSync(PERSISTENT_ORDEM_PATH, JSON.stringify(ordem, null, 2), 'utf-8');
-
-      // Attempt fallbacks
-      const possiblePaths = [
-        path.join(__dirname, '../../server/categorias-ordem.json'),
-        path.join(__dirname, 'categorias-ordem.json'),
-        path.join(process.cwd(), 'server', 'categorias-ordem.json'),
-      ];
-      for (const orderPath of possiblePaths) {
-        try {
-          fs.writeFileSync(orderPath, JSON.stringify(ordem, null, 2), 'utf-8');
-        } catch (e) {}
-      }
+      const updateStmt = db.prepare("UPDATE categorias SET ordem = ? WHERE nome = ?");
+      const transaction = db.transaction((names: string[]) => {
+        names.forEach((name, index) => {
+          updateStmt.run(index + 1, name);
+        });
+      });
+      transaction(ordem);
 
       // Sync: grava a ordem no Supabase para o portal cliente (Vercel) ler
       try {
@@ -1466,6 +1436,236 @@ export function startServer() {
       }
 
       res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── CRUD de Categorias Dinâmicas ───────────────────────────────────────────
+
+  // GET all categories
+  app.get('/api/categorias', (req, res) => {
+    try {
+      const db = getDb();
+      const rows = db.prepare("SELECT * FROM categorias ORDER BY ordem ASC, id ASC").all();
+      const mapped = rows.map((r: any) => ({
+        id: r.id,
+        nome: r.nome,
+        emoji: r.emoji || '',
+        descricao: r.descricao || '',
+        ordem: r.ordem || 0,
+        ativo: r.ativo === 1,
+        setor: r.setor || 'Outros'
+      }));
+      res.json(mapped);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST create category
+  app.post('/api/categorias', requireMaster, (req, res) => {
+    try {
+      const { nome, emoji, descricao, ordem, ativo, setor } = req.body;
+      if (!nome || typeof nome !== 'string' || nome.trim() === '') {
+        return res.status(400).json({ error: 'O nome da categoria é obrigatório.' });
+      }
+
+      const db = getDb();
+      const insertStmt = db.prepare(`
+        INSERT INTO categorias (nome, emoji, descricao, ordem, ativo, setor)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      const result = insertStmt.run(
+        nome.trim(),
+        emoji || '',
+        descricao || '',
+        ordem !== undefined ? Number(ordem) : 0,
+        ativo === false ? 0 : 1,
+        setor || 'Outros'
+      );
+
+      res.status(201).json({ success: true, id: result.lastInsertRowid });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT update category
+  app.put('/api/categorias/:id', requireMaster, (req, res) => {
+    try {
+      const { id } = req.params;
+      const { nome, emoji, descricao, ordem, ativo, setor } = req.body;
+      if (!nome || typeof nome !== 'string' || nome.trim() === '') {
+        return res.status(400).json({ error: 'O nome da categoria é obrigatório.' });
+      }
+
+      const db = getDb();
+      const updateStmt = db.prepare(`
+        UPDATE categorias 
+        SET nome = ?, emoji = ?, descricao = ?, ordem = ?, ativo = ?, setor = ?, updated_at = datetime('now', 'localtime')
+        WHERE id = ?
+      `);
+      updateStmt.run(
+        nome.trim(),
+        emoji || '',
+        descricao || '',
+        ordem !== undefined ? Number(ordem) : 0,
+        ativo === false ? 0 : 1,
+        setor || 'Outros',
+        id
+      );
+
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE category
+  app.delete('/api/categorias/:id', requireMaster, (req, res) => {
+    try {
+      const { id } = req.params;
+      const db = getDb();
+      const deleteStmt = db.prepare("DELETE FROM categorias WHERE id = ?");
+      deleteStmt.run(id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET export categories
+  app.get('/api/categorias/export', (req, res) => {
+    try {
+      const format = req.query.format || 'json';
+      const db = getDb();
+      const rows = db.prepare("SELECT * FROM categorias ORDER BY ordem ASC, id ASC").all() as any[];
+
+      if (format === 'csv') {
+        let csvContent = 'nome,emoji,descricao,ordem,ativo,setor\n';
+        rows.forEach(r => {
+          const nomeSafe = `"${r.nome.replace(/"/g, '""')}"`;
+          const emojiSafe = `"${(r.emoji || '').replace(/"/g, '""')}"`;
+          const descSafe = `"${(r.descricao || '').replace(/"/g, '""')}"`;
+          const ordem = r.ordem || 0;
+          const ativo = r.ativo === 1 ? 'true' : 'false';
+          const setorSafe = `"${(r.setor || 'Outros').replace(/"/g, '""')}"`;
+          csvContent += `${nomeSafe},${emojiSafe},${descSafe},${ordem},${ativo},${setorSafe}\n`;
+        });
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="categorias.csv"');
+        return res.send(csvContent);
+      }
+
+      // JSON format
+      const jsonContent = rows.map(r => ({
+        nome: r.nome,
+        emoji: r.emoji || '',
+        descricao: r.descricao || '',
+        ordem: r.ordem || 0,
+        ativo: r.ativo === 1,
+        setor: r.setor || 'Outros'
+      }));
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename="categorias.json"');
+      res.json(jsonContent);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST import categories
+  app.post('/api/categorias/import', requireMaster, (req, res) => {
+    try {
+      const { data, format } = req.body;
+      if (!data) {
+        return res.status(400).json({ error: 'Nenhum dado fornecido para importação.' });
+      }
+
+      let parsed: Array<{ nome: string, emoji?: string, descricao?: string, ordem?: number, ativo?: boolean, setor?: string }> = [];
+
+      if (format === 'csv') {
+        // Parser simples de CSV que lida com aspas
+        const lines = data.split(/\r?\n/);
+        if (lines.length > 0) {
+          const header = lines[0].toLowerCase().split(',');
+          for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line === '') continue;
+
+            const fields: string[] = [];
+            let current = '';
+            let inQuotes = false;
+            for (let c = 0; c < line.length; c++) {
+              const char = line[c];
+              if (char === '"') {
+                if (inQuotes && line[c + 1] === '"') {
+                  current += '"';
+                  c++;
+                } else {
+                  inQuotes = !inQuotes;
+                }
+              } else if (char === ',' && !inQuotes) {
+                fields.push(current);
+                current = '';
+              } else {
+                current += char;
+              }
+            }
+            fields.push(current);
+
+            const item: any = {};
+            header.forEach((h: string, idx: number) => {
+              const cleanH = h.trim();
+              if (cleanH === 'nome') item.nome = fields[idx]?.trim();
+              if (cleanH === 'emoji') item.emoji = fields[idx]?.trim();
+              if (cleanH === 'descricao' || cleanH === 'descrição') item.descricao = fields[idx]?.trim();
+              if (cleanH === 'ordem') item.ordem = parseInt(fields[idx]);
+              if (cleanH === 'ativo') item.ativo = fields[idx]?.toLowerCase() === 'true' || fields[idx] === '1';
+              if (cleanH === 'setor') item.setor = fields[idx]?.trim();
+            });
+            if (item.nome) {
+              parsed.push(item);
+            }
+          }
+        }
+      } else {
+        // JSON format
+        parsed = typeof data === 'string' ? JSON.parse(data) : data;
+        if (!Array.isArray(parsed)) {
+          return res.status(400).json({ error: 'O formato JSON de importação deve ser uma lista (array).' });
+        }
+      }
+
+      const db = getDb();
+      const insertOrUpdate = db.prepare(`
+        INSERT INTO categorias (nome, emoji, descricao, ordem, ativo, setor)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(nome) DO UPDATE SET
+          emoji = excluded.emoji,
+          descricao = excluded.descricao,
+          ordem = excluded.ordem,
+          ativo = excluded.ativo,
+          setor = excluded.setor,
+          updated_at = datetime('now', 'localtime')
+      `);
+
+      const transaction = db.transaction((items) => {
+        items.forEach((item: any) => {
+          insertOrUpdate.run(
+            item.nome.trim(),
+            item.emoji || '',
+            item.descricao || '',
+            item.ordem !== undefined ? Number(item.ordem) : 0,
+            item.ativo === false ? 0 : 1,
+            item.setor || 'Outros'
+          );
+        });
+      });
+
+      transaction(parsed);
+      res.json({ success: true, count: parsed.length });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

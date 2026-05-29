@@ -18,91 +18,109 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
 
   const filterKey = JSON.stringify(categoriasFiltro);
 
+  const [activeCategories, setActiveCategories] = useState<any[]>([]);
+
   useEffect(() => {
-    fetch(`${API_URL}/api/toledo/produtos`)
-      .then(r => r.json())
-      .then(data => {
-        // Filter out items with price = 0 if configured to do so
-        const ocultarEmFalta = config.toledo_ocultar_em_falta === '1' || config.toledo_ocultar_em_falta === true;
-        let filteredData = ocultarEmFalta ? data.filter((p: any) => p.preco > 0) : data;
+    Promise.all([
+      fetch(`${API_URL}/api/toledo/produtos`).then(r => r.json()),
+      fetch(`${API_URL}/api/categorias`).then(r => r.json())
+    ]).then(([prodData, catData]) => {
+      const activeCats = catData.filter((c: any) => c.ativo);
+      setActiveCategories(activeCats);
 
-        // Apply category filter if provided
-        if (categoriasFiltro && categoriasFiltro.length > 0) {
-          filteredData = filteredData.filter((p: any) => {
-            const productCat = (p.categoria || '').trim().toLowerCase();
-            return categoriasFiltro.some(filterCat => {
-              const fCat = filterCat.trim().toLowerCase();
-              return productCat === fCat || productCat.includes(fCat) || fCat.includes(productCat);
-            });
+      const catMap = new Map<string, any>();
+      activeCats.forEach((c: any) => {
+        catMap.set(c.nome.trim().toLowerCase(), c);
+      });
+
+      // Filter out items with price = 0 if configured to do so
+      const ocultarEmFalta = config.toledo_ocultar_em_falta === '1' || config.toledo_ocultar_em_falta === true;
+      let filteredData = ocultarEmFalta ? prodData.filter((p: any) => p.preco > 0) : prodData;
+
+      // Apply category filter if provided
+      if (categoriasFiltro && categoriasFiltro.length > 0) {
+        filteredData = filteredData.filter((p: any) => {
+          const productCat = (p.categoria || '').trim().toLowerCase();
+          return categoriasFiltro.some(filterCat => {
+            const fCat = filterCat.trim().toLowerCase();
+            return productCat === fCat || productCat.includes(fCat) || fCat.includes(productCat);
           });
-        }
-
-        // Group by category
-        const grouped = filteredData.reduce((acc: any, p: any) => {
-          const cat = p.categoria || 'Outros';
-          if (!acc[cat]) acc[cat] = { nome: cat, produtos: [] };
-          acc[cat].produtos.push(p);
-          return acc;
-        }, {});
-
-        let sortedGroups = Object.values(grouped).sort((a: any, b: any) => a.nome.localeCompare(b.nome));
-
-        // FEATURE: Super Ofertas
-        const ofertas: any[] = [];
-        const nonOfertas: any[] = [];
-
-        sortedGroups.forEach((group: any) => {
-          const norm = group.produtos.filter((p: any) => !p.descricao.includes('OFERTA') && !p.descricao.includes('*'));
-          const ofs = group.produtos.filter((p: any) => p.descricao.includes('OFERTA') || p.descricao.includes('*'));
-
-          if (ofs.length > 0) ofertas.push(...ofs);
-          if (norm.length > 0) nonOfertas.push({ ...group, produtos: norm });
         });
+      }
 
-        if (ofertas.length > 0) {
-          nonOfertas.unshift({ nome: 'OFERTAS DO DIA', isOferta: true, produtos: ofertas });
-        }
+      // Group by category
+      const grouped = filteredData.reduce((acc: any, p: any) => {
+        const cat = p.categoria || 'Despensa e Utilidades Básicas';
+        if (!acc[cat]) acc[cat] = { nome: cat, produtos: [] };
+        acc[cat].produtos.push(p);
+        return acc;
+      }, {});
 
-        // Chunk into slides
-        const newSlides = [];
-        let currentSlideData: any[] = [];
-        let currentCount = 0;
+      // Sort categories based on their database 'ordem'
+      let sortedGroups = Object.values(grouped).sort((a: any, b: any) => {
+        const catA = catMap.get(a.nome.trim().toLowerCase());
+        const catB = catMap.get(b.nome.trim().toLowerCase());
+        const orderA = catA ? catA.ordem : 999;
+        const orderB = catB ? catB.ordem : 999;
+        return orderA - orderB;
+      });
 
-        for (const group of nonOfertas) {
-          let gCount = group.produtos.length;
-          if (currentCount + gCount <= itensPorSlide && gCount > 0) {
-            currentSlideData.push(group);
-            currentCount += gCount;
-          } else if (gCount > 0) {
-            if (currentCount > 0) {
-              newSlides.push(currentSlideData);
-              currentSlideData = [];
-              currentCount = 0;
-            }
-            let chunks = [];
-            for (let i = 0; i < group.produtos.length; i += itensPorSlide) {
-              chunks.push(group.produtos.slice(i, i + itensPorSlide));
-            }
-            for (let i = 0; i < chunks.length; i++) {
-              if (i < chunks.length - 1) {
-                newSlides.push([{ nome: group.nome, isOferta: group.isOferta, produtos: chunks[i] }]);
-              } else {
-                currentSlideData = [{ nome: group.nome, isOferta: group.isOferta, produtos: chunks[i] }];
-                currentCount = chunks[i].length;
-              }
+      // FEATURE: Super Ofertas
+      const ofertas: any[] = [];
+      const nonOfertas: any[] = [];
+
+      sortedGroups.forEach((group: any) => {
+        const norm = group.produtos.filter((p: any) => !p.descricao.includes('OFERTA') && !p.descricao.includes('*'));
+        const ofs = group.produtos.filter((p: any) => p.descricao.includes('OFERTA') || p.descricao.includes('*'));
+
+        if (ofs.length > 0) ofertas.push(...ofs);
+        if (norm.length > 0) nonOfertas.push({ ...group, produtos: norm });
+      });
+
+      if (ofertas.length > 0) {
+        nonOfertas.unshift({ nome: 'OFERTAS DO DIA', isOferta: true, produtos: ofertas });
+      }
+
+      // Chunk into slides
+      const newSlides = [];
+      let currentSlideData: any[] = [];
+      let currentCount = 0;
+
+      for (const group of nonOfertas) {
+        let gCount = group.produtos.length;
+        if (currentCount + gCount <= itensPorSlide && gCount > 0) {
+          currentSlideData.push(group);
+          currentCount += gCount;
+        } else if (gCount > 0) {
+          if (currentCount > 0) {
+            newSlides.push(currentSlideData);
+            currentSlideData = [];
+            currentCount = 0;
+          }
+          let chunks = [];
+          for (let i = 0; i < group.produtos.length; i += itensPorSlide) {
+            chunks.push(group.produtos.slice(i, i + itensPorSlide));
+          }
+          for (let i = 0; i < chunks.length; i++) {
+            if (i < chunks.length - 1) {
+              newSlides.push([{ nome: group.nome, isOferta: group.isOferta, produtos: chunks[i] }]);
+            } else {
+              currentSlideData = [{ nome: group.nome, isOferta: group.isOferta, produtos: chunks[i] }];
+              currentCount = chunks[i].length;
             }
           }
         }
-        if (currentSlideData.length > 0) {
-          newSlides.push(currentSlideData);
-        }
+      }
+      if (currentSlideData.length > 0) {
+        newSlides.push(currentSlideData);
+      }
 
-        if (newSlides.length === 0) {
-          newSlides.push([]);
-        }
-        setSlides(newSlides);
-      })
-      .catch(console.error);
+      if (newSlides.length === 0) {
+        newSlides.push([]);
+      }
+      setSlides(newSlides);
+    })
+    .catch(console.error);
   }, [API_URL, itensPorSlide, config.toledo_ocultar_em_falta, filterKey]);
 
   useEffect(() => {
@@ -126,52 +144,29 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
 
   const getCategoryStyle = (nome: string, isOferta: boolean) => {
     if (isOferta) return { icon: '🔥', bg: 'bg-red-500/20', border: 'border-red-500/50', text: 'text-red-400', isPulse: true };
-    
-    // Normalização de string para evitar problemas com acentos e capitalização
-    const n = (nome || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim();
-    
-    // 1. Queijos e Laticínios
-    if (n === 'queijos e laticinios' || n.includes('queijo') || n.includes('laticinio')) 
-      return { icon: '🧀', bg: 'bg-blue-300/10', border: 'border-blue-300/20', text: 'text-blue-200' };
-    
-    // 2. Embutidos, Frios e Carnes
-    if (n === 'embutidos, frios e carnes' || n.includes('embutido') || n.includes('frio') || n.includes('carne')) 
-      return { icon: '🥩', bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400' };
-    
-    // 3. Peixes e Frutos do Mar
-    if (n === 'peixes e frutos do mar' || n.includes('peixe') || n.includes('mar')) 
-      return { icon: '🐟', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-400' };
-    
-    // 4. Oleaginosas e Castanhas
-    if (n === 'oleaginosas e castanhas' || n.includes('oleaginosa') || n.includes('castanha')) 
-      return { icon: '🥜', bg: 'bg-amber-600/10', border: 'border-amber-600/20', text: 'text-amber-500' };
-    
-    // 5. Frutas Secas e Desidratadas
-    if (n === 'frutas secas e desidratadas' || n.includes('fruta seca') || n.includes('desidratada')) 
-      return { icon: '🍇', bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400' };
-    
-    // 6. Farinhas, Amidos e Polvilhos
-    if (n === 'farinhas, amidos e polvilhos' || n.includes('farinha') || n.includes('amido') || n.includes('polvilho')) 
-      return { icon: '🌾', bg: 'bg-orange-400/10', border: 'border-orange-400/20', text: 'text-orange-300' };
-    
-    // 7. Grãos, Cereais e Sementes
-    if (n === 'graos, cereais e sementes' || n.includes('grao') || n.includes('cereal') || n.includes('semente')) 
-      return { icon: '🌱', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400' };
-    
-    // 8. Temperos, Especiarias e Conservas
-    if (n === 'temperos, especiarias e conservas' || n.includes('tempero') || n.includes('especiaria') || n.includes('conserva')) 
-      return { icon: '🌿', bg: 'bg-teal-400/10', border: 'border-teal-400/20', text: 'text-teal-300' };
-    
-    // 9. Suplementos, Chás e Produtos Naturais
-    if (n === 'suplementos, chas e produtos naturais' || n.includes('suplemento') || n.includes('cha') || n.includes('produto natural')) 
-      return { icon: '🍵', bg: 'bg-sky-400/10', border: 'border-sky-400/20', text: 'text-sky-300' };
-    
-    // Default
-    return { icon: '📦', bg: 'bg-white/5', border: 'border-white/10', text: 'text-white/80' };
+
+    const dbCat = activeCategories.find((c: any) => c.nome.trim().toLowerCase() === nome.trim().toLowerCase());
+    const emoji = dbCat ? dbCat.emoji : '📦';
+
+    const colorsPool = [
+      { bg: 'bg-blue-300/10', border: 'border-blue-300/20', text: 'text-blue-200' },
+      { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400' },
+      { bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-400' },
+      { bg: 'bg-amber-600/10', border: 'border-amber-600/20', text: 'text-amber-500' },
+      { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400' },
+      { bg: 'bg-orange-400/10', border: 'border-orange-400/20', text: 'text-orange-300' },
+      { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400' },
+      { bg: 'bg-teal-400/10', border: 'border-teal-400/20', text: 'text-teal-300' },
+      { bg: 'bg-sky-400/10', border: 'border-sky-400/20', text: 'text-sky-300' },
+    ];
+
+    const idx = dbCat ? activeCategories.indexOf(dbCat) : 0;
+    const style = colorsPool[idx % colorsPool.length];
+
+    return {
+      icon: emoji || '📦',
+      ...style
+    };
   };
 
   const formatPreco = (preco: number) => {
@@ -264,12 +259,12 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
             return (
               <div key={`${group.nome}-${gIdx}`} className="mb-6 break-inside-avoid-page">
                 {/* Category header */}
-                <div className={`flex items-center gap-4 px-6 py-3 rounded-xl ${style.bg} border ${style.border} mb-3 break-inside-avoid shadow-sm ${style.isPulse ? 'animate-pulse ring-4 ring-red-500/30 scale-[1.02] shadow-red-500/20' : ''}`}>
-                  <span style={{ fontSize: 'clamp(1.5rem, calc(var(--desc-font) * 1.8), 5rem)' }}>{style.icon}</span>
-                  <h2 className={`font-black uppercase tracking-wider ${style.text}`} style={{ fontSize: 'clamp(1.25rem, calc(var(--desc-font) * 1.15), 5rem)' }}>
+                <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl ${style.bg} border ${style.border} mb-3.5 break-inside-avoid shadow-sm ${style.isPulse ? 'animate-pulse ring-4 ring-red-500/30 scale-[1.02] shadow-red-500/20' : ''}`}>
+                  <span className="text-2xl flex items-center shrink-0">{style.icon}</span>
+                  <h2 className={`font-black uppercase tracking-wider ${style.text} text-base truncate`} style={{ fontFamily: 'Playfair Display, serif' }}>
                     {group.nome}
                   </h2>
-                  <span className={`font-bold uppercase tracking-widest ${style.text} opacity-60 ml-auto`} style={{ fontSize: 'clamp(0.7rem, calc(var(--desc-font) * 0.6), 2.5rem)' }}>
+                  <span className={`font-bold uppercase tracking-widest ${style.text} opacity-60 ml-auto text-[10px] shrink-0`}>
                     {group.produtos.length} {group.produtos.length === 1 ? 'item' : 'itens'}
                   </span>
                 </div>

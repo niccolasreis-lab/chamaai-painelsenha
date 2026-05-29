@@ -19,23 +19,7 @@ interface ItemCarrinho {
   tipo: 'peso' | 'unidade';
 }
 
-const EMOJIS_CATEGORIA: Record<string, string> = {
-  'Queijos e Laticínios': '🧀',
-  'Embutidos, Frios e Carnes': '🥩',
-  'Peixes e Frutos do Mar': '🐟',
-  'Oleaginosas e Castanhas': '🥜',
-  'Frutas Secas e Desidratadas': '🍇',
-  'Farinhas, Amidos e Polvilhos': '🌾',
-  'Grãos, Cereais e Sementes': '🌱',
-  'Temperos, Especiarias e Conservas': '🌿',
-  'Suplementos, Chás e Produtos Naturais': '🍵',
-  'Outros e Utilidades': '📦',
-  'Todos': '✨'
-};
-
-function getEmojiCategoria(cat: string): string {
-  return EMOJIS_CATEGORIA[cat] || '📦';
-}
+// Category emojis are loaded dynamically from the SQLite database
 
 function getTipoProduto(descricao: string): 'peso' | 'unidade' {
   const desc = descricao.toLowerCase();
@@ -47,6 +31,20 @@ export default function ClientePortal() {
   const [searchParams] = useSearchParams();
   const ticketId = searchParams.get('ticket');
   const API_URL = getApiUrl();
+
+  const [categoriasInfo, setCategoriasInfo] = useState<any[]>([]);
+
+  const emojisMap = useMemo(() => {
+    const map: Record<string, string> = { 'Todos': '✨' };
+    categoriasInfo.forEach((c: any) => {
+      map[c.nome.trim()] = c.emoji || '';
+    });
+    return map;
+  }, [categoriasInfo]);
+
+  const getEmojiCategoria = (cat: string): string => {
+    return emojisMap[cat.trim()] || '📦';
+  };
 
   const [ticketStatus, setTicketStatus] = useState<'carregando' | 'aguardando' | 'expirado' | 'erro'>('carregando');
   const [ticketNumero, setTicketNumero] = useState<string>('');
@@ -202,24 +200,35 @@ export default function ClientePortal() {
     };
   }, [ticketId, API_URL, queuePosition, config, ticketStatus]);
 
-  // Carrega produtos
+  // Carrega produtos e categorias dinâmicas
   useEffect(() => {
-    const fetchProdutos = async () => {
+    const fetchData = async () => {
       setLoadingProdutos(true);
       try {
-        const res = await fetch(`${API_URL}/api/toledo/produtos`);
-        const data = await res.json();
-        if (data.success && data.produtos) {
-          setProdutos(data.produtos);
+        const [resProds, resCats] = await Promise.all([
+          fetch(`${API_URL}/api/toledo/produtos`),
+          fetch(`${API_URL}/api/categorias`)
+        ]);
+        const prodsData = await resProds.json();
+        const catsData = await resCats.json();
+
+        if (Array.isArray(prodsData)) {
+          setProdutos(prodsData);
+        } else if (prodsData.success && prodsData.produtos) {
+          setProdutos(prodsData.produtos);
+        }
+
+        if (Array.isArray(catsData)) {
+          setCategoriasInfo(catsData);
         }
       } catch (e) {
-        console.error('Erro ao carregar produtos');
+        console.error('Erro ao carregar produtos ou categorias:', e);
       } finally {
         setLoadingProdutos(false);
       }
     };
     if (ticketStatus === 'aguardando') {
-      fetchProdutos();
+      fetchData();
     }
   }, [ticketStatus, API_URL]);
 
@@ -304,12 +313,26 @@ export default function ClientePortal() {
   const totalItens = Object.keys(carrinho).length;
 
   const todasCategorias = useMemo(() => {
-    const cats = new Set<string>();
+    const catsWithProds = new Set<string>();
     produtos.forEach(p => {
-      if (p.categoria) cats.add(p.categoria);
+      if (p.categoria) catsWithProds.add(p.categoria.trim());
     });
-    return ['Todos', ...Array.from(cats)];
-  }, [produtos]);
+    
+    const orderedCats: string[] = [];
+    categoriasInfo.forEach((c: any) => {
+      const nameTrimmed = c.nome.trim();
+      if (catsWithProds.has(nameTrimmed)) {
+        orderedCats.push(c.nome);
+        catsWithProds.delete(nameTrimmed);
+      }
+    });
+    
+    catsWithProds.forEach(cat => {
+      orderedCats.push(cat);
+    });
+
+    return ['Todos', ...orderedCats];
+  }, [produtos, categoriasInfo]);
 
   const produtosFiltrados = useMemo(() => {
     let list = produtos;

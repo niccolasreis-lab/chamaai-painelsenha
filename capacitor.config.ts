@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.chamaai.app',
-  appName: 'ChamaAí Operador',
+  appName: 'ChamaAi Operador',
   webDir: 'dist',
   server: {
     androidScheme: 'http',

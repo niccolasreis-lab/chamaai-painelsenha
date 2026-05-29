@@ -1,17 +1,31 @@
 !macro customInit
-  ; Encoded PowerShell: Get-Process | Where-Object { $_.ProcessName -match '^ChamaA.$|^chamaai-novo$' -and $_.ProcessName -notmatch 'Setup|Uninstall|updater' } | ForEach-Object { taskkill /F /PID $_.Id /T >$null 2>&1 }
-  nsExec::ExecToStack 'powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand RwBlAHQALQBQAHIAbwBjAGUAcwBzACAAfAAgAFcAaABlAHIAZQAtAE8AYgBqAGUAYwB0ACAAewAgACQAXwAuAFAAcgBvAGMAZQBzAHMATgBhAG0AZQAgAC0AbQBhAHQAYwBoACAAJwBeAEMAaABhAG0AYQBBAC4AJAB8AF4AYwBoAGEAbQBhAGEAaQAtAG4AbwB2AG8AJAAnACAALQBhAG4AZAAgACQAXwAuAFAAcgBvAGMAZQBzAHMATgBhAG0AZQAgAC0AbgBvAHQAbQBhAHQAYwBoACAAJwBTAGUAdAB1AHAAfABVAG4AaQBuAHMAdABhAGwAbAB8AHUAcABkAGEAdABlAHIAJwAgAH0AIAB8ACAARgBvAHIARQBhAGMAaAAtAE8AYgBqAGUAYwB0ACAAewAgAHQAYQBzAGsAawBpAGwAbAAgAC8ARgAgAC8AUABJAEQAIAAkAF8ALgBJAGQAIAAvAFQAIAA+ACQAbgB1AGwAbAAgADIAPgAmADEAIAB9AA=='
+  ; === PHASE 1: Kill all ChamaAi processes aggressively using native taskkill ===
+  ; Since the app is renamed to ChamaAi (no accents), we can use exact, highly efficient native taskkill
+  ; without any encoding conflicts, PowerShell compilation warnings, or risk of installer self-killing.
+  nsExec::Exec 'taskkill /F /IM "ChamaAi.exe" /T'
+  nsExec::Exec 'taskkill /F /IM "chamaai-novo.exe" /T'
+  nsExec::Exec 'taskkill /F /IM "chamaai.exe" /T'
   
-  ; Não vamos mais renomear o desinstalador, pois isso quebra o fluxo de update do NSIS (Erro 2)
+  ; Free port 3000 (if any zombie process is holding it)
+  nsExec::Exec 'cmd.exe /c "for /f \"tokens=5\" %a in (\'netstat -aon ^| findstr :3000\') do taskkill /F /PID %a /T"'
   
-  Sleep 1500
+  ; === PHASE 2: Wait for processes to fully terminate ===
+  Sleep 2000
 !macroend
 
 !macro customCheckAppRunning
-  ; Ignora a verificação padrão paranóica do NSIS
+  ; Let the installer proceed
+!macroend
+
+!macro macro_customCheckAppRunning
+  ; Fallback alias
 !macroend
 
 !macro customUnInit
-  nsExec::ExecToStack 'powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand RwBlAHQALQBQAHIAbwBjAGUAcwBzACAAfAAgAFcAaABlAHIAZQAtAE8AYgBqAGUAYwB0ACAAewAgACQAXwAuAFAAcgBvAGMAZQBzAHMATgBhAG0AZQAgAC0AbQBhAHQAYwBoACAAJwBeAEMAaABhAG0AYQBBAC4AJAB8AF4AYwBoAGEAbQBhAGEAaQAtAG4AbwB2AG8AJAAnACAALQBhAG4AZAAgACQAXwAuAFAAcgBvAGMAZQBzAHMATgBhAG0AZQAgAC0AbgBvAHQAbQBhAHQAYwBoACAAJwBTAGUAdAB1AHAAfABVAG4AaQBuAHMAdABhAGwAbAB8AHUAcABkAGEAdABlAHIAJwAgAH0AIAB8ACAARgBvAHIARQBhAGMAaAAtAE8AYgBqAGUAYwB0ACAAewAgAHQAYQBzAGsAawBpAGwAbAAgAC8ARgAgAC8AUABJAEQAIAAkAF8ALgBJAGQAIAAvAFQAIAA+ACQAbgB1AGwAbAAgADIAPgAmADEAIAB9AA=='
-  Sleep 1500
+  ; Kill all processes before uninstall
+  nsExec::Exec 'taskkill /F /IM "ChamaAi.exe" /T'
+  nsExec::Exec 'taskkill /F /IM "chamaai-novo.exe" /T'
+  nsExec::Exec 'taskkill /F /IM "chamaai.exe" /T'
+  nsExec::Exec 'cmd.exe /c "for /f \"tokens=5\" %a in (\'netstat -aon ^| findstr :3000\') do taskkill /F /PID %a /T"'
+  Sleep 2000
 !macroend

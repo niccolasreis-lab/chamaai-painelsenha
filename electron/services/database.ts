@@ -58,7 +58,7 @@ export function initDatabase() {
       INSERT OR IGNORE INTO configuracoes VALUES ('som_personalizado', '', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('ocultar_tipo_senha', '0', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('mostrar_rodape', '1', datetime('now'));
-      INSERT OR IGNORE INTO configuracoes VALUES ('texto_rodape', 'ChamaAí - Atendimento de Segunda a Sexta, 8h às 18h', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('texto_rodape', 'ChamaAi - Atendimento de Segunda a Sexta, 8h às 18h', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('rotulo_local', '', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('rotulo_atendimento_geral', 'Atendimento Geral', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('rotulo_atendimento_prioritario', 'Atendimento Prioritário', datetime('now'));
@@ -151,6 +151,57 @@ export function initDatabase() {
         atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
+
+    // Toledo — Categorias dinâmicas
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS categorias (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL UNIQUE,
+        emoji TEXT,
+        descricao TEXT,
+        ordem INTEGER DEFAULT 0,
+        ativo INTEGER DEFAULT 1,
+        setor TEXT DEFAULT 'Mercearia',
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+      );
+    `);
+
+    // Migration: Adicionar coluna setor em categorias caso não exista
+    try {
+      db.prepare("ALTER TABLE categorias ADD COLUMN setor TEXT DEFAULT 'Mercearia'").run();
+      console.log("[DATABASE] Coluna 'setor' adicionada à tabela categorias.");
+    } catch (e) {
+      // Ignorar se a coluna já existe
+    }
+
+    // Seed das novas categorias oficiais
+    try {
+      const catCount = db.prepare("SELECT COUNT(*) as count FROM categorias").get() as any;
+      if (catCount && catCount.count === 0) {
+        const insertStmt = db.prepare(`
+          INSERT INTO categorias (nome, emoji, descricao, ordem, ativo, setor)
+          VALUES (?, ?, ?, ?, 1, ?)
+        `);
+        insertStmt.run('Mesa de Frios, Queijos e Antepastos', '🧀🍷', 'Seleção premium de frios especiais, queijos nobres e antepastos para momentos especiais.', 1, 'QUEIJOS');
+        insertStmt.run('Ingredientes para Feijoada e Churrasco', '🥓🥘', 'Tudo de melhor para sua feijoada tradicional ou churrasco em família.', 2, 'Outros');
+        insertStmt.run('Pescados e Empório Tradicional Ibérico', '🐟🇵🇹', 'Seleção especial de pescados frescos, frutos do mar e produtos tradicionais ibéricos.', 3, 'Outros');
+        insertStmt.run('Hora do Lanche e Snacks', '🥜🥨', 'Biscoitos, petiscos, oleaginosas, snacks deliciosos para qualquer hora do dia.', 4, 'CASTANHAS');
+        insertStmt.run('Confeitaria e Sobremesas', '🍰🥥', 'Doces finos, confeitos, bolos, tortas e sobremesas prontas para adoçar sua vida.', 5, 'Outros');
+        insertStmt.run('Mundo Fitness e Suplementação', '💪⚡', 'Tudo para sua suplementação física, whey, creatina e produtos voltados à saúde.', 6, 'Outros');
+        insertStmt.run('Empório Natural, Grãos e Farinhas Naturais', '🌾🌿', 'Grãos, cereais, sementes selecionadas e farinhas especiais de alta qualidade.', 7, 'CASTANHAS');
+        insertStmt.run('Cantinho Árabe, Especiarias e Ervas', '🌶️👳', 'Ervas aromáticas, especiarias do oriente e iguarias da culinária árabe tradicional.', 8, 'TEMPEROS');
+        insertStmt.run('Despensa e Utilidades Básicas', '🛒🥫', 'Produtos básicos de mercearia, enlatados e utilidades essenciais da despensa.', 9, 'Outros');
+      }
+      
+      // Update existing database categories to new sector categories:
+      db.prepare("UPDATE categorias SET setor = 'QUEIJOS' WHERE nome = 'Mesa de Frios, Queijos e Antepastos'").run();
+      db.prepare("UPDATE categorias SET setor = 'TEMPEROS' WHERE nome = 'Cantinho Árabe, Especiarias e Ervas'").run();
+      db.prepare("UPDATE categorias SET setor = 'CASTANHAS' WHERE nome IN ('Hora do Lanche e Snacks', 'Empório Natural, Grãos e Farinhas Naturais')").run();
+      db.prepare("UPDATE categorias SET setor = 'Outros' WHERE nome NOT IN ('Mesa de Frios, Queijos e Antepastos', 'Cantinho Árabe, Especiarias e Ervas', 'Hora do Lanche e Snacks', 'Empório Natural, Grãos e Farinhas Naturais')").run();
+    } catch (seedErr) {
+      console.error('[DATABASE] Erro ao realizar seed de categorias:', seedErr);
+    }
 
     // Toledo — Log de processamento
     db.exec(`

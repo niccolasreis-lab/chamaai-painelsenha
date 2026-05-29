@@ -4,15 +4,23 @@ import { getApiUrl } from '../shared/apiConfig';
 import { AlertTriangle } from 'lucide-react';
 
 const CATEGORY_RULES: { pattern: RegExp; category: string }[] = [
-  { pattern: /mussarela|queijo|requeijão|ricota|provolone/i, category: 'Queijos e Laticínios' },
-  { pattern: /linguiça|salame|presunto|apresuntado|mortadela|bacon|salsicha|carne/i, category: 'Embutidos, Frios e Carnes' },
-  { pattern: /peixe|bacalhau|camarão|salmão|merluza|atum/i, category: 'Peixes e Frutos do Mar' },
-  { pattern: /castanha|nozes|amendoim|amêndoa|pistache|avelã/i, category: 'Oleaginosas e Castanhas' },
-  { pattern: /uva passa|ameixa|tâmara|damasco|fruta seca|cranberry/i, category: 'Frutas Secas e Desidratadas' },
-  { pattern: /farinha|polvilho|amido|tapioca|fubá/i, category: 'Farinhas, Amidos e Polvilhos' },
-  { pattern: /feijão|arroz|grão de bico|lentilha|soja|aveia|quinoa/i, category: 'Grãos, Cereais e Sementes' },
-  { pattern: /tempero|orégano|pimenta|azeitona|alcaparra|conserva|alho/i, category: 'Temperos, Especiarias e Conservas' },
-  { pattern: /chá|suplemento|whey|creatina|ômega|vitamina/i, category: 'Suplementos, Chás e Produtos Naturais' },
+  { pattern: /mussarela|queijo|requeijão|ricota|provolone|brie|coalho|emental|parmesao|parmesão|gorgonzola/i, category: 'Mesa de Frios, Queijos e Antepastos' },
+  { pattern: /frios|apresuntado|presunto|mortadela|salame|copa|lombo|peito de peru|alcaparra|azeitona|antepasto|conserva/i, category: 'Mesa de Frios, Queijos e Antepastos' },
+  { pattern: /linguiça|linguica|bacon|paio|carne seca|charque|churrasco|panceta|costelinha|carne/i, category: 'Ingredientes para Feijoada e Churrasco' },
+  { pattern: /peixe|bacalhau|camarão|camarao|salmão|salmao|pescados|iberico|ibérico|azeite/i, category: 'Pescados e Empório Tradicional Ibérico' },
+  { pattern: /lanche|snack|castanha|nozes|amendoim|amêndoa|pistache|biscoito|bolacha|salgadinho/i, category: 'Hora do Lanche e Snacks' },
+  { pattern: /sobremesa|doce|bolo|tortinha|confeitaria|chocolate|coco|calda|leite condensado/i, category: 'Confeitaria e Sobremesas' },
+  { pattern: /fitness|suplemento|whey|creatina|proteina|proteína|albumina|colageno/i, category: 'Mundo Fitness e Suplementação' },
+  { pattern: /natural|graos|grãos|farinha|semente|chia|quinoa|aveia|linhaça/i, category: 'Empório Natural, Grãos e Farinhas Naturais' },
+  { pattern: /arabe|árabe|especiarias|ervas|tempero|orégano|pimenta|cominho|curry/i, category: 'Cantinho Árabe, Especiarias e Ervas' },
+];
+
+export const SETORES_PADRAO = [
+  'AZEITONAS',
+  'QUEIJOS',
+  'TEMPEROS',
+  'CASTANHAS',
+  'Outros'
 ];
 
 export function sugerirCategoria(descricao: string): string | null {
@@ -51,7 +59,7 @@ export default function ToledoConfig() {
   const [activeTab, setActiveTab] = useState<'produtos' | 'categorias' | 'logs' | 'ordenar'>('produtos');
   const [searchQuery, setSearchQuery] = useState('');
   const [novoPlu, setNovoPlu] = useState('');
-  const [novaCategoria, setNovaCategoria] = useState('Queijos e Laticínios');
+  const [novaCategoria, setNovaCategoria] = useState('');
   const API_URL = getApiUrl();
   const [categoriasOrdem, setCategoriasOrdem] = useState<string[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -60,6 +68,19 @@ export default function ToledoConfig() {
   const [masterLoginError, setMasterLoginError] = useState('');
   const [masterLoginLoading, setMasterLoginLoading] = useState(false);
   const [isMasterRemote, setIsMasterRemote] = useState(false);
+
+  // Dynamic Categories CRUD & Import/Export states
+  const [categoriasLista, setCategoriasLista] = useState<any[]>([]);
+  const [editingCategoria, setEditingCategoria] = useState<any | null>(null);
+  const [catNome, setCatNome] = useState('');
+  const [catEmoji, setCatEmoji] = useState('');
+  const [catDescricao, setCatDescricao] = useState('');
+  const [catOrdem, setCatOrdem] = useState(0);
+  const [catAtivo, setCatAtivo] = useState(true);
+  const [catSetor, setCatSetor] = useState('Outros');
+  const [importText, setImportText] = useState('');
+  const [importFormat, setImportFormat] = useState<'json' | 'csv'>('json');
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const handleMasterLogin = async () => {
     setMasterLoginLoading(true);
@@ -119,19 +140,6 @@ export default function ToledoConfig() {
     setDraggedIndex(null);
   };
 
-  const CATEGORIAS_PADRAO = [
-    { id: 'Queijos e Laticínios', icon: '🧀' },
-    { id: 'Embutidos, Frios e Carnes', icon: '🥩' },
-    { id: 'Peixes e Frutos do Mar', icon: '🐟' },
-    { id: 'Oleaginosas e Castanhas', icon: '🥜' },
-    { id: 'Frutas Secas e Desidratadas', icon: '🍇' },
-    { id: 'Farinhas, Amidos e Polvilhos', icon: '🌾' },
-    { id: 'Grãos, Cereais e Sementes', icon: '🌱' },
-    { id: 'Temperos, Especiarias e Conservas', icon: '🌿' },
-    { id: 'Suplementos, Chás e Produtos Naturais', icon: '🍵' },
-    { id: 'Outros e Utilidades', icon: '📦' },
-  ];
-
   const safeFetchJson = async (url: string, fallback: any = []) => {
     try {
       const res = await fetch(url);
@@ -143,19 +151,39 @@ export default function ToledoConfig() {
     }
   };
 
+  const fetchCategoriasLista = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/categorias`);
+      if (res.ok) {
+        const data = await res.json();
+        setCategoriasLista(data);
+        if (data.length > 0 && !novaCategoria) {
+          setNovaCategoria(data[0].nome);
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao carregar categorias dinâmicas:', err);
+    }
+  };
+
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [prodData, logData, catData, cfgData] = await Promise.all([
+      const [prodData, logData, catData, cfgData, catsData] = await Promise.all([
         safeFetchJson(`${API_URL}/api/toledo/produtos`, []),
         safeFetchJson(`${API_URL}/api/toledo/log`, []),
         safeFetchJson(`${API_URL}/api/toledo/categorias`, {}),
         safeFetchJson(`${API_URL}/api/configuracoes`, {}),
+        safeFetchJson(`${API_URL}/api/categorias`, []),
       ]);
       setProdutos(prodData);
       setLogs(logData);
       setCategorias(catData);
       setConfig(cfgData);
+      setCategoriasLista(catsData);
+      if (catsData.length > 0 && !novaCategoria) {
+        setNovaCategoria(catsData[0].nome);
+      }
       // Carrega ordem das categorias
       const ordemData = await safeFetchJson(`${API_URL}/api/toledo/categorias-ordem`, []);
       if (Array.isArray(ordemData) && ordemData.length > 0) {
@@ -251,7 +279,6 @@ export default function ToledoConfig() {
     const updated = { ...categorias, [novoPlu.trim()]: novaCategoria.trim() };
     saveCategorias(updated);
     setNovoPlu('');
-    setNovaCategoria('');
   };
 
   const handleRemoveCategoria = (plu: string) => {
@@ -279,6 +306,127 @@ export default function ToledoConfig() {
     }
   };
 
+  const handleSaveCategoria = async () => {
+    if (!catNome.trim()) {
+      alert('O nome da categoria é obrigatório.');
+      return;
+    }
+    const payload = {
+      nome: catNome.trim(),
+      emoji: catEmoji.trim(),
+      descricao: catDescricao.trim(),
+      ordem: Number(catOrdem),
+      ativo: catAtivo,
+      setor: catSetor
+    };
+
+    try {
+      let res;
+      if (editingCategoria) {
+        res = await fetch(`${API_URL}/api/categorias/${editingCategoria.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        res = await fetch(`${API_URL}/api/categorias`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      if (res.ok) {
+        alert(editingCategoria ? 'Categoria atualizada!' : 'Categoria criada com sucesso!');
+        setEditingCategoria(null);
+        clearCatForm();
+        await fetchCategoriasLista();
+        const ordemData = await safeFetchJson(`${API_URL}/api/toledo/categorias-ordem`, []);
+        setCategoriasOrdem(ordemData);
+      } else {
+        const err = await res.json();
+        alert(`Erro: ${err.error || 'Falha ao salvar'}`);
+      }
+    } catch (e: any) {
+      alert(`Erro de conexão: ${e.message}`);
+    }
+  };
+
+  const handleEditCategoria = (cat: any) => {
+    setEditingCategoria(cat);
+    setCatNome(cat.nome);
+    setCatEmoji(cat.emoji);
+    setCatDescricao(cat.descricao);
+    setCatOrdem(cat.ordem);
+    setCatAtivo(cat.ativo);
+    setCatSetor(cat.setor || 'Mercearia');
+  };
+
+  const handleDeleteCategoria = async (id: number) => {
+    if (!confirm('Deseja realmente excluir esta categoria? Isso não removerá os produtos, mas eles perderão este mapeamento.')) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/api/categorias/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        alert('Categoria excluída com sucesso!');
+        await fetchCategoriasLista();
+        const ordemData = await safeFetchJson(`${API_URL}/api/toledo/categorias-ordem`, []);
+        setCategoriasOrdem(ordemData);
+      } else {
+        alert('Erro ao excluir categoria.');
+      }
+    } catch (e: any) {
+      alert(`Erro: ${e.message}`);
+    }
+  };
+
+  const clearCatForm = () => {
+    setCatNome('');
+    setCatEmoji('');
+    setCatDescricao('');
+    setCatOrdem(0);
+    setCatAtivo(true);
+    setCatSetor('Outros');
+    setEditingCategoria(null);
+  };
+
+  const handleImportCategorias = async () => {
+    if (!importText.trim()) {
+      alert('Insira o conteúdo para importar.');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/api/categorias/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: importText,
+          format: importFormat
+        })
+      });
+      if (res.ok) {
+        alert('Importação concluída com sucesso!');
+        setShowImportModal(false);
+        setImportText('');
+        await fetchCategoriasLista();
+        const ordemData = await safeFetchJson(`${API_URL}/api/toledo/categorias-ordem`, []);
+        setCategoriasOrdem(ordemData);
+      } else {
+        const err = await res.json();
+        alert(`Erro na importação: ${err.error || 'Falha'}`);
+      }
+    } catch (e: any) {
+      alert(`Erro de conexão: ${e.message}`);
+    }
+  };
+
+  const handleExportCategorias = (format: 'json' | 'csv') => {
+    window.open(`${API_URL}/api/categorias/export?format=${format}`, '_blank');
+  };
+
   const formatPreco = (preco: number) => {
     const reais = Math.floor(preco / 100);
     const centavos = preco % 100;
@@ -291,6 +439,24 @@ export default function ToledoConfig() {
     } catch {
       return dateStr;
     }
+  };
+
+  const getGroupedCategorias = () => {
+    const groupedMap: Record<string, typeof categoriasLista> = {};
+    
+    SETORES_PADRAO.forEach(setor => {
+      groupedMap[setor] = [];
+    });
+    
+    categoriasLista.forEach(c => {
+      const s = c.setor || 'Mercearia';
+      if (!groupedMap[s]) {
+        groupedMap[s] = [];
+      }
+      groupedMap[s].push(c);
+    });
+    
+    return Object.entries(groupedMap).filter(([, items]) => items.length > 0);
   };
 
   // Group products by category for the products tab
@@ -834,8 +1000,16 @@ export default function ToledoConfig() {
                                   disabled={!isMasterServer}
                                   className="text-xs font-bold bg-surface border border-outline-variant rounded-lg px-2 py-1.5 outline-none focus:border-primary disabled:opacity-50"
                                 >
-                                  {CATEGORIAS_PADRAO.map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
-                                  {!CATEGORIAS_PADRAO.find(c => c.id === p.categoria) && <option value={p.categoria}>{p.categoria}</option>}
+                                  {getGroupedCategorias().map(([setor, cats]) => (
+                                    <optgroup key={setor} label={setor.toUpperCase()}>
+                                      {cats.map(c => (
+                                        <option key={c.nome} value={c.nome}>
+                                          {c.emoji} {c.nome}
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  ))}
+                                  {!categoriasLista.find(c => c.nome === p.categoria) && <option value={p.categoria}>{p.categoria}</option>}
                                 </select>
                                 {(() => {
                                   const sugestao = sugerirCategoria(p.descricao);
@@ -886,101 +1060,312 @@ export default function ToledoConfig() {
             {/* Categories Tab */}
             {activeTab === 'categorias' && (
               <div className="space-y-6">
-                {/* Add new category mapping */}
-                <div className="bg-surface rounded-2xl p-6 border border-outline-variant/50 shadow-sm">
-                  <h3 className="font-bold text-sm text-ink uppercase tracking-widest mb-4">Adicionar Mapeamento</h3>
-                  <div className="flex gap-4 items-end">
-                    <div className="flex-1">
-                      <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-2">Código PLU</label>
-                      <input
-                        type="text"
-                        value={novoPlu}
-                        onChange={(e) => setNovoPlu(e.target.value)}
-                        placeholder="Ex: 1441"
-                        maxLength={4}
-                        className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                      />
+                
+                {/* 1. GERENCIAR CATEGORIAS DO BANCO */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  
+                  {/* Formulário de Adicionar / Editar Categoria */}
+                  <div className="bg-surface rounded-2xl p-6 border border-outline-variant/50 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <h3 className="font-bold text-sm text-ink uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-base">category</span>
+                        {editingCategoria ? 'Editar Categoria' : 'Nova Categoria'}
+                      </h3>
+                      
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Nome da Categoria</label>
+                          <input
+                            type="text"
+                            value={catNome}
+                            onChange={(e) => setCatNome(e.target.value)}
+                            placeholder="Ex: Adega e Vinhos"
+                            className="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-variant text-ink font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Emoji / Ícone</label>
+                          <input
+                            type="text"
+                            value={catEmoji}
+                            onChange={(e) => setCatEmoji(e.target.value)}
+                            placeholder="Ex: 🍷"
+                            maxLength={10}
+                            className="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-variant text-ink font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Descrição Personalizada</label>
+                          <textarea
+                            value={catDescricao}
+                            onChange={(e) => setCatDescricao(e.target.value)}
+                            placeholder="Descrição para exibir no portal do cliente (opcional)..."
+                            rows={3}
+                            className="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-variant text-ink font-medium text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Setor / Departamento</label>
+                          <select
+                            value={catSetor}
+                            onChange={(e) => setCatSetor(e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-variant text-ink font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+                          >
+                            {SETORES_PADRAO.map(setor => (
+                              <option key={setor} value={setor}>
+                                {setor}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Ordem</label>
+                            <input
+                              type="number"
+                              value={catOrdem}
+                              onChange={(e) => setCatOrdem(Number(e.target.value))}
+                              min="0"
+                              className="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-2">Ativo</label>
+                            <button
+                              type="button"
+                              onClick={() => setCatAtivo(!catAtivo)}
+                              className={`w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest border transition-all ${
+                                catAtivo 
+                                  ? 'bg-success/10 text-success border-success/20 hover:bg-success/20' 
+                                  : 'bg-surface-variant text-ink-secondary border border-outline-variant hover:bg-error/5 hover:text-error hover:border-error/20'
+                              }`}
+                            >
+                              {catAtivo ? '✓ Sim' : '✕ Não'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-[2]">
-                      <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-2">Categoria Visual</label>
-                      <select
-                        value={novaCategoria}
-                        onChange={(e) => setNovaCategoria(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
+
+                    <div className="flex gap-2 mt-6">
+                      <button
+                        onClick={handleSaveCategoria}
+                        disabled={!isMasterServer}
+                        className="flex-1 bg-primary text-white py-3 rounded-xl font-bold hover:bg-primary-hover active:scale-95 transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 disabled:opacity-50"
                       >
-                        {CATEGORIAS_PADRAO.map(cat => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.icon} {cat.id}
-                          </option>
-                        ))}
-                      </select>
+                        <span className="material-symbols-outlined text-sm">save</span>
+                        <span>{editingCategoria ? 'Atualizar' : 'Criar'}</span>
+                      </button>
+                      
+                      {editingCategoria && (
+                        <button
+                          onClick={clearCatForm}
+                          className="px-4 bg-surface-variant border border-outline-variant text-ink rounded-xl font-bold hover:bg-surface-variant/80 active:scale-95 transition-all text-xs uppercase tracking-wider"
+                        >
+                          Cancelar
+                        </button>
+                      )}
                     </div>
+                  </div>
+
+                  {/* Lista de Categorias Atuais */}
+                  <div className="bg-surface rounded-2xl border border-outline-variant/50 shadow-sm overflow-hidden lg:col-span-2 flex flex-col justify-between">
+                    <div>
+                      <div className="px-6 py-4 bg-surface-variant/30 border-b border-outline-variant/30 flex justify-between items-center">
+                        <h3 className="font-bold text-sm text-ink uppercase tracking-widest">Categorias Cadastradas ({categoriasLista.length})</h3>
+                        
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleExportCategorias('json')}
+                            className="bg-surface border border-outline-variant hover:bg-surface-variant text-ink-secondary hover:text-ink px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">download</span>
+                            <span>JSON</span>
+                          </button>
+                          <button
+                            onClick={() => handleExportCategorias('csv')}
+                            className="bg-surface border border-outline-variant hover:bg-surface-variant text-ink-secondary hover:text-ink px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">download</span>
+                            <span>CSV</span>
+                          </button>
+                          <button
+                            onClick={() => setShowImportModal(true)}
+                            disabled={!isMasterServer}
+                            className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1 disabled:opacity-50"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">upload</span>
+                            <span>Importar</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {categoriasLista.length === 0 ? (
+                        <div className="p-8 text-center text-ink-secondary">
+                          <p className="font-bold uppercase tracking-widest">Nenhuma categoria no banco</p>
+                        </div>
+                      ) : (
+                        <div className="max-h-[300px] overflow-y-auto divide-y divide-outline-variant/20">
+                          {categoriasLista.map((c) => (
+                            <div key={c.id} className={`px-6 py-3 flex items-center justify-between hover:bg-surface-variant/20 transition-colors ${!c.ativo ? 'opacity-50 bg-surface-variant/10' : ''}`}>
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className="text-xl shrink-0 w-8 h-8 rounded-lg bg-surface-variant/65 flex items-center justify-center">{c.emoji || '📦'}</span>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-ink text-sm truncate">{c.nome}</span>
+                                    <span className="text-[9px] font-bold text-ink-secondary bg-surface-variant px-1.5 py-0.5 rounded-md">Posição: {c.ordem}</span>
+                                    <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider">{c.setor || 'Mercearia'}</span>
+                                    {!c.ativo && (
+                                      <span className="text-[9px] font-bold text-error bg-error/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider">Inativo</span>
+                                    )}
+                                  </div>
+                                  {c.descricao && (
+                                    <p className="text-[11px] text-ink-secondary truncate mt-0.5 max-w-[320px]">{c.descricao}</p>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleEditCategoria(c)}
+                                  disabled={!isMasterServer}
+                                  className="text-outline-variant hover:text-primary transition-colors p-2 outline-none disabled:opacity-50"
+                                >
+                                  <span className="material-symbols-outlined text-sm">edit</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCategoria(c.id)}
+                                  disabled={!isMasterServer}
+                                  className="text-outline-variant hover:text-error transition-colors p-2 outline-none disabled:opacity-50"
+                                >
+                                  <span className="material-symbols-outlined text-sm">delete</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. MAPEAMENTOS DE PLU */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  
+                  {/* Adicionar Mapeamento */}
+                  <div className="bg-surface rounded-2xl p-6 border border-outline-variant/50 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <h3 className="font-bold text-sm text-ink uppercase tracking-widest mb-4">Adicionar Mapeamento PLU</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-2">Código PLU</label>
+                          <input
+                            type="text"
+                            value={novoPlu}
+                            onChange={(e) => setNovoPlu(e.target.value)}
+                            placeholder="Ex: 1441"
+                            maxLength={4}
+                            className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-2">Categoria Visual</label>
+                          <select
+                            value={novaCategoria}
+                            onChange={(e) => setNovaCategoria(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
+                          >
+                            {getGroupedCategorias().map(([setor, cats]) => (
+                              <optgroup key={setor} label={setor.toUpperCase()}>
+                                {cats.map(cat => (
+                                  <option key={cat.nome} value={cat.nome}>
+                                    {cat.emoji} {cat.nome}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    
                     <button
                       onClick={handleAddCategoria}
                       disabled={!isMasterServer}
-                      className="bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary-hover transition-all active:scale-95 flex items-center space-x-2 outline-none uppercase tracking-widest text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full bg-primary text-white py-3.5 rounded-xl font-bold hover:bg-primary-hover transition-all active:scale-95 flex items-center justify-center space-x-2 outline-none uppercase tracking-widest text-xs mt-6 disabled:opacity-50"
                     >
                       <span className="material-symbols-outlined text-sm">add</span>
-                      <span>Adicionar</span>
+                      <span>Vincular PLU</span>
                     </button>
-                  </div>
-                  {/* Sugestão baseada no PLU digitado */}
-                  {novoPlu && (() => {
-                    const prodMatch = produtos.find(p => p.plu === novoPlu);
-                    if (prodMatch) {
-                      const sugestao = sugerirCategoria(prodMatch.descricao);
-                      return (
-                        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
-                          <div className="text-sm flex flex-col">
-                            <span className="font-bold text-blue-900">{prodMatch.descricao}</span>
-                            {sugestao && <span className="text-blue-700 mt-1">💡 Categoria Sugerida: <b>{sugestao}</b></span>}
+                    
+                    {/* Sugestão baseada no PLU digitado */}
+                    {novoPlu && (() => {
+                      const prodMatch = produtos.find(p => p.plu === novoPlu);
+                      if (prodMatch) {
+                        const sugestao = sugerirCategoria(prodMatch.descricao);
+                        return (
+                          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex flex-col gap-2">
+                            <span className="font-bold text-xs text-blue-900 leading-tight">{prodMatch.descricao}</span>
+                            {sugestao && (
+                              <div className="flex items-center justify-between gap-2 mt-1">
+                                <span className="text-[10px] text-blue-700">💡 Sugerido: <b>{sugestao}</b></span>
+                                {novaCategoria !== sugestao && isMasterServer && (
+                                  <button
+                                    onClick={() => setNovaCategoria(sugestao)}
+                                    className="text-[9px] font-bold bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 transition-colors"
+                                  >
+                                    Aplicar
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          {sugestao && novaCategoria !== sugestao && isMasterServer && (
-                            <button
-                              onClick={() => setNovaCategoria(sugestao)}
-                              className="text-xs font-bold bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
-                            >
-                              Aplicar Sugestão
-                            </button>
-                          )}
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
 
-                {/* Existing mappings */}
-                <div className="bg-surface rounded-2xl border border-outline-variant/50 shadow-sm overflow-hidden">
-                  <div className="px-6 py-4 bg-surface-variant/30 border-b border-outline-variant/30">
-                    <h3 className="font-bold text-sm text-ink uppercase tracking-widest">Mapeamentos Atuais ({Object.keys(categorias).length})</h3>
+                  {/* Mapeamentos Atuais */}
+                  <div className="bg-surface rounded-2xl border border-outline-variant/50 shadow-sm overflow-hidden lg:col-span-2">
+                    <div className="px-6 py-4 bg-surface-variant/30 border-b border-outline-variant/30">
+                      <h3 className="font-bold text-sm text-ink uppercase tracking-widest">Mapeamentos Atuais ({Object.keys(categorias).length})</h3>
+                    </div>
+                    {Object.keys(categorias).length === 0 ? (
+                      <div className="p-8 text-center text-ink-secondary">
+                        <p className="font-bold uppercase tracking-widest">Nenhum mapeamento cadastrado</p>
+                      </div>
+                    ) : (
+                      <div className="max-h-[300px] overflow-y-auto divide-y divide-outline-variant/20">
+                        {Object.entries(categorias).sort(([, a], [, b]) => a.localeCompare(b, 'pt-BR')).map(([plu, cat]) => {
+                          const catObj = categoriasLista.find(c => c.nome === cat);
+                          return (
+                            <div key={plu} className="px-6 py-2.5 flex items-center justify-between hover:bg-surface-variant/20 transition-colors">
+                              <div className="flex items-center gap-4">
+                                <span className="text-xs font-mono font-bold text-primary bg-primary/10 px-3 py-1 rounded-lg min-w-[60px] text-center">{plu}</span>
+                                <span className="text-ink-secondary text-xs">→</span>
+                                <span className="font-bold text-ink text-sm flex items-center gap-2">
+                                  <span className="text-base">{catObj?.emoji || '📦'}</span>
+                                  {cat}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => handleRemoveCategoria(plu)}
+                                disabled={!isMasterServer}
+                                className="text-outline-variant hover:text-error transition-colors p-2 outline-none disabled:opacity-50"
+                              >
+                                <span className="material-symbols-outlined text-sm">delete</span>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                  {Object.keys(categorias).length === 0 ? (
-                    <div className="p-8 text-center text-ink-secondary">
-                      <p className="font-bold uppercase tracking-widest">Nenhum mapeamento cadastrado</p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-outline-variant/20">
-                      {Object.entries(categorias).sort(([, a], [, b]) => a.localeCompare(b, 'pt-BR')).map(([plu, cat]) => (
-                        <div key={plu} className="px-6 py-3 flex items-center justify-between hover:bg-surface-variant/20 transition-colors">
-                          <div className="flex items-center gap-4">
-                            <span className="text-sm font-mono font-bold text-primary bg-primary/10 px-3 py-1 rounded-lg min-w-[60px] text-center">{plu}</span>
-                            <span className="text-ink-secondary">→</span>
-                            <span className="font-bold text-ink flex items-center gap-2">
-                              <span>{CATEGORIAS_PADRAO.find(c => c.id === cat)?.icon || '📦'}</span>
-                              {cat}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => handleRemoveCategoria(plu)}
-                            className="text-outline-variant hover:text-error transition-colors p-2 outline-none"
-                          >
-                            <span className="material-symbols-outlined text-sm">delete</span>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-4">
@@ -993,6 +1378,88 @@ export default function ToledoConfig() {
                     </p>
                   </div>
                 </div>
+
+                {/* Modal de Importação de Categorias */}
+                {showImportModal && (
+                  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-surface border border-outline-variant/65 rounded-3xl p-6 shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col justify-between overflow-hidden animate-slide-up">
+                      <div>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-bold text-lg text-ink uppercase tracking-wider flex items-center gap-2">
+                            <span className="material-symbols-outlined">upload</span>
+                            <span>Importar Categorias</span>
+                          </h3>
+                          <button 
+                            onClick={() => { setShowImportModal(false); setImportText(''); }}
+                            className="text-ink-secondary hover:text-ink font-bold text-xl outline-none"
+                          >✕</button>
+                        </div>
+
+                        <p className="text-xs text-ink-secondary mb-4 leading-relaxed">
+                          Cole seu código JSON (formato array de objetos) ou conteúdo CSV. A importação irá mesclar novos itens com os já existentes baseados no nome da categoria.
+                        </p>
+
+                        <div className="flex gap-4 mb-4">
+                          <button
+                            type="button"
+                            onClick={() => setImportFormat('json')}
+                            className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all ${
+                              importFormat === 'json'
+                                ? 'bg-primary text-white border-primary shadow-md shadow-primary/10'
+                                : 'bg-surface-variant text-ink border border-outline-variant'
+                            }`}
+                          >
+                            JSON (Array)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setImportFormat('csv')}
+                            className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all ${
+                              importFormat === 'csv'
+                                ? 'bg-primary text-white border-primary shadow-md shadow-primary/10'
+                                : 'bg-surface-variant text-ink border border-outline-variant'
+                            }`}
+                          >
+                            CSV (Colunas)
+                          </button>
+                        </div>
+
+                        <div className="bg-surface-variant/30 border border-outline-variant/50 p-2.5 rounded-2xl mb-4 text-[10px] font-mono text-ink-secondary leading-relaxed">
+                          {importFormat === 'json' ? (
+                            <span>Exemplo JSON: <br />{'[{"nome": "Doces", "emoji": "🍰", "descricao": "Sobremesas", "ordem": 5, "ativo": true}]'}</span>
+                          ) : (
+                            <span>Exemplo CSV (com cabeçalho): <br />{'nome,emoji,descricao,ordem,ativo'}<br />{'Doces,🍰,Sobremesas,5,true'}</span>
+                          )}
+                        </div>
+
+                        <textarea
+                          value={importText}
+                          onChange={(e) => setImportText(e.target.value)}
+                          placeholder={importFormat === 'json' ? 'Cole o JSON aqui...' : 'Cole o CSV aqui...'}
+                          rows={8}
+                          className="w-full p-4 rounded-2xl border border-outline-variant bg-surface-variant text-ink font-mono text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                        />
+                      </div>
+
+                      <div className="flex gap-3 mt-6">
+                        <button
+                          onClick={handleImportCategorias}
+                          disabled={!importText.trim()}
+                          className="flex-1 bg-primary hover:bg-primary-hover text-white py-3 rounded-xl font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all"
+                        >
+                          <span className="material-symbols-outlined text-sm">check_circle</span>
+                          <span>Confirmar Importação</span>
+                        </button>
+                        <button
+                          onClick={() => { setShowImportModal(false); setImportText(''); }}
+                          className="px-6 bg-surface-variant border border-outline-variant text-ink font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-surface-variant/80 active:scale-95 transition-all"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1040,7 +1507,7 @@ export default function ToledoConfig() {
                         <div className="flex items-center gap-3">
                           <span className="material-symbols-outlined text-ink-secondary/40">drag_indicator</span>
                           <span className="bg-primary/10 text-primary font-black text-xs w-7 h-7 flex items-center justify-center rounded-lg">{i + 1}</span>
-                          <span className="font-bold text-ink">{CATEGORIAS_PADRAO.find(c => c.id === cat)?.icon || '📦'} {cat}</span>
+                          <span className="font-bold text-ink">{categoriasLista.find(c => c.nome === cat)?.emoji || '📦'} {cat}</span>
                         </div>
                         <div className="flex gap-1">
                           <button

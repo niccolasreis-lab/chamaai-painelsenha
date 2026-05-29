@@ -34,6 +34,7 @@ app.commandLine.appendSwitch('disable-background-timer-throttling');
 let mainWindow: BrowserWindow | null = null;
 let printerService: PrinterService;
 let isQuitting = false;
+let isServerStopped = false;
 
 /** Carrega config de impressora do banco */
 function loadPrinterConfig(): Partial<PrinterConfig> {
@@ -195,7 +196,7 @@ ipcMain.handle('create-shortcut', async (_event, { route, title }) => {
     target: exePath,
     args: `--${route}`,
     cwd: path.dirname(exePath),
-    description: `Abre o ChamaAí diretamente na tela do ${title}`,
+    description: `Abre o ChamaAi diretamente na tela do ${title}`,
     appUserModelId: 'com.chamaai.app'
   });
   
@@ -230,23 +231,47 @@ ipcMain.handle('check-for-updates', async () => {
 ipcMain.handle('install-update', async () => {
   if (!app.isPackaged) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
   try {
-    console.log('[UPDATE] Solicitando quitAndInstall silencioso. Iniciando Graceful Shutdown prévio...');
+    console.log('[UPDATE] Iniciando Graceful Shutdown pré-atualização...');
     
-    // Define a flag para true para que o listener de before-quit ignore o fechamento padrão e evite preventDefault()
+    // Define as flags para que o listener de before-quit não tente fazer double-close
     isQuitting = true;
     
     // Libera recursos e para o servidor Express de forma síncrona com o processo de atualização
     globalShortcut.unregisterAll();
-    try { 
-      await stopServer(); 
-      console.log('[UPDATE] Graceful shutdown concluído com sucesso antes da atualização.');
-    } catch (e) { 
-      console.error('[UPDATE] Erro no stopServer antes do quitAndInstall:', e); 
+    
+    if (!isServerStopped) {
+      try { 
+        await stopServer(); 
+        isServerStopped = true;
+        console.log('[UPDATE] Graceful shutdown concluído com sucesso antes da atualização.');
+      } catch (e) { 
+        console.error('[UPDATE] Erro no stopServer antes do quitAndInstall:', e); 
+      }
     }
     
-    // Agora que o servidor Express foi desligado, o DB fechado e todas as portas/arquivos liberados,
-    // iniciamos o quitAndInstall. A flag isSilent=true é mantida para que o instalador execute silenciosamente no Totem/Guichê.
-    autoUpdater.quitAndInstall(true, true);
+    // Aguarda o OS liberar os handles de arquivo (critical para o better-sqlite3.node)
+    // Sem esse delay, o NSIS tenta deletar o .node enquanto o Windows ainda tem o handle aberto
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Determina se o instalador deve rodar de forma silenciosa (apenas no Totem/Telão para evitar UIs indesejadas)
+    // Para desenvolvedores e operador/admin normal, roda interativo para que vejam a interface do instalador abrindo.
+    const args = process.argv.slice(1);
+    const isTotem = args.some(arg => arg.includes('--totem'));
+    const isTelao = args.some(arg => arg.includes('--telao'));
+    const isSilent = isTotem || isTelao;
+    
+    console.log(`[UPDATE] Chamando quitAndInstall. MODO SILENCIOSO: ${isSilent}`);
+    
+    // Agora que o servidor Express foi desligado, o DB fechado
+    // e todas as portas/arquivos liberados, iniciamos o quitAndInstall.
+    autoUpdater.quitAndInstall(isSilent, true);
+    
+    // Fallback: se por qualquer motivo quitAndInstall não matar o processo em 10s, forçamos a saída
+    setTimeout(() => {
+      console.log('[UPDATE] Fallback: forçando saída do processo após timeout.');
+      app.exit(0);
+    }, 10000);
+    
     return { success: true };
   } catch (err: any) {
     console.error('[UPDATE] Erro crítico no install-update:', err);
@@ -395,10 +420,15 @@ app.on('before-quit', async (event) => {
     console.log('[SYSTEM] Iniciando Graceful Shutdown...');
     
     globalShortcut.unregisterAll();
-    try { 
-      await stopServer(); 
-    } catch (e) { 
-      console.error('[SYSTEM] Erro no stopServer durante o desligamento:', e); 
+    
+    // Só chama stopServer se ainda não foi chamado pelo install-update
+    if (!isServerStopped) {
+      try { 
+        await stopServer();
+        isServerStopped = true;
+      } catch (e) { 
+        console.error('[SYSTEM] Erro no stopServer durante o desligamento:', e); 
+      }
     }
     
     console.log('[SYSTEM] Cleanup finalizado. Encerrando processo.');

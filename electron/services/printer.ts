@@ -196,7 +196,7 @@ export class PrinterService {
           console.error('[PrinterService] Erro ao carregar nome_estabelecimento do banco:', e);
         }
 
-        const tituloEstabelecimento = nomeEstabelecimento || data.balcao || 'ChamaAí';
+        const tituloEstabelecimento = nomeEstabelecimento || data.balcao || 'ChamaAi';
         const mostrarEscrita = printFlags.print_escrita !== '0';
         const largura = this.config.width === 32 ? '58mm' : '80mm';
         const mostraQRCode = printFlags.print_qrcode !== '0';

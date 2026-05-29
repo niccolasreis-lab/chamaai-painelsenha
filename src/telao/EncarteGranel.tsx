@@ -27,203 +27,7 @@ const COLORS = {
 
 const STRIPE_COLORS = [COLORS.green, COLORS.amber, COLORS.gold, COLORS.forest];
 
-// ── Category icon/label map ──────────────────────────────────────────────────
-function getCategoryMeta(name: string) {
-  const n = (name || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim();
-
-  // 1. Queijos e Laticínios
-  if (n === 'queijos e laticinios' || n.includes('queijo') || n.includes('laticinio'))
-    return { icon: '🧀', label: 'Queijos & Laticínios', tag: 'laticinios' };
-  
-  // 2. Embutidos, Frios e Carnes
-  if (n === 'embutidos, frios e carnes' || n.includes('embutido') || n.includes('frio') || n.includes('carne'))
-    return { icon: '🥩', label: 'Embutidos & Frios', tag: 'frios' };
-  
-  // 3. Peixes e Frutos do Mar
-  if (n === 'peixes e frutos do mar' || n.includes('peixe') || n.includes('mar'))
-    return { icon: '🐟', label: 'Peixes & Frutos do Mar', tag: 'peixes' };
-  
-  // 4. Oleaginosas e Castanhas
-  if (n === 'oleaginosas e castanhas' || n.includes('oleaginosa') || n.includes('castanha'))
-    return { icon: '🥜', label: 'Castanhas & Sementes', tag: 'oleaginosas' };
-  
-  // 5. Frutas Secas e Desidratadas
-  if (n === 'frutas secas e desidratadas' || n.includes('fruta seca') || n.includes('desidratada'))
-    return { icon: '🍇', label: 'Frutas Secas', tag: 'desidratadas' };
-  
-  // 6. Farinhas, Amidos e Polvilhos
-  if (n === 'farinhas, amidos e polvilhos' || n.includes('farinha') || n.includes('amido') || n.includes('polvilho'))
-    return { icon: '🌾', label: 'Farináceos & Amidos', tag: 'farinhas' };
-  
-  // 7. Grãos, Cereais e Sementes
-  if (n === 'graos, cereais e sementes' || n.includes('grao') || n.includes('cereal') || n.includes('semente'))
-    return { icon: '🌱', label: 'Grãos & Cereais', tag: 'graos' };
-  
-  // 8. Temperos, Especiarias e Conservas
-  if (n === 'temperos, especiarias e conservas' || n.includes('tempero') || n.includes('especiaria') || n.includes('conserva'))
-    return { icon: '🌿', label: 'Temperos & Conservas', tag: 'temperos' };
-  
-  // 9. Suplementos, Chás e Produtos Naturais
-  if (n === 'suplementos, chas e produtos naturais' || n.includes('suplemento') || n.includes('cha') || n.includes('produto natural'))
-    return { icon: '🍵', label: 'Suplementos & Chás', tag: 'suplementos' };
-
-  // 10. Outros e Utilidades (Default)
-  return { icon: '📦', label: 'Outros & Utilidades', tag: 'outros' };
-}
-
-function getProductIcon(desc: string) {
-  const d = desc.toLowerCase();
-
-  // ── Carnes / Açougue ──
-  if (d.match(/picanha|alcatra|maminha|contra.?fil|fil.?mignon|patinho|coxão|lagarto|acém|acem/)) return '🥩';
-  if (d.match(/costela|t.?bone|baby.?beef|bife|chuleta/)) return '🥩';
-  if (d.match(/carne\s|carne$|bovina|bovino|gado|boi\b/)) return '🥩';
-  if (d.match(/suíno|suino|porco|lombo|pernil|panceta|bacon|toucinho|leitão|leitao/)) return '🐷';
-  if (d.match(/frango|peito de frango|coxa|sobrecoxa|asa\b|filé de frango|file de frango|chester/)) return '🍗';
-  if (d.match(/linguiça|linguica|calabresa|paio|chouriço|chourico/)) return '🌭';
-  if (d.match(/salsicha|hot.?dog|frank/)) return '🌭';
-  if (d.match(/hambúrguer|hamburguer|burger/)) return '🍔';
-  if (d.match(/charque|carne.?seca|jerked|jabá|jaba/)) return '🥩';
-  if (d.match(/moída|moida|ground|tripa|bucho|dobradinha|rabada|rabo/)) return '🥩';
-  if (d.match(/cordeiro|cabrito|carneiro|ovelha/)) return '🐑';
-
-  // ── Frios / Embutidos ──
-  if (d.match(/salame|salami|copa|capicola|capocollo|mortadela|presunt/)) return '🥓';
-  if (d.match(/peito de peru|blanquet|apresuntado|rosbife/)) return '🥓';
-  if (d.match(/lombo\s|lombo$|defumad/)) return '🥓';
-  if (d.match(/embutido|fatiado|frios/)) return '🥓';
-
-  // ── Peixes / Frutos do Mar ──
-  if (d.match(/salmão|salmao|tilápia|tilapia|bacalhau|merluza|pescada|sardinha|atum/)) return '🐟';
-  if (d.match(/peixe|filé de peixe|file de peixe|robalo|dourado|pintado|tambaqui/)) return '🐟';
-  if (d.match(/camarão|camarao|lagosta|lula|polvo|mexilhão|mexilhao|ostra|marisco/)) return '🦐';
-
-  // ── Queijos / Laticínios ──
-  if (d.match(/queijo|mussarela|muçarela|parmesão|parmesao|provolone|gorgonzola|brie|camembert/)) return '🧀';
-  if (d.match(/ricota|cottage|coalho|minas|cheddar|gruyere|emmental|gouda/)) return '🧀';
-  if (d.match(/requeijão|requeijao|cream.?cheese/)) return '🧀';
-  if (d.match(/manteiga|margarina/)) return '🧈';
-  if (d.match(/leite\b|iogurte|coalhada|nata|creme de leite/)) return '🥛';
-  if (d.match(/ovo\b|ovos\b/)) return '🥚';
-
-  // ── Frutas (frescas e secas) ──
-  if (d.match(/ameixa/)) return '🫐';
-  if (d.match(/uva\b|passa/)) return '🍇';
-  if (d.match(/banana/)) return '🍌';
-  if (d.match(/maçã|maca|apple/)) return '🍎';
-  if (d.match(/laranja|tangerina|mexerica|bergamota/)) return '🍊';
-  if (d.match(/limão|limao|lima/)) return '🍋';
-  if (d.match(/manga\b/)) return '🥭';
-  if (d.match(/abacaxi|ananás|ananas/)) return '🍍';
-  if (d.match(/morango|framboesa|blueberry|mirtilo/)) return '🍓';
-  if (d.match(/melão|melao|melancia/)) return '🍈';
-  if (d.match(/pêssego|pessego|nectarina/)) return '🍑';
-  if (d.match(/caqui|figo/)) return '🍑';
-  if (d.match(/mamão|mamao|papaia|papaya/)) return '🍈';
-  if (d.match(/goiaba|pitanga|acerola|jabuticaba/)) return '🍒';
-  if (d.match(/abacate/)) return '🥑';
-  if (d.match(/kiwi/)) return '🥝';
-  if (d.match(/coco\b/)) return '🥥';
-  if (d.match(/pera\b|pêra/)) return '🍐';
-  if (d.match(/damasco|apricot/)) return '🍑';
-  if (d.match(/fruta\s|mix|nuts|nut|frutas/)) return '🥜';
-  if (d.match(/desidratad|cristaliz/)) return '🍇';
-  if (d.match(/cranberr/)) return '🍒';
-  if (d.match(/tâmara|tamara/)) return '🌴';
-
-  // ── Oleaginosas / Castanhas ──
-  if (d.match(/castanha|castanhas/)) return '🌰';
-  if (d.match(/nozes|noz\b|walnut/)) return '🌰';
-  if (d.match(/amêndoa|amendoa|almond/)) return '🌰';
-  if (d.match(/amendoim|peanut/)) return '🥜';
-  if (d.match(/pistache|pistachio/)) return '🥜';
-  if (d.match(/macadâmia|macadamia|pecã|pecan|avelã|avela/)) return '🌰';
-
-  // ── Grãos / Cereais ──
-  if (d.match(/arroz/)) return '🍚';
-  if (d.match(/feijão|feijao|feijoada/)) return '🫘';
-  if (d.match(/aveia/)) return '🥣';
-  if (d.match(/granola/)) return '🥣';
-  if (d.match(/lentilha|grão de bico|grao de bico|ervilha|soja/)) return '🫛';
-  if (d.match(/milho|fubá|fuba|canjica|pipoca|quirera/)) return '🌽';
-  if (d.match(/quinoa|quinua|centeio|cevada|painço|painco/)) return '🌾';
-  if (d.match(/trigo|triguilho|bulgur/)) return '🌾';
-  if (d.match(/semente|gergelim|linhaça|linhaca|chia|girassol|abóbora/)) return '🌻';
-
-  // ── Farinhas / Amidos ──
-  if (d.match(/farinha|polvilho|amido|fécula|fecula|tapioca/)) return '🌾';
-  if (d.match(/flocão|flocao|flocos/)) return '🌾';
-
-  // ── Temperos / Especiarias ──
-  if (d.match(/pimenta/)) return '🌶️';
-  if (d.match(/cominho|canela|cravo|cúrcuma|curcuma|curry|noz.?moscada/)) return '🌿';
-  if (d.match(/orégano|oregano|manjericão|manjericao|alecrim|tomilho|sálvia|salvia/)) return '🌿';
-  if (d.match(/páprica|paprica|louro|gengibre|açafrão|acafrao|erva.?doce/)) return '🌿';
-  if (d.match(/tempero|condimento|chimichurri|mostarda em grão/)) return '🌿';
-  if (d.match(/sal\b|sal\s/)) return '🧂';
-
-  // ── Doces / Confeitos ──
-  if (d.match(/chocolate|cacau|achocolatado/)) return '🍫';
-  if (d.match(/bala|jujuba|gominha|goma|confeito|drageado/)) return '🍬';
-  if (d.match(/açúcar|açucar|rapadura|mascavo|demerara|cristal/)) return '🍯';
-  if (d.match(/mel\b|melado|geleia|geléia/)) return '🍯';
-  if (d.match(/biscoito|cookie|bolacha/)) return '🍪';
-  if (d.match(/bolo|torta|brownie|cupcake/)) return '🍰';
-  if (d.match(/paçoca|pacoca|pé de moleque|pe de moleque/)) return '🍬';
-
-  // ── Bebidas ──
-  if (d.match(/café|cafe|cappuccino|espresso/)) return '☕';
-  if (d.match(/chá|cha\b|erva\s|mate\b|hibisco|camomila|cidreira|boldo/)) return '🍵';
-  if (d.match(/suco|néctar|nectar|refresco/)) return '🧃';
-  if (d.match(/cerveja|chopp|chope/)) return '🍺';
-  if (d.match(/vinho|espumante|champagne/)) return '🍷';
-  if (d.match(/whisky|whiskey|vodka|gin|rum|tequila|cachaça|cachaca/)) return '🥃';
-  if (d.match(/água|agua|mineral/)) return '💧';
-  if (d.match(/refrigerante|coca|guaraná|guarana|sprite|fanta/)) return '🥤';
-
-  // ── Padaria ──
-  if (d.match(/pão|pao|baguete|ciabatta|brioche|bisnaga/)) return '🍞';
-  if (d.match(/croissant|sonho|rosca/)) return '🥐';
-
-  // ── Massas ──
-  if (d.match(/macarrão|macarrao|espaguete|penne|fusilli|lasanha|massa\b|nhoque/)) return '🍝';
-
-  // ── Congelados ──
-  if (d.match(/sorvete|picolé|picole|gelato/)) return '🍦';
-  if (d.match(/pizza|esfiha|empada|coxinha|pastel/)) return '🍕';
-  if (d.match(/congelad|nugget|steak/)) return '🧊';
-
-  // ── Limpeza / Higiene ──
-  if (d.match(/sabão|sabao|detergente|desinfetante|amaciante|alvejante/)) return '🧴';
-  if (d.match(/papel\s|papel$|guardanapo|toalha/)) return '🧻';
-  if (d.match(/shampoo|condicionador|sabonete|creme dental|escova/)) return '🧴';
-
-  // ── Pet ──
-  if (d.match(/ração|racao|petisco|pet|cachorro|gato\b/)) return '🐕';
-
-  // ── Conservas / Enlatados ──
-  if (d.match(/azeitona|palmito|milho verde|ervilha|conserva/)) return '🫒';
-  if (d.match(/extrato|molho|catchup|ketchup|maionese|mostarda/)) return '🥫';
-
-  // ── Azeites / Óleos ──
-  if (d.match(/azeite|óleo|oleo|vinagre/)) return '🫒';
-
-  // ── Hortifruti / Verduras ──
-  if (d.match(/alface|rúcula|rucula|espinafre|couve|agrião|agriao|repolho/)) return '🥬';
-  if (d.match(/tomate/)) return '🍅';
-  if (d.match(/cenoura|beterraba|batata|mandioca|inhame|cará|cara\b/)) return '🥕';
-  if (d.match(/cebola|alho\b/)) return '🧅';
-  if (d.match(/pimentão|pimentao|abobrinha|berinjela|pepino|jiló|jilo|quiabo/)) return '🫑';
-  if (d.match(/brócolis|brocolis|couve.?flor/)) return '🥦';
-  if (d.match(/cogumelo|champignon|shitake|shiitake/)) return '🍄';
-
-  // ── Fallback: usar ícone da categoria ──
-  return '🏷️';
-}
+// Toledo dynamic category mappings are now queried directly from SQLite database.
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function EncarteGranel({ duracao, itensPorSlide, onComplete, config, categoriasFiltro }: EncarteGranelProps) {
@@ -238,56 +42,69 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
 
   const filterKey = JSON.stringify(categoriasFiltro);
 
-  // ── Fetch products and build slides ──────────────────────────────────────────
+  // ── Fetch products and dynamic categories from SQLite ────────────────────────
   useEffect(() => {
-    fetch(`${API_URL}/api/toledo/produtos`)
-      .then(r => r.json())
-      .then((data: any[]) => {
-        // Filter out items with price = 0 if configured to do so
-        const ocultarEmFalta = config?.toledo_ocultar_em_falta === '1' || config?.toledo_ocultar_em_falta === true;
-        let filteredData = ocultarEmFalta ? data.filter((p: any) => p.preco > 0) : data;
+    Promise.all([
+      fetch(`${API_URL}/api/toledo/produtos`).then(r => r.json()),
+      fetch(`${API_URL}/api/categorias`).then(r => r.json())
+    ]).then(([prodData, catData]) => {
+      const activeCats = catData.filter((c: any) => c.ativo);
+      const catMap = new Map<string, any>();
+      activeCats.forEach((c: any) => {
+        catMap.set(c.nome.trim().toLowerCase(), c);
+      });
 
-        // Apply category filter if provided
-        if (categoriasFiltro && categoriasFiltro.length > 0) {
-          filteredData = filteredData.filter((p: any) => {
-            const productCat = (p.categoria || '').trim().toLowerCase();
-            return categoriasFiltro.some(filterCat => {
-              const fCat = filterCat.trim().toLowerCase();
-              return productCat === fCat || productCat.includes(fCat) || fCat.includes(productCat);
-            });
+      const ocultarEmFalta = config?.toledo_ocultar_em_falta === '1' || config?.toledo_ocultar_em_falta === true;
+      let filteredData = ocultarEmFalta ? prodData.filter((p: any) => p.preco > 0) : prodData;
+
+      // Apply category filter if provided
+      if (categoriasFiltro && categoriasFiltro.length > 0) {
+        filteredData = filteredData.filter((p: any) => {
+          const productCat = (p.categoria || '').trim().toLowerCase();
+          return categoriasFiltro.some(filterCat => {
+            const fCat = filterCat.trim().toLowerCase();
+            return productCat === fCat || productCat.includes(fCat) || fCat.includes(productCat);
+          });
+        });
+      }
+
+      // Group by category
+      const groups: Record<string, any[]> = {};
+      filteredData.forEach((p: any) => {
+        const cat = p.categoria || 'Despensa e Utilidades Básicas';
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(p);
+      });
+
+      // Build slides: each slide = one chunk of a category
+      const slides: any[] = [];
+      const sortedCats = Object.keys(groups).sort((a, b) => {
+        const catA = catMap.get(a.trim().toLowerCase());
+        const catB = catMap.get(b.trim().toLowerCase());
+        const orderA = catA ? catA.ordem : 999;
+        const orderB = catB ? catB.ordem : 999;
+        return orderA - orderB;
+      });
+
+      for (const catName of sortedCats) {
+        const items = groups[catName].sort((a: any, b: any) => a.descricao.localeCompare(b.descricao));
+        const dbCat = catMap.get(catName.trim().toLowerCase()) || { emoji: '📦', descricao: '' };
+
+        for (let i = 0; i < items.length; i += itemsLimit) {
+          slides.push({
+            category: catName,
+            icon: dbCat.emoji || '📦',
+            label: dbCat.descricao || '',
+            items: items.slice(i, i + itemsLimit),
+            totalItems: items.length,
           });
         }
+      }
 
-        // Group by category
-        const groups: Record<string, any[]> = {};
-        filteredData.forEach(p => {
-          const cat = p.categoria || 'Outros';
-          if (!groups[cat]) groups[cat] = [];
-          groups[cat].push(p);
-        });
-
-        // Build slides: each slide = one chunk of a category
-        const slides: any[] = [];
-        const sortedCats = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-
-        for (const catName of sortedCats) {
-          const items = groups[catName].sort((a: any, b: any) => a.descricao.localeCompare(b.descricao));
-          const meta = getCategoryMeta(catName);
-
-          for (let i = 0; i < items.length; i += itemsLimit) {
-            slides.push({
-              category: catName,
-              ...meta,
-              items: items.slice(i, i + itemsLimit),
-              totalItems: items.length,
-            });
-          }
-        }
-
-        if (slides.length === 0) slides.push({ category: 'Vazio', icon: '📦', label: '', tag: 'granel', items: [], totalItems: 0 });
-        setCategorySlides(slides);
-      })
-      .catch(console.error);
+      if (slides.length === 0) slides.push({ category: 'Vazio', icon: '📦', label: '', tag: 'granel', items: [], totalItems: 0 });
+      setCategorySlides(slides);
+    })
+    .catch(console.error);
   }, [API_URL, itemsLimit, config?.toledo_ocultar_em_falta, filterKey]);
 
   // ── Auto-advance ────────────────────────────────────────────────────────────
@@ -361,33 +178,33 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
 
       {/* ══════════════ CATEGORY HEADER ══════════════ */}
       <div style={{
-        padding: '10px 28px 6px', display: 'flex', alignItems: 'center', gap: 14,
-        borderBottom: '1.5px solid rgba(0,0,0,0.07)', flexShrink: 0, background: COLORS.paper
+        padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 10,
+        borderBottom: '1px solid rgba(0,0,0,0.05)', flexShrink: 0, background: COLORS.paper
       }}>
         {/* Pill */}
         <span style={{
           background: COLORS.forest, color: '#fff', fontWeight: 700,
-          letterSpacing: 3, padding: '5px 12px', borderRadius: 4, textTransform: 'uppercase' as const,
-          fontSize: 'clamp(8px, calc(var(--desc-font) * 0.5), 18px)',
+          letterSpacing: 2, padding: '3px 8px', borderRadius: 4, textTransform: 'uppercase' as const,
+          fontSize: '10px',
         }}>Categoria</span>
         {/* Icon */}
-        <span style={{ fontSize: 'clamp(1.5rem, calc(var(--desc-font) * 1.8), 5rem)' }}>{slide.icon}</span>
+        <span style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center' }}>{slide.icon}</span>
         {/* Name */}
-        <span style={{ fontFamily: 'Playfair Display, serif', fontWeight: 800, color: COLORS.forest, fontSize: 'clamp(1.25rem, calc(var(--desc-font) * 1.15), 5rem)' }}>
+        <span style={{ fontFamily: 'Playfair Display, serif', fontWeight: 800, color: COLORS.forest, fontSize: '1.4rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {slide.category}
         </span>
         {/* Spacer + subtitle */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 20 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: 'clamp(10px, calc(var(--desc-font) * 0.55), 24px)', fontWeight: 500, color: COLORS.muted }}>{slide.label}</span>
-            <span style={{ fontSize: 'clamp(9px, calc(var(--desc-font) * 0.5), 20px)', fontWeight: 600, color: COLORS.muted, marginLeft: 12, opacity: 0.7 }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 500, color: COLORS.muted }}>{slide.label}</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: COLORS.muted, marginLeft: 8, opacity: 0.7 }}>
               {slide.totalItems} {slide.totalItems === 1 ? 'item' : 'itens'}
             </span>
           </div>
           {/* Counter Overlay */}
           <div style={{
-            background: 'rgba(0,0,0,0.04)', padding: '6px 14px', borderRadius: 20,
-            fontSize: 14, fontWeight: 700, color: COLORS.forest, letterSpacing: 1
+            background: 'rgba(0,0,0,0.04)', padding: '4px 10px', borderRadius: 12,
+            fontSize: 12, fontWeight: 700, color: COLORS.forest, letterSpacing: 1
           }}>
             {currentSlide + 1} / {totalSlides}
           </div>
@@ -401,10 +218,9 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
           height: '100%', alignContent: 'start'
         }}>
           {slide.items.map((p: any, idx: number) => {
-            const stripe = STRIPE_COLORS[idx % 4];
-            const pIcon = getProductIcon(p.descricao);
             const isOferta = p.descricao.includes('OFERTA') || p.descricao.includes('*');
             const cleanName = p.descricao.replace(/\* OFERTA \*/g, '').replace(/OFERTA/gi, '').replace(/\*/g, '').trim();
+            const stripe = STRIPE_COLORS[idx % STRIPE_COLORS.length];
 
             return (
               <div
@@ -425,14 +241,6 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
                 <div style={{
                   width: 4, background: p.preco === 0 ? '#a1a1aa' : (isOferta ? '#e53e3e' : stripe), flexShrink: 0
                 }} />
-                {/* Icon area */}
-                <div style={{
-                  width: 'clamp(40px, calc(var(--desc-font) * 2.5), 120px)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: COLORS.bg, borderRight: '1px solid rgba(0,0,0,0.07)', flexShrink: 0
-                }}>
-                  <span style={{ fontSize: 'clamp(1.2rem, calc(var(--desc-font) * 1.5), 4rem)' }}>{pIcon}</span>
-                </div>
                 {/* Body */}
                 <div style={{ flex: 1, padding: '4px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', minWidth: 0 }} className={config?.toledo_fonte_descricao === 'auto' ? '@container' : ''}>
                   <span style={{

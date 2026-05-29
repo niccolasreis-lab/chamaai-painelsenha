@@ -21,8 +21,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon.png', 'icon.ico', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'ChamaAí - Operador',
-        short_name: 'ChamaAí',
+        name: 'ChamaAi - Operador',
+        short_name: 'ChamaAi',
         description: 'Sistema de Gestão de Filas - Painel do Operador',
         theme_color: '#2563eb',
         background_color: '#020617',
