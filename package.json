@@ -1,7 +1,7 @@
 {
   "name": "chamaai-novo",
   "private": true,
-  "version": "1.0.72",
+  "version": "1.0.73",
   "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev:vite": "vite --host",
@@ -29,8 +29,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "public/icon.ico",
-      "requestedExecutionLevel": "requireAdministrator"
+      "icon": "public/icon.ico"
     },
     "nsis": {
       "oneClick": false,
