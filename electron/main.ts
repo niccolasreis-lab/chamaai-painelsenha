@@ -33,6 +33,7 @@ app.commandLine.appendSwitch('disable-background-timer-throttling');
 
 let mainWindow: BrowserWindow | null = null;
 let printerService: PrinterService;
+let isQuitting = false;
 
 /** Carrega config de impressora do banco */
 function loadPrinterConfig(): Partial<PrinterConfig> {
@@ -229,10 +230,22 @@ ipcMain.handle('check-for-updates', async () => {
 ipcMain.handle('install-update', async () => {
   if (!app.isPackaged) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
   try {
-    console.log('[UPDATE] Solicitando quitAndInstall silencioso...');
+    console.log('[UPDATE] Solicitando quitAndInstall silencioso. Iniciando Graceful Shutdown prévio...');
     
-    // Chama o instalador silencioso (true) e força o reinício depois (true)
-    // O instalador NSIS em background vai chamar o taskkill se necessário.
+    // Define a flag para true para que o listener de before-quit ignore o fechamento padrão e evite preventDefault()
+    isQuitting = true;
+    
+    // Libera recursos e para o servidor Express de forma síncrona com o processo de atualização
+    globalShortcut.unregisterAll();
+    try { 
+      await stopServer(); 
+      console.log('[UPDATE] Graceful shutdown concluído com sucesso antes da atualização.');
+    } catch (e) { 
+      console.error('[UPDATE] Erro no stopServer antes do quitAndInstall:', e); 
+    }
+    
+    // Agora que o servidor Express foi desligado, o DB fechado e todas as portas/arquivos liberados,
+    // iniciamos o quitAndInstall. A flag isSilent=true é mantida para que o instalador execute silenciosamente no Totem/Guichê.
     autoUpdater.quitAndInstall(true, true);
     return { success: true };
   } catch (err: any) {
@@ -375,7 +388,6 @@ app.on('window-all-closed', () => {
   }
 });
 
-let isQuitting = false;
 app.on('before-quit', async (event) => {
   if (!isQuitting) {
     event.preventDefault();
