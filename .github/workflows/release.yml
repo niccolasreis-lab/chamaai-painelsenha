@@ -41,6 +41,9 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
+          # Descarta alterações em arquivos rastreados (como package-lock.json gerado por npm install)
+          git reset --hard HEAD
+          
           # Puxa possíveis modificações concorrentes
           git pull origin main --rebase
           
