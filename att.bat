@@ -18,6 +18,11 @@ if not exist "%TARGET_DIR%" (
 )
 echo.
 
+echo [*] Limpando pastas de compilacoes antigas para evitar divergencia de checksum (sha512)...
+if exist "release" rd /s /q "release"
+if exist "%TARGET_DIR%" del /q "%TARGET_DIR%\*"
+echo.
+
 echo [*] Compilando a aplicacao para producao...
 echo Isso pode levar de 1 a 2 minutos...
 call npm run build:dist
