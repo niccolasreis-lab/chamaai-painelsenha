@@ -194,6 +194,17 @@ export function startServer() {
     }
   }));
 
+  // Serve compiled offline updates locally over HTTP to bypass file:// protocol download errors
+  const LOCAL_UPDATES_DIR = 'C:\\ChamaAi_Atualizacoes';
+  if (!fs.existsSync(LOCAL_UPDATES_DIR)) {
+    try { fs.mkdirSync(LOCAL_UPDATES_DIR, { recursive: true }); } catch (e) {}
+  }
+  app.use('/local-updates', express.static(LOCAL_UPDATES_DIR, {
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    }
+  }));
+
   // Serve frontend static files from dist folder
   const DIST_DIR = path.join(__dirname, '../../dist');
   if (fs.existsSync(DIST_DIR)) {
