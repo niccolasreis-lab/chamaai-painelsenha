@@ -64,6 +64,24 @@ function loadPrinterConfig(): Partial<PrinterConfig> {
   }
 }
 
+/** Busca caminho personalizado para atualizações locais/offline */
+function getCustomUpdatePath(): string | null {
+  try {
+    const db = getDb();
+    const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'update_path'").get() as any;
+    if (row && row.valor) {
+      return row.valor;
+    }
+  } catch (e) {}
+
+  // Fallback: pasta padrão local
+  const defaultLocalPath = 'C:\\ChamaAi_Atualizacoes';
+  if (fs.existsSync(defaultLocalPath)) {
+    return defaultLocalPath;
+  }
+  return null;
+}
+
 function createWindow() {
   // Initialize printer with DB config
   const printerCfg = loadPrinterConfig();
@@ -389,6 +407,19 @@ if (!gotTheLock) {
 
         autoUpdateLogger.info('Iniciando configuração do autoUpdater...');
         autoUpdater.logger = autoUpdateLogger;
+
+        // Configuração dinâmica de atualização local/offline
+        const localUpdatePath = getCustomUpdatePath();
+        if (localUpdatePath) {
+          autoUpdateLogger.info(`Atualizador local/offline ativado! Lendo da pasta: ${localUpdatePath}`);
+          const formattedPath = localUpdatePath.replace(/\\/g, '/');
+          autoUpdater.setFeedURL({
+            provider: 'generic',
+            url: `file:///${formattedPath}`
+          });
+        } else {
+          autoUpdateLogger.info('Usando canal padrão de atualizações (GitHub Releases).');
+        }
         
         autoUpdater.on('checking-for-update', () => autoUpdateLogger.info('Verificando se há atualizações...'));
         autoUpdater.on('update-available', (info) => {
