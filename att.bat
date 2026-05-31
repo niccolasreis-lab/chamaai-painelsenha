@@ -18,6 +18,11 @@ if not exist "%TARGET_DIR%" (
 )
 echo.
 
+echo [*] Encerrando processos e instaladores antigos para liberar arquivos...
+taskkill /F /IM "ChamaA*.exe" /T >nul 2>&1
+taskkill /F /IM "chamaai*.exe" /T >nul 2>&1
+echo.
+
 echo [*] Limpando pastas de compilacoes antigas para evitar divergencia de checksum (sha512)...
 if exist "release" rd /s /q "release"
 if exist "%TARGET_DIR%" del /q "%TARGET_DIR%\*"

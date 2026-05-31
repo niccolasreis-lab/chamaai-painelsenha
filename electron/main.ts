@@ -387,21 +387,35 @@ if (!gotTheLock) {
       // Inicializa o verificador de atualizações silencioso
       if (app.isPackaged) {
         const updateLogPath = 'C:\\ChamaAi\\autoupdate.log';
+        const writeLog = (logMsg: string) => {
+          try {
+            // Log rotation: se o arquivo exceder 5MB, rotaciona para .bak
+            if (fs.existsSync(updateLogPath)) {
+              const stats = fs.statSync(updateLogPath);
+              if (stats.size > 5 * 1024 * 1024) { // 5MB
+                try { if (fs.existsSync(`${updateLogPath}.bak`)) fs.unlinkSync(`${updateLogPath}.bak`); } catch(e) {}
+                fs.renameSync(updateLogPath, `${updateLogPath}.bak`);
+              }
+            }
+            fs.appendFileSync(updateLogPath, logMsg, 'utf8');
+          } catch (e) {}
+        };
+
         const autoUpdateLogger = {
           info(message: string) {
             const logMsg = `[${new Date().toISOString()}] [INFO] ${message}\n`;
             console.log('[AUTO-UPDATE]', message);
-            try { fs.appendFileSync(updateLogPath, logMsg, 'utf8'); } catch (e) {}
+            writeLog(logMsg);
           },
           warn(message: string) {
             const logMsg = `[${new Date().toISOString()}] [WARN] ${message}\n`;
             console.warn('[AUTO-UPDATE]', message);
-            try { fs.appendFileSync(updateLogPath, logMsg, 'utf8'); } catch (e) {}
+            writeLog(logMsg);
           },
           error(message: string) {
             const logMsg = `[${new Date().toISOString()}] [ERROR] ${message}\n`;
             console.error('[AUTO-UPDATE]', message);
-            try { fs.appendFileSync(updateLogPath, logMsg, 'utf8'); } catch (e) {}
+            writeLog(logMsg);
           }
         };
 
