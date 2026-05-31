@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import * as path from 'path';
-import { initDatabase, getDb } from './services/database';
+import * as fs from 'fs';
+import { initDatabase, getDb, closeDatabase } from './services/database';
 import { startServer, stopServer } from '../server/index';
 import { PrinterService, PrinterConfig } from './services/printer';
 import { autoUpdater } from 'electron-updater';
@@ -215,12 +216,12 @@ ipcMain.handle('get-app-version', () => {
 ipcMain.handle('check-for-updates', async () => {
   if (!app.isPackaged) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
   try {
-    const result = await autoUpdater.checkForUpdatesAndNotify();
+    const result = await autoUpdater.checkForUpdates();
     if (result && result.updateInfo) {
       if (result.updateInfo.version === app.getVersion()) {
          return { success: true, message: 'Você já está usando a versão mais recente!' };
       }
-      return { success: true, message: `Uma nova versão (${result.updateInfo.version}) foi encontrada e está sendo baixada. O aplicativo será atualizado na próxima vez que for aberto.` };
+      return { success: true, message: `A atualização (${result.updateInfo.version}) foi encontrada e está sendo baixada. Clique em Instalar Atualização Agora para aplicá-la quando terminar.` };
     }
     return { success: true, message: 'O sistema já está atualizado.' };
   } catch (err: any) {
@@ -249,16 +250,22 @@ ipcMain.handle('install-update', async () => {
       }
     }
     
+    // Garante que a conexão do SQLite foi encerrada de forma redundante e segura
+    try {
+      closeDatabase();
+      console.log('[UPDATE] Banco de dados SQLite fechado com segurança antes da atualização.');
+    } catch (e) {
+      console.error('[UPDATE] Erro ao fechar banco de dados antes da atualização:', e);
+    }
+    
     // Aguarda o OS liberar os handles de arquivo (critical para o better-sqlite3.node)
     // Sem esse delay, o NSIS tenta deletar o .node enquanto o Windows ainda tem o handle aberto
     await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Determina se o instalador deve rodar de forma silenciosa (apenas no Totem/Telão para evitar UIs indesejadas)
-    // Para desenvolvedores e operador/admin normal, roda interativo para que vejam a interface do instalador abrindo.
-    const args = process.argv.slice(1);
-    const isTotem = args.some(arg => arg.includes('--totem'));
-    const isTelao = args.some(arg => arg.includes('--telao'));
-    const isSilent = isTotem || isTelao;
+    // Em ambientes com domínio corporativo, instalações silenciosas são bloqueadas por GPO.
+    // Rodamos o instalador de forma INTERATIVA para que o UAC/SmartScreen possa ser aprovado pelo usuário.
+    // O instalador OneClick é rápido — aparece brevemente e some sozinho.
+    const isSilent = false;
     
     console.log(`[UPDATE] Chamando quitAndInstall. MODO SILENCIOSO: ${isSilent}`);
     
@@ -361,36 +368,56 @@ if (!gotTheLock) {
 
       // Inicializa o verificador de atualizações silencioso
       if (app.isPackaged) {
-        console.log('[AUTO-UPDATE] Iniciando configuração...');
+        const updateLogPath = 'C:\\ChamaAi\\autoupdate.log';
+        const autoUpdateLogger = {
+          info(message: string) {
+            const logMsg = `[${new Date().toISOString()}] [INFO] ${message}\n`;
+            console.log('[AUTO-UPDATE]', message);
+            try { fs.appendFileSync(updateLogPath, logMsg, 'utf8'); } catch (e) {}
+          },
+          warn(message: string) {
+            const logMsg = `[${new Date().toISOString()}] [WARN] ${message}\n`;
+            console.warn('[AUTO-UPDATE]', message);
+            try { fs.appendFileSync(updateLogPath, logMsg, 'utf8'); } catch (e) {}
+          },
+          error(message: string) {
+            const logMsg = `[${new Date().toISOString()}] [ERROR] ${message}\n`;
+            console.error('[AUTO-UPDATE]', message);
+            try { fs.appendFileSync(updateLogPath, logMsg, 'utf8'); } catch (e) {}
+          }
+        };
+
+        autoUpdateLogger.info('Iniciando configuração do autoUpdater...');
+        autoUpdater.logger = autoUpdateLogger;
         
-        autoUpdater.on('checking-for-update', () => console.log('[AUTO-UPDATE] Verificando se há atualizações...'));
+        autoUpdater.on('checking-for-update', () => autoUpdateLogger.info('Verificando se há atualizações...'));
         autoUpdater.on('update-available', (info) => {
-          console.log('[AUTO-UPDATE] Atualização disponível:', info.version);
+          autoUpdateLogger.info(`Atualização disponível: ${info.version}`);
           if (mainWindow) {
             mainWindow.webContents.send('update-available', info);
           }
         });
-        autoUpdater.on('update-not-available', () => console.log('[AUTO-UPDATE] Nenhuma atualização encontrada.'));
+        autoUpdater.on('update-not-available', () => autoUpdateLogger.info('Nenhuma atualização encontrada.'));
         autoUpdater.on('error', (err) => {
-          console.error('[AUTO-UPDATE] Erro no autoUpdater:', err);
+          autoUpdateLogger.error(`Erro no autoUpdater: ${err.message || err}`);
           if (mainWindow) {
             mainWindow.webContents.send('update-error', err.message);
           }
         });
         autoUpdater.on('download-progress', (progress) => {
-          console.log(`[AUTO-UPDATE] Download: ${progress.percent}%`);
+          autoUpdateLogger.info(`Progresso do Download: ${Math.round(progress.percent || 0)}%`);
           if (mainWindow) {
             mainWindow.webContents.send('download-progress', progress);
           }
         });
         autoUpdater.on('update-downloaded', (info) => {
-          console.log('[AUTO-UPDATE] Atualização baixada e pronta para instalar.');
+          autoUpdateLogger.info('Atualização baixada e pronta para instalar.');
           if (mainWindow) {
             mainWindow.webContents.send('update-downloaded', info);
           }
         });
 
-        autoUpdater.checkForUpdatesAndNotify();
+        autoUpdater.checkForUpdates();
       }
     } catch (err: any) {
       const { dialog } = require('electron');
@@ -429,6 +456,14 @@ app.on('before-quit', async (event) => {
       } catch (e) { 
         console.error('[SYSTEM] Erro no stopServer durante o desligamento:', e); 
       }
+    }
+    
+    // Garante que a conexão do SQLite foi encerrada de forma redundante e segura
+    try {
+      closeDatabase();
+      console.log('[SYSTEM] Banco de dados SQLite fechado com segurança durante o desligamento.');
+    } catch (e) {
+      console.error('[SYSTEM] Erro ao fechar banco de dados durante o desligamento:', e);
     }
     
     console.log('[SYSTEM] Cleanup finalizado. Encerrando processo.');

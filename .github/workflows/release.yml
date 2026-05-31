@@ -1,0 +1,62 @@
+name: Compilar e Publicar Versão (Autoupdate)
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'Manual_de_Instalacao.html'
+      - 'DESIGN.MD'
+      - '.gitignore'
+      - '.vscode/**'
+      - '.agents/**'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Clonar Repositório
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar Dependências
+        run: npm install
+
+      - name: Configurar Git e Incrementar Versão (SemVer)
+        shell: bash
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Puxa possíveis modificações concorrentes
+          git pull origin main --rebase
+          
+          # Incrementa a versão no package.json (Patch: 1.0.X -> 1.0.X+1)
+          npm version patch --no-git-tag-version
+          
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "Nova versão gerada: $NEW_VERSION"
+          
+          git add package.json
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+          git push origin main
+        id: versioning
+
+      - name: Compilar e Publicar Release no GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run publish:update

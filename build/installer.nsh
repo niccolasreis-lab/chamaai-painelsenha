@@ -1,31 +1,24 @@
-!macro customInit
-  ; === PHASE 1: Kill all ChamaAi processes aggressively using native taskkill ===
-  ; Since the app is renamed to ChamaAi (no accents), we can use exact, highly efficient native taskkill
-  ; without any encoding conflicts, PowerShell compilation warnings, or risk of installer self-killing.
-  nsExec::Exec 'taskkill /F /IM "ChamaAi.exe" /T'
-  nsExec::Exec 'taskkill /F /IM "chamaai-novo.exe" /T'
-  nsExec::Exec 'taskkill /F /IM "chamaai.exe" /T'
-  
-  ; Free port 3000 (if any zombie process is holding it)
-  nsExec::Exec 'cmd.exe /c "for /f \"tokens=5\" %a in (\'netstat -aon ^| findstr :3000\') do taskkill /F /PID %a /T"'
-  
-  ; === PHASE 2: Wait for processes to fully terminate ===
+!ifndef nsProcess::FindProcess
+    !include "nsProcess.nsh"
+!endif
+
+!macro customCheckAppRunning
+  ; Matamos o processo ChamaAi.exe no início do instalador/desinstalador
+  ; Isso garante que o desinstalador anterior (caso exista) encontre o processo morto
+  ; e não exiba a tela "Não é possível fechar o ChamaAi".
+  nsProcess::_KillProcess "ChamaAi.exe"
+  Pop $R0
   Sleep 2000
 !macroend
 
-!macro customCheckAppRunning
-  ; Let the installer proceed
+!macro customInstall
+  ; Aguarda mais 1 segundo para garantir liberação dos arquivos
+  Sleep 1000
 !macroend
 
-!macro macro_customCheckAppRunning
-  ; Fallback alias
-!macroend
-
-!macro customUnInit
-  ; Kill all processes before uninstall
-  nsExec::Exec 'taskkill /F /IM "ChamaAi.exe" /T'
-  nsExec::Exec 'taskkill /F /IM "chamaai-novo.exe" /T'
-  nsExec::Exec 'taskkill /F /IM "chamaai.exe" /T'
-  nsExec::Exec 'cmd.exe /c "for /f \"tokens=5\" %a in (\'netstat -aon ^| findstr :3000\') do taskkill /F /PID %a /T"'
+!macro customUnInstall
+  ; Garante encerramento completo na desinstalação
+  nsProcess::_KillProcess "ChamaAi.exe"
+  Pop $R0
   Sleep 2000
 !macroend

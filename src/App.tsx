@@ -98,7 +98,11 @@ function Home() {
             <h2 className="font-sans text-2xl font-bold text-ink mb-2 uppercase tracking-wide">Operador</h2>
             <p className="text-sm text-ink-secondary font-semibold uppercase tracking-widest">Painel Padrão (Vertical)</p>
           </Link>
-          <Link to="/operador-touch" className="group p-4 bg-surface rounded-[24px] shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex items-center justify-center gap-3">
+          <Link 
+            to="/operador-touch" 
+            onClick={() => localStorage.setItem('app_mode', 'touch')}
+            className="group p-4 bg-surface rounded-[24px] shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex items-center justify-center gap-3"
+          >
             <span className="material-symbols-outlined text-primary">tablet_landscape</span>
             <span className="font-sans text-sm font-bold text-ink uppercase tracking-wider">Painel Touch (TV)</span>
           </Link>

@@ -137,30 +137,6 @@ export default function Dashboard() {
             
             <button 
               onClick={async () => {
-                const api = (window as any).api;
-                if (api?.checkForUpdates) {
-                  try {
-                    const btn = document.getElementById('btn-update');
-                    if(btn) { btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">refresh</span> Verificando...'; btn.setAttribute('disabled', 'true'); }
-                    const res = await api.checkForUpdates();
-                    alert(res.message);
-                    if(btn) { btn.innerHTML = '<span class="material-symbols-outlined text-sm">download</span> Atualizar Agora'; btn.removeAttribute('disabled'); }
-                  } catch (err) {
-                    alert('Erro ao buscar atualização.');
-                  }
-                } else {
-                  alert('O sistema de atualização só funciona no aplicativo final (.exe)');
-                }
-              }}
-              id="btn-update"
-              className="w-full bg-primary text-white py-3 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-primary/90 transition-all active:scale-95 flex items-center justify-center gap-2 mb-3"
-            >
-              <span className="material-symbols-outlined text-sm">download</span>
-              Atualizar Agora
-            </button>
-
-            <button 
-              onClick={async () => {
                 if(window.confirm('⚠️ ATENÇÃO: Deseja realmente ZERAR todas as senhas?\n\nIsso voltará o contador para 001 e limpará a fila de espera atual.')) {
                   try {
                     const res = await fetch(`${getApiUrl()}/api/reset-senhas`, { method: 'POST' });
