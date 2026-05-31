@@ -7,6 +7,28 @@ export default function Emissao() {
   const navigate = useNavigate();
   const [config, setConfig] = useState<any>({});
   const [pessoasAguardando, setPessoasAguardando] = useState(0);
+  const [saudacao, setSaudacao] = useState('BEM-VINDO(A)');
+
+  useEffect(() => {
+    const atualizarSaudacao = () => {
+      const horaAtual = new Date().getHours();
+      let novaSaudacao = 'BEM-VINDO(A)';
+
+      if (horaAtual >= 5 && horaAtual < 12) {
+        novaSaudacao = 'BOM DIA!';
+      } else if (horaAtual >= 12 && horaAtual < 18) {
+        novaSaudacao = 'BOA TARDE!';
+      } else {
+        novaSaudacao = 'BOA NOITE!';
+      }
+      setSaudacao(novaSaudacao);
+    };
+
+    atualizarSaudacao();
+    const interval = setInterval(atualizarSaudacao, 3600000);
+    return () => clearInterval(interval);
+  }, []);
+
   const API_URL = getApiUrl();
 
   const [showConfigModal, setShowConfigModal] = useState(false);
@@ -238,16 +260,16 @@ export default function Emissao() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center p-6 gap-10 overflow-hidden">
-        <div className="text-center shrink-0 flex flex-col items-center">
-          <h2 className="font-sans text-7xl font-black text-ink mb-4 uppercase tracking-wide">
-            Bem-vindo(a)
+      <main className="flex-1 flex flex-col items-center justify-start xl:justify-center p-4 md:p-6 gap-6 lg:gap-8 overflow-y-auto scrollbar-hide w-full">
+        <div className="text-center shrink-0 flex flex-col items-center mt-4">
+          <h2 id="titulo-saudacao" className="font-sans text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-ink mb-2 uppercase tracking-wide">
+            {saudacao}
           </h2>
-          <p className="text-3xl text-ink-secondary font-bold tracking-wide">
+          <p className="text-xl sm:text-2xl md:text-3xl text-ink-secondary font-bold tracking-wide">
             Toque na tela para retirar sua senha
           </p>
           
-          <div className="mt-10 inline-flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-2 border-primary/20 px-10 py-6 rounded-[32px] shadow-[0_20px_50px_rgba(37,99,235,0.06)] overflow-hidden group gap-4">
+          <div className="mt-6 md:mt-8 inline-flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-2 border-primary/20 px-6 py-4 md:px-10 md:py-6 rounded-[24px] md:rounded-[32px] shadow-[0_20px_50px_rgba(37,99,235,0.06)] overflow-hidden group gap-4">
             {/* Blinking live indicator - now centered in the flex column flow */}
             <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-emerald-600">
               <span className="relative flex h-2 w-2">
@@ -257,13 +279,13 @@ export default function Emissao() {
               <span className="text-[10px] font-black tracking-widest uppercase">FILA AO VIVO</span>
             </div>
             
-            <div className="flex items-center gap-5">
-              <div className="w-16 h-16 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/30">
-                <span className="material-symbols-outlined text-[2.5rem]">group</span>
+            <div className="flex items-center gap-4 md:gap-5">
+              <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/30">
+                <span className="material-symbols-outlined text-[2rem] md:text-[2.5rem]">group</span>
               </div>
-              <div className="flex flex-col items-start leading-none gap-2">
-                <span className="font-sans text-[11px] font-black uppercase tracking-widest text-ink-secondary">Pessoas Aguardando</span>
-                <span className="font-sans text-6xl font-black text-primary flex items-baseline gap-1 tracking-tighter">
+              <div className="flex flex-col items-start leading-none gap-1 md:gap-2">
+                <span className="font-sans text-[10px] md:text-[11px] font-black uppercase tracking-widest text-ink-secondary">Pessoas Aguardando</span>
+                <span className="font-sans text-5xl md:text-6xl font-black text-primary flex items-baseline gap-1 tracking-tighter">
                   {pessoasAguardando}
                   <span className="text-sm font-semibold text-ink-secondary/70 font-sans tracking-normal lowercase">clientes</span>
                 </span>
@@ -272,19 +294,29 @@ export default function Emissao() {
           </div>
         </div>
 
-        <div className="flex flex-col justify-center gap-6 max-w-2xl w-full px-4 overflow-hidden">
+        {/* Banners Wrapper */}
+        <div className="banners-wrapper px-4 shrink-0 w-full max-w-4xl">
+          <div className="info-banner banner-yellow text-sm py-3 px-4">
+            📱 <strong>Fila na palma da mão!</strong> Escaneie o QR Code do seu ticket e acompanhe sua posição ao vivo pelo celular.
+          </div>
+          <div className="info-banner banner-green text-sm py-3 px-4 mt-2">
+            📝 <strong>Monte sua lista:</strong> Consulte os preços dos nossos produtos a granel de forma simples e rápida.
+          </div>
+        </div>
+
+        <div className="flex flex-col md:flex-row justify-center gap-6 max-w-6xl w-full px-4 mb-8">
           {config.ocultar_tipo_senha === '1' ? (
             <button 
               onClick={() => emitirSenha(false)}
-              className="w-full bg-surface border-2 border-outline-variant rounded-[40px] py-12 flex flex-col items-center justify-center gap-8 shadow-[0_20px_40px_rgba(0,0,0,0.05)] hover:border-primary hover:shadow-[0_20px_50px_rgba(37,99,235,0.15)] active:scale-95 transition-all duration-200 outline-none group"
+              className="w-full bg-surface border-2 border-outline-variant rounded-[32px] md:rounded-[40px] py-8 md:py-10 lg:py-12 flex flex-col items-center justify-center gap-6 shadow-[0_20px_40px_rgba(0,0,0,0.05)] hover:border-primary hover:shadow-[0_20px_50px_rgba(37,99,235,0.15)] active:scale-95 transition-all duration-200 outline-none group"
             >
-              <div className="w-40 h-40 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary transition-colors">
-                <span className="material-symbols-outlined text-[8rem] text-primary group-hover:text-white transition-colors">
+              <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary transition-colors">
+                <span className="material-symbols-outlined text-[6rem] md:text-[8rem] text-primary group-hover:text-white transition-colors">
                   confirmation_number
                 </span>
               </div>
               <div className="text-center">
-                <span className="font-sans text-6xl font-black text-primary block uppercase">Emitir Senha</span>
+                <span className="font-sans text-5xl md:text-6xl font-black text-primary block uppercase">Emitir Senha</span>
               </div>
             </button>
           ) : (
@@ -293,16 +325,16 @@ export default function Emissao() {
               {config.fila_normal_ativa !== '0' && (
                 <button 
                   onClick={() => emitirSenha(false)}
-                  className="w-full bg-surface border-[6px] border-primary/40 rounded-[40px] py-12 flex flex-col items-center justify-center gap-4 hover:border-primary hover:bg-primary/5 active:scale-95 transition-all duration-300 outline-none group" style={{animation: 'totemGlow 1.5s ease-in-out infinite'}}
+                  className="w-full bg-surface border-[4px] md:border-[6px] border-primary/40 rounded-[32px] md:rounded-[40px] py-6 md:py-8 lg:py-12 flex flex-col items-center justify-center gap-4 hover:border-primary hover:bg-primary/5 active:scale-95 transition-all duration-300 outline-none group" style={{animation: 'totemGlow 1.5s ease-in-out infinite'}}
                 >
-                  <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-primary/40">
-                    <span className="material-symbols-outlined text-[5rem] text-white">
+                  <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-primary flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-primary/40">
+                    <span className="material-symbols-outlined text-[4rem] md:text-[5rem] text-white">
                       touch_app
                     </span>
                   </div>
                   <div className="text-center">
-                    <span className="font-sans text-3xl font-bold text-ink block uppercase tracking-widest">Atendimento {config.rotulo_atendimento_geral || 'Geral'}</span>
-                    <span className="font-sans text-5xl font-black text-primary block uppercase mt-3">TOQUE AQUI</span>
+                    <span className="font-sans text-2xl md:text-3xl font-bold text-ink block uppercase tracking-widest">{config.rotulo_atendimento_geral || 'Atendimento Geral'}</span>
+                    <span className="font-sans text-4xl md:text-5xl font-black text-primary block uppercase mt-3">TOQUE AQUI</span>
                   </div>
                 </button>
               )}
@@ -311,18 +343,18 @@ export default function Emissao() {
               {config.fila_preferencial_ativa !== '0' && (
                 <button 
                   onClick={() => emitirSenha(true)}
-                  className="w-full bg-surface border-[6px] border-warning/40 rounded-[40px] py-12 flex flex-col items-center justify-center gap-4 hover:border-warning hover:bg-warning/5 active:scale-95 transition-all duration-300 outline-none group" style={{animation: 'totemGlowWarning 1.5s ease-in-out infinite'}}
+                  className="w-full bg-surface border-[4px] md:border-[6px] border-warning/40 rounded-[32px] md:rounded-[40px] py-6 md:py-8 lg:py-12 flex flex-col items-center justify-center gap-4 hover:border-warning hover:bg-warning/5 active:scale-95 transition-all duration-300 outline-none group" style={{animation: 'totemGlowWarning 1.5s ease-in-out infinite'}}
                 >
-                  <div className="w-24 h-24 rounded-full bg-warning flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-warning/40">
-                    <span className="material-symbols-outlined text-[5rem] text-white">
+                  <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-warning flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-warning/40">
+                    <span className="material-symbols-outlined text-[4rem] md:text-[5rem] text-white">
                       touch_app
                     </span>
                   </div>
                   <div className="text-center">
-                    <span className="font-sans text-3xl font-bold text-ink block uppercase tracking-widest">Atendimento {config.rotulo_atendimento_prioritario || 'Prioritário'}</span>
-                    <span className="font-sans text-5xl font-black text-warning block uppercase mt-3">TOQUE AQUI</span>
+                    <span className="font-sans text-2xl md:text-3xl font-bold text-ink block uppercase tracking-widest">{config.rotulo_atendimento_prioritario || 'Atendimento Prioritário'}</span>
+                    <span className="font-sans text-4xl md:text-5xl font-black text-warning block uppercase mt-3">TOQUE AQUI</span>
                   </div>
-                  <div className="text-ink-secondary text-base font-medium px-8 mt-2">
+                  <div className="text-ink-secondary text-sm md:text-base font-medium px-4 md:px-8 mt-2">
                     Pessoas com deficiência, idosos, gestantes e lactantes.
                   </div>
                 </button>

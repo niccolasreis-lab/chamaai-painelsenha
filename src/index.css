@@ -162,3 +162,182 @@
   }
 }
 
+/* ── Custom Theme variables ── */
+:root {
+  --primary-blue: #0052cc;
+  --light-blue:   #e6f0ff;
+  --text-dark:    #0a192f;
+  --gray-text:    #657786;
+  --green-success: #22c55e;
+}
+
+/* ── Live Badge Pulse Dot ── */
+.dot-live {
+  width: 8px;
+  height: 8px;
+  background-color: white;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse-dot 1.5s infinite;
+}
+
+@keyframes pulse-dot {
+  0% { transform: scale(0.9); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.5; }
+  100% { transform: scale(0.9); opacity: 1; }
+}
+
+/* ── Info Banner Shine Effect ── */
+.info-banner {
+  border-radius: 14px;
+  padding: 12px 15px;
+  text-align: center;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s ease;
+}
+
+.info-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.6), transparent);
+  transform: skewX(-20deg);
+  animation: shine 4s infinite;
+}
+
+@keyframes shine {
+  0% { left: -100%; }
+  20% { left: 200%; }
+  100% { left: 200%; }
+}
+
+.banner-yellow {
+  background: #fffdf5;
+  border: 1px solid #fef3c7;
+  color: #b45309;
+}
+
+.banner-green {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.banners-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 650px;
+  margin-top: 15px;
+  margin-bottom: 15px;
+}
+
+
+/* ── Button Breathe Effect ── */
+.btn-touch {
+  animation: button-breathe 2s infinite ease-in-out;
+}
+
+@keyframes button-breathe {
+  0% { box-shadow: 0 10px 25px rgba(0, 82, 204, 0.05), 0 0 0 0 rgba(0, 82, 204, 0.2); }
+  50% { box-shadow: 0 15px 35px rgba(0, 82, 204, 0.15), 0 0 0 8px rgba(0, 82, 204, 0); }
+  100% { box-shadow: 0 10px 25px rgba(0, 82, 204, 0.05), 0 0 0 0 rgba(0, 82, 204, 0); }
+}
+
+/* ── Physical Printer & Ticket Simulation ── */
+.printer-base {
+  width: 100%;
+  max-width: 450px;
+  background: #e2e8f0;
+  border-radius: 0 0 20px 20px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-top: 2px solid #cbd5e1;
+  position: relative;
+  z-index: 10;
+}
+
+.printer-slot {
+  width: 240px;
+  height: 10px;
+  background: #1e293b;
+  border-radius: 3px;
+  box-shadow: inset 0 3px 6px rgba(0,0,0,0.8);
+  position: relative;
+  z-index: 20;
+}
+
+.printed-ticket {
+  width: 180px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-top: none;
+  padding: 15px 12px;
+  position: absolute;
+  top: 25px; 
+  z-index: 5;
+  text-align: center;
+  box-shadow: 0 15px 25px rgba(0,0,0,0.2);
+  font-size: 0.7rem;
+  color: #334155;
+  
+  transform: translateY(-120%);
+  opacity: 0;
+  transition: transform 0.5s ease-in, opacity 0.4s ease-in;
+  pointer-events: none;
+}
+
+.printed-ticket::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  background: linear-gradient(-45deg, transparent 4px, #ffffff 4px), linear-gradient(45deg, transparent 4px, #ffffff 4px);
+  background-size: 8px 12px;
+}
+
+.animate-print-tease {
+  animation: boomerangSuspense 2.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes boomerangSuspense {
+  0% { transform: translateY(-120%); opacity: 0; }
+  15% { transform: translateY(-60%); opacity: 1; }
+  35% { transform: translateY(-110%); opacity: 1; }
+  55% { transform: translateY(-40%); opacity: 1; }
+  70% { transform: translateY(-90%); opacity: 1; }
+  90% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* ── Elastic Success Confirmation Card Animations ── */
+.animate-pop-in-card {
+  animation: popInCard 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.animate-bounce-check {
+  animation: bounceCheck 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.4) forwards;
+}
+
+@keyframes popInCard {
+  0% { transform: scale(0.9) translateY(20px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes bounceCheck {
+  0% { transform: scale(0); }
+  100% { transform: scale(1); }
+}
+
+

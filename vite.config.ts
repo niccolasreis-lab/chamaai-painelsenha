@@ -1,22 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import mkcert from 'vite-plugin-mkcert'
 
 // https://vite.dev/config/
-export default defineConfig({
-  server: {
-    https: true as any,
-    host: true,
-    proxy: {
-      '/api': 'http://localhost:3000',
-      '/events': 'http://localhost:3000',
-      '/uploads': 'http://localhost:3000'
-    }
-  },
-  plugins: [
+export default defineConfig(async ({ command }) => {
+  const isDev = command === 'serve'
+  const plugins: any[] = [
     react(),
-    mkcert(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon.png', 'icon.ico', 'icon-192.png', 'icon-512.png'],
@@ -51,6 +41,25 @@ export default defineConfig({
         enabled: true
       }
     })
-  ],
-  base: './',
+  ]
+
+  if (isDev) {
+    const mkcertPlugin = (await import('vite-plugin-mkcert')).default
+    plugins.push(mkcertPlugin())
+  }
+
+  return {
+    server: {
+      https: isDev ? (true as any) : false,
+      host: true,
+      proxy: {
+        '/api': 'http://localhost:3000',
+        '/events': 'http://localhost:3000',
+        '/uploads': 'http://localhost:3000'
+      }
+    },
+    plugins,
+    base: './',
+  }
 })
+
