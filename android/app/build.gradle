@@ -25,7 +25,7 @@ android {
     productFlavors {
         operador {
             dimension "mode"
-            applicationId "com.chamaai.app.operador"
+            applicationId "br.com.chamaai.operador"
             resValue "string", "app_name", "ChamaAi Operador"
             resValue "string", "title_activity_main", "ChamaAi Operador"
             buildConfigField "String", "APP_MODE", "\"operador\""

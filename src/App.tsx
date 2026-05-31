@@ -14,6 +14,7 @@ import Queue from './admin/Queue';
 import Operators from './admin/Operators';
 import Relatorios from './admin/Relatorios';
 import ToledoConfig from './admin/ToledoConfig';
+import AdminEncarte from './admin/AdminEncarte';
 import MobileOperador from './operador/MobileOperador';
 import Bridge from './operador/Bridge';
 import Login from './Login';
@@ -230,6 +231,7 @@ export default function App() {
           <Route path="/admin/operators" element={<ProtectedRoute requireAdmin><Operators /></ProtectedRoute>} />
           <Route path="/admin/relatorios" element={<ProtectedRoute requireAdmin><Relatorios /></ProtectedRoute>} />
           <Route path="/admin/toledo" element={<ProtectedRoute requireAdmin><ToledoConfig /></ProtectedRoute>} />
+          <Route path="/admin/encarte" element={<ProtectedRoute requireAdmin><AdminEncarte /></ProtectedRoute>} />
         </Routes>
       </HashRouter>
     </LicenseGate>

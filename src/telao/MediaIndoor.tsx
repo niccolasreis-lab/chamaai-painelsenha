@@ -94,7 +94,11 @@ export default function MediaIndoor() {
       const res = await fetch(`${API_URL}/api/midias`);
       if (res.ok) {
         const data = await res.json();
-        setMidias(data);
+        // Filtrar apenas mídias ativas e não expiradas para o Telão
+        const midiasAtivas = Array.isArray(data) 
+          ? data.filter((m: any) => m.ativo === 1 && m.status === 'ativo')
+          : [];
+        setMidias(midiasAtivas);
       }
     } catch (err) {
       console.error('Erro ao buscar mídias', err);

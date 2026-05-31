@@ -1,415 +1,404 @@
 import { useState, useEffect } from 'react';
-import { getApiUrl } from '../shared/apiConfig';
 import { useSSE } from '../shared/useSSE';
 
 export default function ControleTouch() {
-  const [fila, setFila] = useState<any[]>([]);
+  const [ip, setIp] = useState(localStorage.getItem('server_ip_override') || '');
+  const [guiche, setGuiche] = useState(localStorage.getItem('operator_guiche') || '');
+  const [isSetup, setIsSetup] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isValidating, setIsValidating] = useState(false);
   const [senhaAtual, setSenhaAtual] = useState<any>(null);
-  const [guiche, setGuiche] = useState('Guichê 1');
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  
-  // Novos estados para tolerância de falhas, rede e configurações
-  const [connectionError, setConnectionError] = useState(false);
-  const [showConfigModal, setShowConfigModal] = useState(false);
-  const [tempIp, setTempIp] = useState(localStorage.getItem('server_ip_override') || '');
-  const [tempGuiche, setTempGuiche] = useState('');
-  const [autoBoot, setAutoBoot] = useState(localStorage.getItem('app_mode') === 'touch');
+  const [queueCounts, setQueueCounts] = useState({ geral: 0, preferencial: 0 });
+  const [showConfirmDevolver, setShowConfirmDevolver] = useState(false);
+  const [isActionPending, setIsActionPending] = useState(false);
 
-  const API_URL = getApiUrl();
-
+  // Validate server connection on initial load if configuration already exists
   useEffect(() => {
-    const handleBeforePrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforePrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforePrompt);
+    if (ip && guiche) {
+      setIsValidating(true);
+      fetch(`http://${ip}:3000/health`)
+        .then((res) => {
+          if (res.ok) {
+            setIsSetup(true);
+            fetchInitialData(ip, guiche);
+          } else {
+            setErrorMsg('Servidor não encontrado. Verifique o IP e a rede Wi-Fi.');
+          }
+        })
+        .catch(() => {
+          setErrorMsg('Servidor não encontrado. Verifique o IP e a rede Wi-Fi.');
+        })
+        .finally(() => {
+          setIsValidating(false);
+        });
+    }
   }, []);
 
-  const refreshData = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/fila`);
-      if (res.ok) {
-        const data = await res.json();
-        setFila(Array.isArray(data) ? data : []);
-        setConnectionError(false);
-      } else {
-        setConnectionError(true);
-      }
-    } catch (err) {
-      setConnectionError(true);
-    }
-  };
+  // Set up real-time SSE syncing
+  const { data: sseData, connected: sseConnected } = useSSE(
+    isSetup ? `http://${ip}:3000/events` : null
+  );
 
+  // Listen to SSE updates
   useEffect(() => {
-    try {
-      const savedGuiche = localStorage.getItem('myStationName') || 'Guichê 1';
-      setGuiche(savedGuiche);
-      setTempGuiche(savedGuiche);
-    } catch (e) {}
+    if (!sseData) return;
 
-    refreshData();
-    const interval = setInterval(refreshData, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Sincronização em tempo real via SSE
-  const { data: sseEvent, connected: sseConnected } = useSSE(`${API_URL}/events`);
-
-  useEffect(() => {
-    if (!sseEvent) return;
-
-    if (sseEvent.event === 'NOVA_SENHA_EMITIDA' || sseEvent.event === 'NOVA_SENHA_CHAMADA') {
-      refreshData();
-    } else if (sseEvent.event === 'SISTEMA_RESETADO') {
-      setSenhaAtual(null);
-      setFila([]);
-      refreshData();
-    }
-  }, [sseEvent]);
-
-  // Se o SSE mudar de estado de desconectado para conectado, atualiza a fila
-  useEffect(() => {
-    if (sseConnected) {
-      refreshData();
-    }
-  }, [sseConnected]);
-
-  const handleSaveConfig = () => {
-    if (tempIp.trim() === '') {
-      localStorage.removeItem('server_ip_override');
-    } else {
-      localStorage.setItem('server_ip_override', tempIp.trim());
-    }
-    localStorage.setItem('myStationName', tempGuiche.trim() || 'Guichê 1');
-    
-    if (autoBoot) {
-      localStorage.setItem('app_mode', 'touch');
-    } else {
-      localStorage.removeItem('app_mode');
-    }
-    
-    setShowConfigModal(false);
-    window.location.reload();
-  };
-
-  const handleExit = () => {
-    localStorage.removeItem('app_mode');
-    window.location.href = '#/';
-  };
-
-  const chamarProxima = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/chamar-proxima`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          operador_id: 1, 
-          guiche: guiche
-        })
+    if (sseData.event === 'queue-update') {
+      setQueueCounts({
+        geral: sseData.data.geral || 0,
+        preferencial: sseData.data.preferencial || 0,
       });
-      if (res.ok) {
-        const result = await res.json();
-        setSenhaAtual(result.data);
-        refreshData();
-        if (navigator.vibrate) navigator.vibrate(80);
-        setConnectionError(false);
-      } else if (res.status === 404) {
-        if (navigator.vibrate) navigator.vibrate([30, 30]);
-        setConnectionError(false);
-      } else {
-        setConnectionError(true);
+    } else if (sseData.event === 'ticket-called') {
+      if (sseData.data.guiche === `Guichê ${guiche}`) {
+        if (sseData.data.numero === null) {
+          setSenhaAtual(null);
+        } else {
+          setSenhaAtual({
+            id: sseData.data.id,
+            numero: sseData.data.numero,
+            preferencial: sseData.data.preferencial,
+          });
+        }
       }
-    } catch (err) {
-      setConnectionError(true);
+    }
+  }, [sseData, guiche]);
+
+  // Fetch queue counts and active called ticket on setup success
+  const fetchInitialData = async (serverIp: string, guicheNum: string) => {
+    try {
+      // 1. Fetch queue counts
+      const queueRes = await fetch(`http://${serverIp}:3000/api/fila`);
+      if (queueRes.ok) {
+        const queueData = await queueRes.json();
+        const geral = queueData.filter((s: any) => s.preferencial === 0).length;
+        const pref = queueData.filter((s: any) => s.preferencial === 1).length;
+        setQueueCounts({ geral, preferencial: pref });
+      }
+
+      // 2. Fetch last called ticket to find if there is an active one for this guichê
+      const ticketsRes = await fetch(`http://${serverIp}:3000/api/senhas`);
+      if (ticketsRes.ok) {
+        const ticketsData = await ticketsRes.json();
+        const active = ticketsData.find(
+          (s: any) => s.status === 'chamada' && s.guiche === `Guichê ${guicheNum}`
+        );
+        if (active) {
+          setSenhaAtual({
+            id: active.id,
+            numero: `${active.preferencial ? 'P' : 'A'}-${String(active.numero).padStart(3, '0')}`,
+            preferencial: active.preferencial,
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao buscar dados iniciais:', e);
     }
   };
 
-  const repetirChamada = async () => {
-    if (!senhaAtual) return;
+  const handleConnect = async () => {
+    if (!ip.trim() || !guiche.trim()) {
+      setErrorMsg('Preencha os campos de IP e Guichê.');
+      return;
+    }
+    setErrorMsg('');
+    setIsValidating(true);
+
+    const cleanIp = ip.trim().replace(/^https?:\/\//i, '').replace(/:3000\/?$/, '');
+
     try {
-      const res = await fetch(`${API_URL}/api/chamadas`, {
+      const res = await fetch(`http://${cleanIp}:3000/health`);
+      if (res.ok) {
+        localStorage.setItem('server_ip_override', cleanIp);
+        localStorage.setItem('operator_guiche', guiche.trim());
+        setIsSetup(true);
+        fetchInitialData(cleanIp, guiche.trim());
+      } else {
+        setErrorMsg('Servidor não encontrado. Verifique o IP e a rede Wi-Fi.');
+      }
+    } catch (err) {
+      setErrorMsg('Servidor não encontrado. Verifique o IP e a rede Wi-Fi.');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const triggerVibration = (pattern: number | number[]) => {
+    if (navigator.vibrate) {
+      navigator.vibrate(pattern);
+    }
+  };
+
+  const handleProximo = async () => {
+    if (isActionPending) return;
+    setIsActionPending(true);
+    triggerVibration(100); // Short vibration
+
+    try {
+      const res = await fetch(`http://${ip}:3000/api/operador/proximo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          senha_id: senhaAtual.id,
-          operador_id: 1,
-          guiche: guiche
-        })
+        body: JSON.stringify({ guiche }),
       });
-      if (res.ok) {
-        if (navigator.vibrate) navigator.vibrate(40);
-        setConnectionError(false);
-      } else {
-        setConnectionError(true);
+      if (!res.ok) {
+        if (res.status === 404) {
+          alert('Fila vazia! Nenhuma senha aguardando.');
+        } else {
+          alert('Erro ao chamar o próximo cliente.');
+        }
       }
     } catch (err) {
-      setConnectionError(true);
+      alert('Sem comunicação com o servidor.');
+    } finally {
+      setIsActionPending(false);
     }
   };
 
-  const estornar = async () => {
-    if (!senhaAtual) return;
+  const handleRepetir = async () => {
+    if (isActionPending || !senhaAtual) return;
+    setIsActionPending(true);
+    triggerVibration(50); // Single tap vibration
+
     try {
-      const res = await fetch(`${API_URL}/api/senhas/estornar`, {
+      const res = await fetch(`http://${ip}:3000/api/operador/repetir`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senha_id: senhaAtual.id })
+        body: JSON.stringify({ guiche }),
+      });
+      if (!res.ok) {
+        alert('Erro ao repetir a chamada.');
+      }
+    } catch (err) {
+      alert('Sem comunicação com o servidor.');
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
+  const handleDevolver = async () => {
+    setShowConfirmDevolver(false);
+    if (isActionPending || !senhaAtual) return;
+    setIsActionPending(true);
+    triggerVibration([50, 50, 50]); // Triple short vibration
+
+    try {
+      const res = await fetch(`http://${ip}:3000/api/operador/devolver`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guiche }),
       });
       if (res.ok) {
         setSenhaAtual(null);
-        refreshData();
-        if (navigator.vibrate) navigator.vibrate([40, 40, 40]);
-        setConnectionError(false);
       } else {
-        setConnectionError(true);
+        alert('Erro ao devolver a senha à fila.');
       }
     } catch (err) {
-      setConnectionError(true);
+      alert('Sem comunicação com o servidor.');
+    } finally {
+      setIsActionPending(false);
     }
   };
 
-  const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-      }
-    }
-  };
-
-  const normalCount = fila.filter(s => s.preferencial === 0).length;
-  const prefCount = fila.filter(s => s.preferencial === 1).length;
-
-  const renderConfigModal = () => (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl flex flex-col gap-6 relative animate-scale-in">
-        <div>
-          <h3 className="font-sans text-2xl font-black text-white uppercase tracking-wider mb-2">Configurar Terminal</h3>
-          <p className="text-xs font-sans text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
-            Ajuste a conexão e identificação deste tablet.
-          </p>
-        </div>
-        
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="block font-bold tracking-widest text-slate-400 uppercase mb-2 text-xs ml-1">IP do Servidor (Telão)</label>
-            <input 
-              type="text" 
-              value={tempIp}
-              onChange={(e) => setTempIp(e.target.value)}
-              placeholder="Ex: 192.168.1.100"
-              className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-500 text-white font-bold text-lg placeholder:text-slate-700"
-              autoFocus
-            />
-            <p className="text-[9px] text-slate-500 mt-2 font-bold uppercase tracking-wider leading-relaxed">
-              Deixe em branco para rodar localmente neste dispositivo (Localhost).
-            </p>
-          </div>
-
-          <div>
-            <label className="block font-bold tracking-widest text-slate-400 uppercase mb-2 text-xs ml-1">Nome / Número do Guichê</label>
-            <input 
-              type="text" 
-              value={tempGuiche}
-              onChange={(e) => setTempGuiche(e.target.value)}
-              placeholder="Ex: Guichê 1"
-              className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-500 text-white font-bold text-lg placeholder:text-slate-700"
-            />
-          </div>
-
-          <div className="flex items-center gap-3 bg-slate-950 border border-slate-800/60 rounded-2xl p-4 mt-2">
-            <input 
-              type="checkbox" 
-              id="autoBootCheck" 
-              checked={autoBoot}
-              onChange={(e) => setAutoBoot(e.target.checked)}
-              className="w-6 h-6 rounded border-slate-850 text-blue-600 bg-slate-900 focus:ring-0 focus:ring-offset-0 cursor-pointer"
-            />
-            <label htmlFor="autoBootCheck" className="text-xs font-bold text-slate-300 uppercase tracking-wider cursor-pointer select-none">
-              Inicialização Automática (Abrir direto aqui)
-            </label>
-          </div>
-        </div>
-
-        <div className="flex gap-4 mt-2">
-          <button 
-            type="button"
-            onClick={() => setShowConfigModal(false)}
-            className="flex-1 py-4 bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-850 rounded-2xl font-bold uppercase tracking-widest text-sm transition-all active:scale-95"
-          >
-            Cancelar
-          </button>
-          <button 
-            type="button"
-            onClick={handleSaveConfig}
-            className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold uppercase tracking-widest text-sm transition-all active:scale-95 shadow-lg shadow-blue-900/10"
-          >
-            Salvar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (connectionError && !showConfigModal) {
+  // --- SCREEN 1: Setup & Connection ---
+  if (!isSetup) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center font-sans p-6">
-        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[2.5rem] p-10 shadow-2xl flex flex-col items-center text-center animate-fade-in">
-          <div className="w-24 h-24 bg-rose-500/10 text-rose-500 rounded-full flex items-center justify-center mb-8 border border-rose-500/20">
-            <span className="material-symbols-outlined text-[4rem] animate-pulse">wifi_off</span>
-          </div>
-          <h2 className="font-sans text-3xl font-black text-white uppercase tracking-wider mb-2">Servidor Offline</h2>
-          <p className="text-slate-400 font-semibold text-sm mb-6 uppercase tracking-wider leading-relaxed">
-            Não foi possível estabelecer conexão com o servidor do painel.
-          </p>
+      <div className="min-h-screen bg-[#F8F9FA] text-[#1E293B] flex flex-col items-center justify-center p-6 font-sans">
+        <div className="w-full max-w-md bg-white rounded-3xl p-8 border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.03)] flex flex-col items-center">
           
-          <div className="bg-slate-950 border border-slate-850 rounded-2xl p-5 w-full text-left mb-8 flex flex-col gap-2">
-            <div>
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">IP do Servidor</span>
-              <span className="font-mono text-lg font-bold text-blue-400">
-                {localStorage.getItem('server_ip_override') || 'localhost (Local)'}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">URL da API</span>
-              <span className="font-mono text-sm text-slate-500 break-all">{API_URL || 'Nenhuma'}</span>
-            </div>
+          {/* Centralized Logo */}
+          <div className="text-center mb-8 flex flex-col items-center gap-1">
+            <span className="material-symbols-outlined text-5xl text-[#2563EB]">sensors</span>
+            <h1 className="text-4xl font-extrabold text-[#2563EB] tracking-wider uppercase">ChamaAí</h1>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Módulo Operador Touch</p>
           </div>
 
-          <div className="flex flex-col gap-4 w-full">
-            <button 
-              onClick={() => {
-                setConnectionError(false);
-                refreshData();
-              }}
-              className="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-sans text-lg font-bold uppercase tracking-widest py-5 rounded-2xl transition-all shadow-xl shadow-blue-900/10 active:scale-95 flex items-center justify-center gap-3"
+          <div className="w-full space-y-5">
+            {/* IP Address Field */}
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">IP do Servidor</label>
+              <input
+                type="text"
+                value={ip}
+                onChange={(e) => setIp(e.target.value)}
+                placeholder="Ex: 192.168.1.100"
+                className="w-full bg-[#F8F9FA] border border-slate-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10 rounded-2xl px-5 py-4 focus:outline-none font-bold text-lg text-slate-800 placeholder:text-slate-300"
+              />
+            </div>
+
+            {/* Guichê Field */}
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Número do Guichê</label>
+              <input
+                type="number"
+                value={guiche}
+                onChange={(e) => setGuiche(e.target.value)}
+                placeholder="Ex: 1"
+                className="w-full bg-[#F8F9FA] border border-slate-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10 rounded-2xl px-5 py-4 focus:outline-none font-bold text-lg text-slate-800 placeholder:text-slate-300"
+              />
+            </div>
+
+            {/* Error Message */}
+            {errorMsg && (
+              <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 text-rose-600 text-xs font-bold text-center leading-relaxed">
+                {errorMsg}
+              </div>
+            )}
+
+            {/* Connect Button */}
+            <button
+              onClick={handleConnect}
+              disabled={isValidating}
+              className="w-full bg-[#2563EB] text-white py-4 rounded-2xl font-bold uppercase tracking-widest hover:bg-[#1D4ED8] transition-all active:scale-[0.98] shadow-lg shadow-[#2563EB]/15 flex items-center justify-center gap-3 disabled:opacity-50"
             >
-              <span className="material-symbols-outlined text-xl">refresh</span>
-              Tentar Novamente
-            </button>
-            <button 
-              onClick={() => setShowConfigModal(true)}
-              className="w-full bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 font-sans text-lg font-bold uppercase tracking-widest py-5 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-3"
-            >
-              <span className="material-symbols-outlined text-xl">settings</span>
-              Configurar IP
+              {isValidating ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  Conectando...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-xl">login</span>
+                  CONECTAR
+                </>
+              )}
             </button>
           </div>
         </div>
-
-        {showConfigModal && renderConfigModal()}
       </div>
     );
   }
 
+  // --- SCREEN 2: Operator Landscape Workspace ---
   return (
-    <div className="touch-container">
-       {/* Left side: Current Ticket & Stats */}
-       <div className="w-full md:flex-1 flex flex-col gap-4 md:gap-6">
-          {/* Header */}
-          <div className="flex items-center justify-between bg-white rounded-3xl p-4 md:p-6 border border-slate-200 shadow-sm">
-             <div className="flex items-center gap-3 md:gap-4">
-                <span className="material-symbols-outlined text-blue-600 text-3xl md:text-5xl">storefront</span>
-                <div>
-                   <h1 className="font-sans text-xl md:text-3xl font-bold uppercase tracking-widest">{guiche}</h1>
-                   <div className="flex items-center gap-1.5 mt-0.5 md:mt-1">
-                      <span className={`w-2 h-2 rounded-full ${sseConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                      <span className={`font-bold tracking-widest text-[9px] md:text-xs uppercase ${sseConnected ? 'text-emerald-600' : 'text-rose-500'}`}>
-                         {sseConnected ? 'Conectado' : 'Conectando...'}
-                      </span>
-                   </div>
-                </div>
-             </div>
-             <div className="flex items-center gap-2">
-                 {deferredPrompt && (
-                   <button 
-                     onClick={handleInstallClick}
-                     className="w-10 h-10 md:w-14 md:h-14 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center hover:bg-blue-200 transition-colors"
-                     title="Instalar App"
-                   >
-                     <span className="material-symbols-outlined text-xl md:text-2xl">download</span>
-                   </button>
-                 )}
-                 <button 
-                   onClick={() => setShowConfigModal(true)} 
-                   className="w-10 h-10 md:w-14 md:h-14 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full flex items-center justify-center transition-colors"
-                   title="Configurar Painel"
-                 >
-                    <span className="material-symbols-outlined text-xl md:text-2xl">settings</span>
-                 </button>
-                 <button 
-                   onClick={handleExit} 
-                   className="w-10 h-10 md:w-14 md:h-14 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full flex items-center justify-center transition-colors"
-                   title="Sair"
-                 >
-                    <span className="material-symbols-outlined text-xl md:text-2xl">close</span>
-                 </button>
-              </div>
+    <div className="h-screen w-screen bg-[#F8F9FA] text-[#1E293B] flex flex-row font-sans p-6 overflow-hidden select-none">
+      
+      {/* LEFT COLUMN (~40% width) */}
+      <div className="w-[40%] flex flex-col gap-5 pr-3 h-full shrink-0">
+        
+        {/* Card 1: Guichê & Connection Status */}
+        <div className="bg-white border border-slate-200/80 rounded-[20px] p-5 shadow-[0_4px_12px_rgba(0,0,0,0.01)] flex items-center justify-between shrink-0">
+          <div>
+            <h2 className="text-2xl font-black text-[#1E293B] leading-none uppercase tracking-wide">
+              GUICHÊ {guiche}
+            </h2>
+            <div className="flex items-center gap-2 mt-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${sseConnected ? 'bg-[#16A34A] animate-pulse' : 'bg-[#EF4444]'}`}></span>
+              <span className={`text-[10px] font-black uppercase tracking-widest ${sseConnected ? 'text-[#16A34A]' : 'text-[#EF4444]'}`}>
+                {sseConnected ? 'CONECTADO' : 'DESCONECTADO'}
+              </span>
+            </div>
           </div>
-
-          {/* Current Ticket */}
-          <div className="flex-1 min-h-[200px] sm:min-h-[280px] md:min-h-0 bg-white rounded-[40px] flex flex-col items-center justify-center p-6 relative overflow-hidden border-2 border-slate-200 shadow-xl">
-             {senhaAtual ? (
-                <>
-                   <span className="text-slate-400 font-bold uppercase tracking-[0.3em] mb-2 md:mb-4 text-sm md:text-xl">Em Atendimento</span>
-                   <span className="font-sans text-7xl sm:text-8xl md:text-[10rem] lg:text-[14rem] font-black text-blue-600 leading-none drop-shadow-md">
-                     {String(senhaAtual.numero).padStart(3, '0')}
-                   </span>
-                   <span className={`mt-4 md:mt-8 px-4 py-1.5 md:px-8 md:py-3 rounded-full font-bold uppercase tracking-widest text-sm md:text-2xl ${senhaAtual.preferencial ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                     {senhaAtual.preferencial ? 'ATENDIMENTO PRIORITÁRIO' : 'ATENDIMENTO NORMAL'}
-                   </span>
-                </>
-             ) : (
-                <div className="flex flex-col items-center opacity-30 text-slate-500">
-                   <span className="material-symbols-outlined text-5xl md:text-[8rem] mb-2 md:mb-6">chair</span>
-                   <span className="font-sans text-lg md:text-4xl uppercase tracking-widest text-center">Nenhum atendimento</span>
-                </div>
-             )}
-          </div>
-
-          {/* Counters */}
-          <div className="grid grid-cols-2 gap-4 md:gap-6 h-20 sm:h-32 shrink-0">
-             <div className="bg-white rounded-3xl flex flex-col items-center justify-center border-b-4 border-blue-500 shadow-sm p-2">
-                <span className="text-2xl sm:text-3xl md:text-5xl font-black text-slate-800">{normalCount}</span>
-                <span className="text-slate-500 font-bold tracking-widest uppercase text-[10px] md:text-sm mt-0.5 md:mt-1">Fila Geral</span>
-             </div>
-             <div className="bg-white rounded-3xl flex flex-col items-center justify-center border-b-4 border-amber-500 shadow-sm p-2">
-                <span className="text-2xl sm:text-3xl md:text-5xl font-black text-amber-500">{prefCount}</span>
-                <span className="text-slate-500 font-bold tracking-widest uppercase text-[10px] md:text-sm mt-0.5 md:mt-1">Fila Preferencial</span>
-             </div>
-          </div>
-       </div>
-
-        {/* Right side: Action Buttons */}
-        <div className="w-full md:flex-1 flex flex-col gap-4 md:gap-6 shrink-0">
-           <button 
-              onClick={chamarProxima}
-              className="h-32 sm:h-56 md:h-auto md:flex-[2] bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white active:scale-[0.98] rounded-[32px] md:rounded-[40px] flex flex-col items-center justify-center gap-2 md:gap-6 transition-all shadow-xl p-4"
-           >
-              <span className="material-symbols-outlined text-4xl sm:text-[5rem] md:text-[8rem]">campaign</span>
-              <span className="font-sans text-3xl sm:text-5xl md:text-7xl font-black uppercase tracking-widest">Próximo</span>
-           </button>
-           
-           <button 
-              onClick={repetirChamada}
-              className="h-20 sm:h-28 md:h-auto md:flex-1 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white active:scale-[0.98] rounded-[32px] md:rounded-[40px] flex items-center justify-center gap-3 md:gap-6 transition-all shadow-md p-4"
-           >
-              <span className="material-symbols-outlined text-2xl sm:text-4xl md:text-6xl">refresh</span>
-              <span className="font-sans text-xl sm:text-3xl md:text-5xl font-bold uppercase tracking-widest">Repetir</span>
-           </button>
-
-           <button 
-              onClick={estornar}
-              className="h-16 sm:h-20 md:h-auto md:flex-[0.6] bg-white hover:bg-slate-50 active:bg-slate-100 active:scale-[0.98] rounded-[32px] md:rounded-[40px] flex items-center justify-center gap-3 md:gap-6 transition-all border-2 border-amber-500/30 text-amber-600 shadow-sm p-4"
-           >
-              <span className="material-symbols-outlined text-xl sm:text-3xl md:text-5xl">undo</span>
-              <span className="font-sans text-sm sm:text-2xl md:text-3xl font-bold uppercase tracking-widest">Devolver à Fila</span>
-           </button>
+          <button
+            onClick={() => setIsSetup(false)}
+            className="w-12 h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all active:scale-95"
+            title="Voltar à Tela de Conexão"
+          >
+            <span className="material-symbols-outlined text-2xl">settings</span>
+          </button>
         </div>
 
-        {showConfigModal && renderConfigModal()}
+        {/* Card 2: Senha em Atendimento */}
+        <div className="bg-white border border-slate-200/80 rounded-[20px] p-6 shadow-[0_4px_12px_rgba(0,0,0,0.01)] flex-1 flex flex-col items-center justify-center text-center relative overflow-hidden">
+          {senhaAtual ? (
+            <div className="flex flex-col items-center">
+              <span className="text-[#1E293B] font-black text-6xl md:text-7xl lg:text-8xl leading-none tracking-tighter">
+                {senhaAtual.numero}
+              </span>
+              <span className="text-slate-400 font-extrabold uppercase tracking-[0.3em] text-[10px] md:text-xs mt-4">
+                EM ATENDIMENTO
+              </span>
+              <span className={`mt-3 px-3 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-widest ${senhaAtual.preferencial ? 'bg-amber-50 text-amber-600 border border-amber-200/50' : 'bg-blue-50 text-blue-600 border border-blue-200/50'}`}>
+                {senhaAtual.preferencial ? 'Prioritário' : 'Normal'}
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center opacity-40 text-slate-400">
+              <span className="material-symbols-outlined text-6xl mb-3 text-slate-300">chair</span>
+              <span className="text-xs font-black uppercase tracking-widest">NENHUM ATENDIMENTO</span>
+            </div>
+          )}
+        </div>
+
+        {/* Card 3: Contadores de Fila */}
+        <div className="grid grid-cols-2 gap-4 h-24 shrink-0">
+          {/* Fila Geral */}
+          <div className="bg-white border-b-4 border-[#2563EB] border border-slate-200/80 rounded-[20px] flex flex-col items-center justify-center p-2 shadow-[0_4px_12px_rgba(0,0,0,0.01)]">
+            <span className="text-3xl font-black text-slate-800 leading-none">{queueCounts.geral}</span>
+            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px] mt-1">FILA GERAL</span>
+          </div>
+          
+          {/* Fila Preferencial */}
+          <div className="bg-white border-b-4 border-[#D97706] border border-slate-200/80 rounded-[20px] flex flex-col items-center justify-center p-2 shadow-[0_4px_12px_rgba(0,0,0,0.01)]">
+            <span className="text-3xl font-black text-[#D97706] leading-none">{queueCounts.preferencial}</span>
+            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px] mt-1">FILA PREFERENCIAL</span>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT COLUMN (~60% width) */}
+      <div className="w-[60%] flex flex-col gap-4 pl-3 h-full justify-between">
+        
+        {/* PRÓXIMO BUTTON (~45% height) */}
+        <button
+          onClick={handleProximo}
+          disabled={isActionPending}
+          className="h-[44%] w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-xl shadow-[#16A34A]/10 border-none outline-none disabled:opacity-50 select-none"
+        >
+          <span className="material-symbols-outlined text-5xl md:text-6xl">campaign</span>
+          <span className="text-3xl md:text-4xl lg:text-5xl font-black">PRÓXIMO</span>
+        </button>
+
+        {/* REPETIR BUTTON (~30% height) */}
+        <button
+          onClick={handleRepetir}
+          disabled={isActionPending || !senhaAtual}
+          className="h-[29%] w-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-extrabold uppercase tracking-widest rounded-3xl flex items-center justify-center gap-4 active:scale-[0.98] transition-all shadow-lg shadow-[#2563EB]/10 border-none outline-none disabled:opacity-30 select-none"
+        >
+          <span className="material-symbols-outlined text-3xl md:text-4xl">refresh</span>
+          <span className="text-xl md:text-2xl lg:text-3xl font-black">REPETIR</span>
+        </button>
+
+        {/* DEVOLVER BUTTON (~25% height) */}
+        <button
+          onClick={() => setShowConfirmDevolver(true)}
+          disabled={isActionPending || !senhaAtual}
+          className="h-[23%] w-full bg-white hover:bg-amber-50/30 text-[#D97706] border-2 border-[#D97706] font-extrabold uppercase tracking-widest rounded-3xl flex items-center justify-center gap-3 active:scale-[0.98] transition-all shadow-sm outline-none disabled:opacity-30 select-none"
+        >
+          <span className="material-symbols-outlined text-2xl md:text-3xl">undo</span>
+          <span className="text-lg md:text-xl font-black">DEVOLVER À FILA</span>
+        </button>
+      </div>
+
+      {/* --- CONFIRM MODAL FOR DEVOLVER --- */}
+      {showConfirmDevolver && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-[24px] p-6 max-w-sm w-full shadow-2xl flex flex-col gap-6">
+            <div className="text-center">
+              <div className="w-14 h-14 bg-amber-50 text-[#D97706] rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-250/20">
+                <span className="material-symbols-outlined text-3xl">warning</span>
+              </div>
+              <h3 className="text-xl font-black text-slate-800 uppercase tracking-wide">Confirmar Estorno</h3>
+              <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mt-2 leading-relaxed">
+                Tem certeza que deseja devolver a senha <strong className="text-slate-800">{senhaAtual?.numero}</strong> de volta para a fila de espera?
+              </p>
+            </div>
+            
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowConfirmDevolver(false)}
+                className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold uppercase tracking-widest text-xs transition-all active:scale-95"
+              >
+                CANCELAR
+              </button>
+              <button
+                onClick={handleDevolver}
+                className="flex-1 py-4 bg-[#D97706] hover:bg-[#B45309] text-white rounded-xl font-bold uppercase tracking-widest text-xs transition-all active:scale-95"
+              >
+                CONFIRMAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

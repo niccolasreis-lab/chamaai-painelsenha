@@ -251,6 +251,46 @@ export function initDatabase() {
       );
     `);
 
+    // Encarte — Filtros e Renomeação
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS encarte_filtros (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        palavra_chave TEXT NOT NULL,
+        ativo INTEGER DEFAULT 1
+      );
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS encarte_nomes_customizados (
+        codigo_produto TEXT PRIMARY KEY,
+        nome_exibicao TEXT NOT NULL,
+        ativo INTEGER DEFAULT 1
+      );
+    `);
+
+    // Encarte — Temas
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS encarte_temas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        imagem_fundo TEXT NOT NULL,
+        data_inicio TEXT,
+        data_fim TEXT,
+        ativo INTEGER DEFAULT 1
+      );
+    `);
+
+    // Migration: Adicionar colunas em midias
+    try {
+      db.prepare("ALTER TABLE midias ADD COLUMN data_expiracao TEXT").run();
+      console.log("[DATABASE] Coluna 'data_expiracao' adicionada à tabela midias.");
+    } catch (e) {}
+
+    try {
+      db.prepare("ALTER TABLE midias ADD COLUMN status TEXT DEFAULT 'ativo'").run();
+      console.log("[DATABASE] Coluna 'status' adicionada à tabela midias.");
+    } catch (e) {}
+
     console.log('SQLite Database initialized at', dbPath);
     return db;
   } catch (err) {

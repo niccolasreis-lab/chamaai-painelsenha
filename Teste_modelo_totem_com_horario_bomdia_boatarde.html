@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Totem de Atendimento - Saudação Dinâmica</title>
+    <style>
+        :root {
+            --primary-blue: #0052cc;
+            --light-blue: #e6f0ff;
+            --text-dark: #0a192f;
+            --gray-text: #657786;
+            --green-success: #22c55e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f4f6f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Estrutura Externa do Totem Físico */
+        .totem-structure {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        /* Tela do Totem */
+        .totem-screen {
+            width: 450px;
+            height: 800px;
+            background: #ffffff;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 40px 20px;
+            position: relative;
+            overflow: hidden;
+            border-top: 15px solid var(--primary-blue);
+        }
+
+        /* Topo / Boas-vindas */
+        .header {
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .header h1 {
+            color: var(--text-dark);
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            transition: opacity 0.3s ease;
+        }
+
+        .header p {
+            color: var(--gray-text);
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        /* Contador de Fila */
+        .queue-container {
+            position: relative;
+            margin: 15px 0;
+        }
+
+        .live-queue {
+            background: #ffffff;
+            border: 2px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 15px 35px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+        }
+
+        .queue-badge {
+            background: var(--green-success);
+            color: white;
+            font-size: 0.65rem;
+            font-weight: bold;
+            padding: 4px 12px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 10px rgba(34, 197, 94, 0.3);
+        }
+
+        /* Animação do Ponto Verde (Live) */
+        .dot-live {
+            width: 8px;
+            height: 8px;
+            background-color: white;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse-dot 1.5s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0% { transform: scale(0.9); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+            100% { transform: scale(0.9); opacity: 1; }
+        }
+
+        .queue-icon {
+            color: var(--primary-blue);
+            font-size: 1.8rem;
+        }
+
+        .queue-info span {
+            font-size: 0.7rem;
+            color: var(--gray-text);
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .queue-number {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+
+        .queue-number h2 {
+            font-size: 2.2rem;
+            color: var(--primary-blue);
+            line-height: 1;
+            font-weight: 800;
+        }
+
+        .queue-number span {
+            font-size: 0.85rem;
+            color: var(--gray-text);
+            text-transform: lowercase;
+        }
+
+        /* Container de Banners */
+        .banners-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 95%;
+        }
+
+        /* Banners Informativos com Efeito Shine */
+        .info-banner {
+            border-radius: 14px;
+            padding: 12px 15px;
+            text-align: center;
+            font-size: 0.85rem;
+            line-height: 1.3;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+
+        /* Efeito de Brilho passando pelo Card */
+        .info-banner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.6), transparent);
+            transform: skewX(-20deg);
+            animation: shine 4s infinite;
+        }
+
+        @keyframes shine {
+            0% { left: -100%; }
+            20% { left: 200%; }
+            100% { left: 200%; }
+        }
+
+        .banner-yellow {
+            background: #fffdf5;
+            border: 1px solid #fef3c7;
+            color: #b45309;
+        }
+
+        .banner-green {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+
+        /* Botão Principal Toque Aqui animado */
+        .btn-touch {
+            background: white;
+            border: 3px solid #d8e2ef;
+            border-radius: 24px;
+            width: 90%;
+            padding: 25px 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            outline: none;
+            margin-bottom: 10px;
+            /* Animação de respiração na sombra do botão */
+            animation: button-breathe 2s infinite ease-in-out;
+        }
+
+        @keyframes button-breathe {
+            0% { box-shadow: 0 10px 25px rgba(0, 82, 204, 0.05), 0 0 0 0 rgba(0, 82, 204, 0.2); }
+            50% { box-shadow: 0 15px 35px rgba(0, 82, 204, 0.15), 0 0 0 8px rgba(0, 82, 204, 0); }
+            100% { box-shadow: 0 10px 25px rgba(0, 82, 204, 0.05), 0 0 0 0 rgba(0, 82, 204, 0); }
+        }
+
+        .btn-touch:active {
+            transform: scale(0.97);
+            border-color: var(--primary-blue);
+            animation: none; /* Para a animação ao clicar */
+        }
+
+        .click-icon {
+            background: var(--primary-blue);
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.8rem;
+            box-shadow: 0 8px 20px rgba(0, 82, 204, 0.25);
+        }
+
+        .btn-touch h3 {
+            color: var(--gray-text);
+            text-transform: uppercase;
+            font-size: 0.95rem;
+            letter-spacing: 0.8px;
+            font-weight: 700;
+        }
+
+        .btn-touch span {
+            color: var(--primary-blue);
+            font-weight: 800;
+            font-size: 1.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* --- TELA DE SUCESSO --- */
+        .success-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+
+        .success-screen.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .success-card {
+            width: 100%;
+            max-width: 360px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transform: scale(0.9) translateY(20px);
+            opacity: 0;
+        }
+
+        /* Animação Elástica do Card de Sucesso */
+        .success-screen.active .success-card {
+            animation: popInCard 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            animation-delay: 0.1s;
+        }
+
+        @keyframes popInCard {
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+        .check-icon {
+            width: 60px;
+            height: 60px;
+            background: var(--green-success);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.2rem;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 25px rgba(34, 197, 94, 0.3);
+            transform: scale(0);
+        }
+
+        .success-screen.active .check-icon {
+            animation: bounceCheck 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.4) forwards;
+            animation-delay: 0.3s;
+        }
+
+        @keyframes bounceCheck {
+            100% { transform: scale(1); }
+        }
+
+        .success-card h4 {
+            font-size: 1.4rem;
+            color: var(--text-dark);
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .success-card p {
+            color: var(--gray-text);
+            font-size: 0.95rem;
+            margin-bottom: 30px;
+        }
+
+        .senha-box {
+            width: 100%;
+            background: #ffffff;
+            border: 2px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 30px;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        }
+
+        .senha-box .label {
+            font-size: 0.75rem;
+            color: var(--gray-text);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .senha-box .numero-senha {
+            font-size: 3.5rem;
+            font-weight: 800;
+            color: var(--primary-blue);
+            margin: 10px 0;
+            text-shadow: 2px 2px 0px rgba(0, 82, 204, 0.1);
+        }
+
+        .senha-meta {
+            display: flex;
+            justify-content: space-around;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+            margin-top: 10px;
+        }
+
+        .meta-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .meta-item .meta-label {
+            font-size: 0.65rem;
+            color: var(--gray-text);
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .meta-item .meta-value {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-top: 4px;
+        }
+
+        /* Botão Retirar Nova Senha animado no Hover */
+        .btn-back {
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 15px 30px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(0, 82, 204, 0.25);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-back:hover {
+            background: #0041a8;
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(0, 82, 204, 0.35);
+        }
+
+        /* --- CALHA DA IMPRESSORA FÍSICA --- */
+        .printer-base {
+            width: 450px;
+            background: #e2e8f0;
+            border-radius: 0 0 20px 20px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-top: 2px solid #cbd5e1;
+            position: relative;
+            z-index: 10;
+        }
+
+        .printer-slot {
+            width: 240px;
+            height: 10px;
+            background: #1e293b;
+            border-radius: 3px;
+            box-shadow: inset 0 3px 6px rgba(0,0,0,0.8);
+            position: relative;
+            z-index: 20;
+        }
+
+        /* Ticket Físico Impresso */
+        .printed-ticket {
+            width: 180px;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-top: none;
+            padding: 15px 12px;
+            position: absolute;
+            top: 25px; 
+            z-index: 5;
+            text-align: center;
+            box-shadow: 0 15px 25px rgba(0,0,0,0.2);
+            font-size: 0.7rem;
+            color: #334155;
+            
+            transform: translateY(-120%);
+            opacity: 0;
+            transition: transform 0.5s ease-in, opacity 0.4s ease-in;
+            pointer-events: none;
+        }
+
+        .printed-ticket::after {
+            content: "";
+            position: absolute;
+            bottom: -6px;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background: linear-gradient(-45deg, transparent 4px, #ffffff 4px), linear-gradient(45deg, transparent 4px, #ffffff 4px);
+            background-size: 8px 12px;
+        }
+
+        .printed-ticket h5 {
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            color: #000;
+            margin-bottom: 4px;
+        }
+
+        .printed-ticket .ticket-number {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary-blue);
+            margin: 5px 0;
+        }
+
+        /* Animação do Papel */
+        .animate-print-tease {
+            animation: boomerangSuspense 2.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+
+        @keyframes boomerangSuspense {
+            0% { transform: translateY(-120%); opacity: 0; }
+            15% { transform: translateY(-60%); opacity: 1; }
+            35% { transform: translateY(-110%); opacity: 1; }
+            55% { transform: translateY(-40%); opacity: 1; }
+            70% { transform: translateY(-90%); opacity: 1; }
+            90% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="totem-structure">
+    
+    <div class="totem-screen">
+        
+        <div class="header">
+            <h1 id="titulo-saudacao">BEM-VINDO(A)</h1>
+            <p>Toque na tela para retirar sua senha</p>
+        </div>
+
+        <div class="queue-container">
+            <div class="queue-badge"><span class="dot-live"></span> Fila ao Vivo</div>
+            <div class="live-queue">
+                <div class="queue-icon">👥</div>
+                <div class="queue-info">
+                    <span>Pessoas Aguardando</span>
+                    <div class="queue-number">
+                        <h2 id="main-queue-count">41</h2>
+                        <span>clientes</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="banners-wrapper">
+            <div class="info-banner banner-yellow">
+                📱 <strong>Fila na palma da mão!</strong> Escaneie o QR Code do seu ticket e acompanhe sua posição ao vivo pelo celular.
+            </div>
+            <div class="info-banner banner-green">
+                📝 <strong>Monte sua lista:</strong> Consulte os preços dos nossos produtos a granel de forma simples e rápida.
+            </div>
+        </div>
+
+        <button class="btn-touch" onclick="gerarSenhaFluxo()">
+            <div class="click-icon">👆</div>
+            <div>
+                <h3>Atendimento Geral</h3>
+                <span>Toque Aqui</span>
+            </div>
+        </button>
+
+        <div class="success-screen" id="modal-sucesso">
+            <div class="success-card">
+                <div class="check-icon">✓</div>
+                <h4>Senha Emitida</h4>
+                <p>Retire seu ticket e aguarde.</p>
+                
+                <div class="senha-box">
+                    <div class="label">Sua Senha</div>
+                    <div class="numero-senha" id="display-senha">439</div>
+                    
+                    <div class="senha-meta">
+                        <div class="meta-item">
+                            <div class="meta-label">Horário</div>
+                            <div class="meta-value" id="display-hora">12:21</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="meta-label">Na Frente</div>
+                            <div class="meta-value" id="display-frente">41</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn-back" onclick="voltarTelaInicial()">
+                    <span>+</span> Retirar Nova Senha
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="printer-base">
+        <div class="printer-slot"></div>
+        
+        <div class="printed-ticket" id="ticket-fisico">
+            <h5>SENHA EMITIDA</h5>
+            <div class="ticket-number" id="ticket-codigo">439</div>
+            <p style="font-weight: bold; margin-top:2px;">Atendimento Geral</p>
+            <hr style="border:none; border-top:1px dashed #cbd5e1; margin:6px 0;">
+            <p style="font-size: 0.65rem;"><strong>Fila e Lista de Produtos</strong></p>
+            <div style="width: 50px; height: 50px; background: #222; margin: 6px auto; display: flex; align-items:center; justify-content:center; color:white; font-size:1.1rem;">📷</div>
+            <p style="font-size:0.55rem; color:var(--gray-text); line-height:1.2;">Escaneie o QR Code para acompanhar sua vez e consultar os preços a granel!</p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    let totalFila = 41;
+    let proximaSenha = 439;
+    let temporizadorRetorno = null; 
+
+    // --- NOVA FUNÇÃO: SAUDAÇÃO DINÂMICA ---
+    function atualizarSaudacao() {
+        const horaAtual = new Date().getHours();
+        let saudacao = "BEM-VINDO(A)";
+
+        if (horaAtual >= 5 && horaAtual < 12) {
+            saudacao = "BOM DIA!";
+        } else if (horaAtual >= 12 && horaAtual < 18) {
+            saudacao = "BOA TARDE!";
+        } else {
+            saudacao = "BOA NOITE!";
+        }
+
+        document.getElementById('titulo-saudacao').innerText = saudacao;
+    }
+
+    // Inicializa a saudação ao abrir e agenda uma verificação a cada 1 hora
+    atualizarSaudacao();
+    setInterval(atualizarSaudacao, 3600000); 
+    // ---------------------------------------
+
+    function gerarSenhaFluxo() {
+        clearTimeout(temporizadorRetorno);
+
+        const modal = document.getElementById('modal-sucesso');
+        const ticket = document.getElementById('ticket-fisico');
+        
+        document.getElementById('display-senha').innerText = proximaSenha;
+        document.getElementById('ticket-codigo').innerText = proximaSenha;
+        document.getElementById('display-frente').innerText = totalFila;
+        
+        const agora = new Date();
+        const horas = String(agora.getHours()).padStart(2, '0');
+        const minutos = String(agora.getMinutes()).padStart(2, '0');
+        document.getElementById('display-hora').innerText = `${horas}:${minutos}`;
+
+        modal.classList.add('active');
+
+        ticket.style.transition = 'none';
+        ticket.classList.remove('animate-print-tease');
+        void ticket.offsetWidth; 
+        
+        ticket.style.transition = '';
+        ticket.classList.add('animate-print-tease');
+
+        totalFila++;
+        proximaSenha++;
+
+        temporizadorRetorno = setTimeout(() => {
+            voltarTelaInicial();
+        }, 7500);
+    }
+
+    function voltarTelaInicial() {
+        clearTimeout(temporizadorRetorno);
+
+        document.getElementById('modal-sucesso').classList.remove('active');
+        document.getElementById('ticket-fisico').classList.remove('animate-print-tease');
+
+        document.getElementById('main-queue-count').innerText = totalFila;
+    }
+</script>
+
+</body>
+</html>

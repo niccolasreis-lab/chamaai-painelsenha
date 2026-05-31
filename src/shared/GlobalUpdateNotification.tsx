@@ -7,10 +7,32 @@ export default function GlobalUpdateNotification() {
   const [errorMessage, setErrorMessage] = useState('');
   const [dismissed, setDismissed] = useState(false);
 
+  // Estados para exibir aviso pós-atualização
+  const [justUpdatedInfo, setJustUpdatedInfo] = useState<any>(null);
+  const [showSuccessCard, setShowSuccessCard] = useState(false);
+
   useEffect(() => {
     // Check if we are running in Electron and have access to the API
     const api = (window as any).api;
     if (!api) return;
+
+    let successTimer: any = null;
+
+    // Verifica se acabamos de atualizar
+    try {
+      api.checkUpdateStatus().then((status: any) => {
+        console.log('[UPDATE STATUS] Status de atualização:', status);
+        if (status && status.justUpdated) {
+          setJustUpdatedInfo(status);
+          setShowSuccessCard(true);
+          successTimer = setTimeout(() => {
+            setShowSuccessCard(false);
+          }, 15000);
+        }
+      }).catch((e: any) => {
+        console.error('[UPDATE STATUS] Erro ao obter status:', e);
+      });
+    } catch (e) {}
 
     // Listen to update events from main process
     const cleanupAvailable = api.onUpdateAvailable((info: any) => {
@@ -58,6 +80,7 @@ export default function GlobalUpdateNotification() {
       if (typeof cleanupProgress === 'function') cleanupProgress();
       if (typeof cleanupDownloaded === 'function') cleanupDownloaded();
       if (typeof cleanupError === 'function') cleanupError();
+      if (successTimer) clearTimeout(successTimer);
       clearInterval(checkInterval);
     };
   }, []);
@@ -71,6 +94,42 @@ export default function GlobalUpdateNotification() {
       console.error('Erro ao instalar atualização:', err);
     }
   };
+
+  // Exibe o card de sucesso de atualização primeiro, se aplicável
+  if (showSuccessCard && justUpdatedInfo) {
+    return (
+      <div className="fixed bottom-6 right-6 z-[9999] max-w-sm w-full bg-surface/95 backdrop-blur-md border border-success/30 rounded-3xl p-5 shadow-2xl animate-scale-in flex flex-col gap-4 font-sans text-ink">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex gap-3">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-success/15 text-success">
+              <span className="material-symbols-outlined font-black">
+                verified
+              </span>
+            </div>
+            <div>
+              <h4 className="font-bold text-sm uppercase tracking-wider text-success">
+                Sistema Atualizado!
+              </h4>
+              <p className="text-xs text-ink mt-1 font-semibold leading-relaxed">
+                Você já está utilizando a versão mais nova: <span className="px-2 py-0.5 bg-success/15 text-success rounded-full text-xs font-bold font-mono border border-success/20">v{justUpdatedInfo.currentVersion}</span>
+              </p>
+              {justUpdatedInfo.previousVersion && (
+                <p className="text-[10px] text-ink-secondary mt-1.5 leading-relaxed">
+                  Atualizado com sucesso a partir da versão v{justUpdatedInfo.previousVersion}.
+                </p>
+              )}
+            </div>
+          </div>
+          <button 
+            onClick={() => setShowSuccessCard(false)} 
+            className="text-ink-secondary/60 hover:text-ink hover:bg-outline-variant/40 w-6 h-6 rounded-full flex items-center justify-center transition-all shrink-0"
+          >
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (updateState === 'idle' || dismissed) return null;
 

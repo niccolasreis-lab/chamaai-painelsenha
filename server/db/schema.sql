@@ -51,7 +51,9 @@ CREATE TABLE IF NOT EXISTS midias (
   tipo      TEXT NOT NULL CHECK(tipo IN ('imagem','video')),
   ordem     INTEGER NOT NULL DEFAULT 0,
   ativo     INTEGER NOT NULL DEFAULT 1,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  data_expiracao TEXT,
+  status    TEXT DEFAULT 'ativo'
 );
 
 -- Configurações gerais do sistema (chave/valor)
@@ -89,5 +91,29 @@ CREATE TABLE IF NOT EXISTS teloes (
   encarte_categorias TEXT DEFAULT '',
   criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
   vinculado_em DATETIME
+);
+
+-- Encarte: Filtros de exclusão
+CREATE TABLE IF NOT EXISTS encarte_filtros (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  palavra_chave TEXT NOT NULL,
+  ativo INTEGER DEFAULT 1
+);
+
+-- Encarte: Nomes customizados de exibição
+CREATE TABLE IF NOT EXISTS encarte_nomes_customizados (
+  codigo_produto TEXT PRIMARY KEY,
+  nome_exibicao TEXT NOT NULL,
+  ativo INTEGER DEFAULT 1
+);
+
+-- Encarte: Temas (backgrounds com vigência)
+CREATE TABLE IF NOT EXISTS encarte_temas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  imagem_fundo TEXT NOT NULL,
+  data_inicio TEXT,
+  data_fim TEXT,
+  ativo INTEGER DEFAULT 1
 );
 

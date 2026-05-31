@@ -199,6 +199,16 @@ export function startServer() {
   if (!fs.existsSync(LOCAL_UPDATES_DIR)) {
     try { fs.mkdirSync(LOCAL_UPDATES_DIR, { recursive: true }); } catch (e) {}
   }
+  app.use('/local-updates', (req, res, next) => {
+    if (req.path.endsWith('.exe') && req.path.includes('-')) {
+      const spacePath = req.path.replace(/-/g, ' ');
+      const fullPath = path.join(LOCAL_UPDATES_DIR, spacePath.substring(1));
+      if (fs.existsSync(fullPath)) {
+        req.url = spacePath;
+      }
+    }
+    next();
+  });
   app.use('/local-updates', express.static(LOCAL_UPDATES_DIR, {
     setHeaders: (res) => {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
@@ -249,6 +259,23 @@ export function startServer() {
       executarBackupAgendado();
     } catch (err) {
       console.error('[CRON] ❌ Erro ao executar backup agendado:', err);
+    }
+    // ----------------------------------
+
+    // --- EXPIRAÇÃO DE MÍDIAS ---
+    try {
+      const db = getDb();
+      const info = db.prepare(`
+        UPDATE midias 
+        SET status = 'expirado' 
+        WHERE data_expiracao IS NOT NULL AND status = 'ativo' AND data_expiracao < date('now')
+      `).run();
+      if (info.changes > 0) {
+        console.log(`[CRON] ${info.changes} mídia(s) expiraram hoje.`);
+        broadcastEvent('MIDIAS_ATUALIZADAS', { action: 'expire' });
+      }
+    } catch (err) {
+      console.error('[CRON] Erro ao expirar mídias:', err);
     }
     // ----------------------------------
 
@@ -652,6 +679,18 @@ export function startServer() {
 
       broadcastEvent('NOVA_SENHA_EMITIDA', novaSenha);
 
+      // Notifica os contadores de fila dos operadores touch
+      try {
+        const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
+        const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
+        broadcastEvent('queue-update', {
+          geral: countGeral.count,
+          preferencial: countPref.count
+        });
+      } catch (errQueue) {
+        console.error('Erro ao emitir queue-update:', errQueue);
+      }
+
       // Sync: espelha a nova senha na nuvem para o Portal do Cliente
       syncNovaSenha(novaSenha.id, numero, 'aguardando');
 
@@ -750,6 +789,179 @@ export function startServer() {
     }
   });
 
+  // --- ANDROID OPERATOR TOUCH ENDPOINTS & BROADCASTS ---
+  
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok' });
+  });
+
+  app.post('/api/operador/proximo', (req: express.Request, res: express.Response) => {
+    try {
+      const { guiche } = req.body;
+      const db = getDb();
+      
+      console.log(`[Operador Touch - Proximo] guiche=${guiche}`);
+
+      // 1. Busca a próxima senha (preferencial primeiro, depois por ordem de chegada)
+      const proxima = db.prepare(
+        `SELECT s.*, b.nome as balcao_nome, b.prefixo_senha 
+         FROM senhas s 
+         JOIN balcoes b ON s.balcao_id = b.id 
+         WHERE s.status = 'aguardando' 
+         ORDER BY s.preferencial DESC, s.id ASC 
+         LIMIT 1`
+      ).get() as any;
+
+      if (!proxima) {
+        return res.status(404).json({ error: 'Nenhuma senha aguardando na fila.' });
+      }
+
+      const formattedNumero = `${proxima.preferencial ? 'P' : 'A'}-${String(proxima.numero).padStart(3, '0')}`;
+
+      // 2. Marca como chamada
+      db.prepare("UPDATE senhas SET status = 'chamada', chamada_em = datetime('now') WHERE id = ?").run(proxima.id);
+
+      // 3. Registra a chamada (operador_id = 1 como padrão)
+      db.prepare('INSERT INTO chamadas (senha_id, operador_id, guiche) VALUES (?, 1, ?)').run(proxima.id, `Guichê ${guiche}`);
+
+      // 4. Counts for queue-update
+      const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
+      const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
+
+      const ticketPayload = {
+        id: proxima.id,
+        numero: formattedNumero,
+        preferencial: proxima.preferencial,
+        guiche: `Guichê ${guiche}`
+      };
+
+      // Broadcast para os telões antigos e novos
+      const standardPayload = {
+        ...proxima,
+        status: 'chamada',
+        guiche: `Guichê ${guiche}`,
+        aguardando_count: countGeral.count + countPref.count
+      };
+      
+      broadcastEvent('NOVA_SENHA_CHAMADA', standardPayload);
+      broadcastEvent('ticket-called', ticketPayload);
+      broadcastEvent('queue-update', {
+        geral: countGeral.count,
+        preferencial: countPref.count
+      });
+
+      // Sincroniza com Supabase
+      syncStatusSenha(proxima.id, 'chamada', `Guichê ${guiche}`);
+
+      res.json({ success: true, data: ticketPayload });
+    } catch (err: any) {
+      console.error('[Operador Touch - Proximo] ERRO:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/operador/repetir', (req: express.Request, res: express.Response) => {
+    try {
+      const { guiche } = req.body;
+      const db = getDb();
+      
+      console.log(`[Operador Touch - Repetir] guiche=${guiche}`);
+
+      // Busca a última chamada deste guichê
+      const ultimaChamada = db.prepare(`
+        SELECT s.*, c.guiche 
+        FROM chamadas c
+        JOIN senhas s ON c.senha_id = s.id
+        WHERE c.guiche = ?
+        ORDER BY c.id DESC
+        LIMIT 1
+      `).get(`Guichê ${guiche}`) as any;
+
+      if (!ultimaChamada) {
+        return res.status(404).json({ error: 'Nenhuma senha chamada anteriormente neste guichê.' });
+      }
+
+      // Atualiza o timestamp da senha e registra uma nova chamada
+      db.prepare("UPDATE senhas SET chamada_em = datetime('now') WHERE id = ?").run(ultimaChamada.id);
+      db.prepare('INSERT INTO chamadas (senha_id, operador_id, guiche) VALUES (?, 1, ?)').run(ultimaChamada.id, `Guichê ${guiche}`);
+
+      const formattedNumero = `${ultimaChamada.preferencial ? 'P' : 'A'}-${String(ultimaChamada.numero).padStart(3, '0')}`;
+
+      const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
+      const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
+
+      const ticketPayload = {
+        id: ultimaChamada.id,
+        numero: formattedNumero,
+        preferencial: ultimaChamada.preferencial,
+        guiche: `Guichê ${guiche}`
+      };
+
+      const standardPayload = {
+        ...ultimaChamada,
+        status: 'chamada',
+        guiche: `Guichê ${guiche}`,
+        aguardando_count: countGeral.count + countPref.count
+      };
+
+      broadcastEvent('NOVA_SENHA_CHAMADA', standardPayload);
+      broadcastEvent('ticket-called', ticketPayload);
+
+      // Sincroniza com Supabase
+      syncStatusSenha(ultimaChamada.id, 'chamada', `Guichê ${guiche}`);
+
+      res.json({ success: true, data: ticketPayload });
+    } catch (err: any) {
+      console.error('[Operador Touch - Repetir] ERRO:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/operador/devolver', (req: express.Request, res: express.Response) => {
+    try {
+      const { guiche } = req.body;
+      const db = getDb();
+      
+      console.log(`[Operador Touch - Devolver] guiche=${guiche}`);
+
+      // Busca a senha atualmente em atendimento (status 'chamada') neste guichê
+      const ultimaChamada = db.prepare(`
+        SELECT s.* 
+        FROM chamadas c
+        JOIN senhas s ON c.senha_id = s.id
+        WHERE c.guiche = ? AND s.status = 'chamada'
+        ORDER BY c.id DESC
+        LIMIT 1
+      `).get(`Guichê ${guiche}`) as any;
+
+      if (!ultimaChamada) {
+        return res.status(404).json({ error: 'Nenhuma senha em atendimento encontrada para este guichê.' });
+      }
+
+      // Atualiza a senha para 'aguardando' e remove a chamada_em
+      db.prepare("UPDATE senhas SET status = 'aguardando', chamada_em = NULL WHERE id = ?").run(ultimaChamada.id);
+
+      const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
+      const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
+
+      // Notifica o telão sobre o estorno e limpa o ticket-called no guichê
+      broadcastEvent('SENHA_ESTORNADA', { id: ultimaChamada.id, aguardando_count: countGeral.count + countPref.count });
+      broadcastEvent('ticket-called', { numero: null, preferencial: null, guiche: `Guichê ${guiche}` });
+      broadcastEvent('queue-update', {
+        geral: countGeral.count,
+        preferencial: countPref.count
+      });
+
+      // Sincroniza com Supabase
+      syncStatusSenha(ultimaChamada.id, 'aguardando');
+
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('[Operador Touch - Devolver] ERRO:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // NOVA ROTA: O servidor decide atomicamente quem é o próximo da fila
   app.post('/api/chamar-proxima', (req: express.Request, res: express.Response) => {
     try {
@@ -781,16 +993,35 @@ export function startServer() {
       db.prepare('INSERT INTO chamadas (senha_id, operador_id, guiche) VALUES (?, ?, ?)').run(proxima.id, operador_id, guiche);
 
       // 4. Conta aguardando
-      const aguardandoCount = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando'").get() as any;
+      const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
+      const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
 
       const payload = {
         ...proxima,
         status: 'chamada',
         guiche,
-        aguardando_count: aguardandoCount.count
+        aguardando_count: countGeral.count + countPref.count
       };
 
       broadcastEvent('NOVA_SENHA_CHAMADA', payload);
+      
+      // Também transmite para os painéis Operator Touch se o guichê for numérico ou correspondente
+      try {
+        const guicheNumero = guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim();
+        const formattedNumero = `${proxima.preferencial ? 'P' : 'A'}-${String(proxima.numero).padStart(3, '0')}`;
+        broadcastEvent('ticket-called', {
+          id: proxima.id,
+          numero: formattedNumero,
+          preferencial: proxima.preferencial,
+          guiche: guicheNumero
+        });
+        broadcastEvent('queue-update', {
+          geral: countGeral.count,
+          preferencial: countPref.count
+        });
+      } catch (errBroad) {
+        console.error('Erro ao enviar ticket-called/queue-update secundário:', errBroad);
+      }
 
       // Sync: atualiza status na nuvem (Portal do Cliente verá que a vez chegou)
       syncStatusSenha(proxima.id, 'chamada', guiche);
@@ -829,15 +1060,30 @@ export function startServer() {
 
       console.log('[Chamada] Senha info:', senhaInfo);
 
-      const aguardandoCount = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando'").get() as any;
+      const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
+      const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
 
       const payload = {
         ...senhaInfo,
         guiche,
-        aguardando_count: aguardandoCount.count
+        aguardando_count: countGeral.count + countPref.count
       };
 
       broadcastEvent('NOVA_SENHA_CHAMADA', payload);
+
+      // Também transmite para os painéis Operator Touch correspondentes
+      try {
+        const guicheNumero = guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim();
+        const formattedNumero = `${senhaInfo.preferencial ? 'P' : 'A'}-${String(senhaInfo.numero).padStart(3, '0')}`;
+        broadcastEvent('ticket-called', {
+          id: senhaInfo.id,
+          numero: formattedNumero,
+          preferencial: senhaInfo.preferencial,
+          guiche: guicheNumero
+        });
+      } catch (errBroad) {
+        console.error('Erro ao enviar ticket-called secundário:', errBroad);
+      }
 
       // Sync: atualiza status na nuvem
       syncStatusSenha(senha_id, 'chamada', guiche);
@@ -856,10 +1102,21 @@ export function startServer() {
       const db = getDb();
       db.prepare("UPDATE senhas SET status = 'aguardando', chamada_em = NULL WHERE id = ?").run(senha_id);
       
-      const aguardandoCount = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando'").get() as any;
+      const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
+      const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
       
       // Notifica todos os painéis
-      broadcastEvent('SENHA_ESTORNADA', { id: senha_id, aguardando_count: aguardandoCount.count });
+      broadcastEvent('SENHA_ESTORNADA', { id: senha_id, aguardando_count: countGeral.count + countPref.count });
+      
+      // Também transmite para os painéis Operator Touch correspondentes
+      try {
+        broadcastEvent('queue-update', {
+          geral: countGeral.count,
+          preferencial: countPref.count
+        });
+      } catch (errBroad) {
+        console.error('Erro ao enviar queue-update secundário:', errBroad);
+      }
 
       // Sync: volta status na nuvem
       syncStatusSenha(senha_id, 'aguardando');
@@ -933,6 +1190,28 @@ export function startServer() {
       res.json({ success: true });
     } catch (err: any) {
       console.error('Error in DELETE /api/midias:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put('/api/midias/:id', requireMaster, (req, res) => {
+    try {
+      const { id } = req.params;
+      const { ativo, data_expiracao, status } = req.body;
+      const db = getDb();
+      
+      db.prepare(`
+        UPDATE midias 
+        SET ativo = COALESCE(?, ativo), 
+            data_expiracao = COALESCE(?, data_expiracao),
+            status = COALESCE(?, status)
+        WHERE id = ?
+      `).run(ativo, data_expiracao, status, id);
+      
+      broadcastEvent('MIDIAS_ATUALIZADAS', { action: 'update' });
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('Error in PUT /api/midias:', err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -1267,6 +1546,102 @@ export function startServer() {
   });
 
   // ═══════════════════════════════════════════════════════════════════
+  //  ENCARTE — Configurações Adicionais (Admin)
+  // ═══════════════════════════════════════════════════════════════════
+
+  // --- FILTROS DE EXCLUSÃO ---
+  app.get('/api/admin/encarte-filtros', requireMaster, (req, res) => {
+    try { res.json(getDb().prepare('SELECT * FROM encarte_filtros').all()); } 
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.post('/api/admin/encarte-filtros', requireMaster, (req, res) => {
+    try {
+      const { palavra_chave } = req.body;
+      const stmt = getDb().prepare('INSERT INTO encarte_filtros (palavra_chave) VALUES (?)');
+      res.status(201).json({ id: stmt.run(palavra_chave).lastInsertRowid, palavra_chave, ativo: 1 });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.put('/api/admin/encarte-filtros/:id', requireMaster, (req, res) => {
+    try {
+      const { palavra_chave, ativo } = req.body;
+      getDb().prepare('UPDATE encarte_filtros SET palavra_chave = ?, ativo = ? WHERE id = ?').run(palavra_chave, ativo, req.params.id);
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.delete('/api/admin/encarte-filtros/:id', requireMaster, (req, res) => {
+    try { getDb().prepare('DELETE FROM encarte_filtros WHERE id = ?').run(req.params.id); res.json({ success: true }); } 
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  // --- NOMES CUSTOMIZADOS ---
+  app.get('/api/admin/encarte-nomes', requireMaster, (req, res) => {
+    try { res.json(getDb().prepare('SELECT * FROM encarte_nomes_customizados').all()); } 
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.post('/api/admin/encarte-nomes', requireMaster, (req, res) => {
+    try {
+      const { codigo_produto, nome_exibicao } = req.body;
+      getDb().prepare('INSERT OR REPLACE INTO encarte_nomes_customizados (codigo_produto, nome_exibicao) VALUES (?, ?)').run(codigo_produto, nome_exibicao);
+      res.status(201).json({ codigo_produto, nome_exibicao, ativo: 1 });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.put('/api/admin/encarte-nomes/:id', requireMaster, (req, res) => {
+    try {
+      const { nome_exibicao, ativo } = req.body;
+      getDb().prepare('UPDATE encarte_nomes_customizados SET nome_exibicao = ?, ativo = ? WHERE codigo_produto = ?').run(nome_exibicao, ativo, req.params.id);
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.delete('/api/admin/encarte-nomes/:id', requireMaster, (req, res) => {
+    try { getDb().prepare('DELETE FROM encarte_nomes_customizados WHERE codigo_produto = ?').run(req.params.id); res.json({ success: true }); } 
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  // --- TEMAS (Backgrounds com Vigência) ---
+  app.get('/api/admin/encarte-temas', requireMaster, (req, res) => {
+    try { res.json(getDb().prepare('SELECT * FROM encarte_temas').all()); } 
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.post('/api/admin/encarte-temas', requireMaster, (req, res) => {
+    try {
+      const { nome, imagem_fundo, data_inicio, data_fim } = req.body;
+      const stmt = getDb().prepare('INSERT INTO encarte_temas (nome, imagem_fundo, data_inicio, data_fim) VALUES (?, ?, ?, ?)');
+      res.status(201).json({ id: stmt.run(nome, imagem_fundo, data_inicio || null, data_fim || null).lastInsertRowid });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.put('/api/admin/encarte-temas/:id', requireMaster, (req, res) => {
+    try {
+      const { nome, imagem_fundo, data_inicio, data_fim, ativo } = req.body;
+      getDb().prepare('UPDATE encarte_temas SET nome = ?, imagem_fundo = ?, data_inicio = ?, data_fim = ?, ativo = ? WHERE id = ?')
+             .run(nome, imagem_fundo, data_inicio || null, data_fim || null, ativo, req.params.id);
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.delete('/api/admin/encarte-temas/:id', requireMaster, (req, res) => {
+    try { getDb().prepare('DELETE FROM encarte_temas WHERE id = ?').run(req.params.id); res.json({ success: true }); } 
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  // --- TEMA ATUAL (Para o Telão) ---
+  app.get('/api/telao/tema-atual', (req, res) => {
+    try {
+      // Comparar a string ISO "YYYY-MM-DD" atual contra os campos de data no SQLite
+      const now = new Date().toISOString().split('T')[0];
+      const db = getDb();
+      const tema = db.prepare(`
+        SELECT * FROM encarte_temas 
+        WHERE ativo = 1 
+          AND (data_inicio IS NULL OR data_inicio <= ?)
+          AND (data_fim IS NULL OR data_fim >= ?)
+        ORDER BY id DESC LIMIT 1
+      `).get(now, now);
+      res.json(tema || null);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
   //  TOLEDO — Encarte de Preços por KG
   // ═══════════════════════════════════════════════════════════════════
 
@@ -1274,10 +1649,48 @@ export function startServer() {
   app.get('/api/toledo/produtos', (req, res) => {
     try {
       const db = getDb();
-      const produtos = db.prepare(
+
+      // 1. Carregar filtros ativos
+      const filtros = db.prepare('SELECT palavra_chave FROM encarte_filtros WHERE ativo = 1').all() as any[];
+      const keywordList = filtros.map(f => f.palavra_chave.toLowerCase());
+
+      // 2. Carregar nomes customizados ativos
+      const nomes = db.prepare('SELECT codigo_produto, nome_exibicao FROM encarte_nomes_customizados WHERE ativo = 1').all() as any[];
+      const mapNomes = new Map();
+      nomes.forEach(n => mapNomes.set(n.codigo_produto, n.nome_exibicao));
+
+      // 3. Buscar os produtos
+      let produtos = db.prepare(
         'SELECT plu, descricao, preco, categoria, atualizado_em FROM toledo_produtos ORDER BY categoria ASC, descricao ASC'
-      ).all();
-      res.json(produtos);
+      ).all() as any[];
+
+      // 4. Aplicar filtros e renomeação
+      const finalProdutos = [];
+      for (const p of produtos) {
+        const lowerDesc = p.descricao.toLowerCase();
+        
+        // Hide tags fixas
+        if (lowerDesc.includes('[oculto]') || lowerDesc.includes('#hide')) continue;
+
+        // Keyword filters
+        let blocked = false;
+        for (const kw of keywordList) {
+          if (lowerDesc.includes(kw)) {
+            blocked = true;
+            break;
+          }
+        }
+        if (blocked) continue;
+
+        // Sobrescrita de nome customizado
+        if (mapNomes.has(p.plu)) {
+          p.descricao = mapNomes.get(p.plu);
+        }
+
+        finalProdutos.push(p);
+      }
+
+      res.json(finalProdutos);
     } catch (err: any) {
       console.error('[TOLEDO API] Erro ao buscar produtos:', err);
       res.status(500).json({ error: err.message });
@@ -2044,7 +2457,37 @@ async function gerarBackupZip(opts: {
       `powershell -NoProfile -Command "Compress-Archive -Path '${tempDir}\\*' -DestinationPath '${zipFile}' -Force"`,
       { timeout: 120000 }
     );
-    console.log(`[BACKUP] ✅ Backup gerado com sucesso: ${zipFile}`);
+    console.log(`[BACKUP] ✅ Arquivo ZIP gerado: ${zipFile}`);
+
+    // --- VALIDAÇÃO DO BACKUP (Compactação e Descompactação) ---
+    console.log(`[BACKUP] 🔍 Iniciando validação do backup gerado...`);
+    const validationDir = path.join(opts.destino, `_val_${timestamp}`);
+    try {
+      fs.mkdirSync(validationDir, { recursive: true });
+      execSync(
+        `powershell -NoProfile -Command "Expand-Archive -Path '${zipFile}' -DestinationPath '${validationDir}' -Force"`,
+        { timeout: 120000 }
+      );
+      
+      const dbJsonValPath = path.join(validationDir, 'database.json');
+      if (!fs.existsSync(dbJsonValPath)) {
+        throw new Error("Arquivo database.json não encontrado após descompactação da validação.");
+      }
+      
+      const valHash = crypto.createHash('sha256').update(fs.readFileSync(dbJsonValPath)).digest('hex');
+      const originalHash = manifest['database.json'];
+      
+      if (valHash !== originalHash) {
+        throw new Error(`Checksum SHA256 inválido para database.json. Esperado: ${originalHash}, Obtido: ${valHash}`);
+      }
+      console.log(`[BACKUP] ✅ Validação concluída. O backup está íntegro.`);
+    } catch (valErr: any) {
+      console.error(`[BACKUP] ❌ Falha na validação do backup: ${valErr.message}`);
+      throw new Error(`Validação de integridade do backup falhou: ${valErr.message}`);
+    } finally {
+      try { fs.rmSync(validationDir, { recursive: true, force: true }); } catch (e) {}
+    }
+    // -------------------------------------------------------------
 
     return zipFile;
   } finally {
@@ -2071,9 +2514,14 @@ async function restoreBackupZip(zipFilePath: string): Promise<void> {
   if (needsRename) {
     actualZipPath = zipFilePath + '.zip';
     if (fs.existsSync(zipFilePath)) {
+      // Pequeno atraso para garantir liberação do descriptor do multer antes do rename se necessário
+      await new Promise(resolve => setTimeout(resolve, 200));
       fs.renameSync(zipFilePath, actualZipPath);
     }
   }
+
+  // Atraso de segurança de 500ms para Windows liberar qualquer lock de leitura no arquivo
+  await new Promise(resolve => setTimeout(resolve, 500));
 
   try {
     fs.mkdirSync(tempDir, { recursive: true });

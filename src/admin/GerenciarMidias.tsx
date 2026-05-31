@@ -9,6 +9,8 @@ interface Midia {
   tipo: 'imagem' | 'video';
   ordem: number;
   ativo: number;
+  status: string;
+  data_expiracao: string | null;
 }
 
 export default function GerenciarMidias() {
@@ -74,6 +76,23 @@ export default function GerenciarMidias() {
       }
     } catch (err) {
       console.error('Erro ao excluir', err);
+    }
+  };
+
+  const handleUpdate = async (id: number, data: Partial<Midia>) => {
+    try {
+      const res = await fetch(`${API_URL}/api/midias/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        fetchMidias();
+      } else {
+        alert('Erro ao atualizar mídia');
+      }
+    } catch (err) {
+      console.error('Erro ao atualizar', err);
     }
   };
 
@@ -151,22 +170,40 @@ export default function GerenciarMidias() {
                 </div>
               </div>
 
-              <div className="flex justify-between items-start">
-                <div className="overflow-hidden">
+              <div className="flex justify-between items-start mt-4">
+                <div className="overflow-hidden w-full">
                   <h3 className="font-bold text-lg text-ink truncate pr-2 uppercase font-sans tracking-wide" title={midia.nome}>
                     {midia.nome}
                   </h3>
-                  <p className="text-[10px] font-bold tracking-widest text-ink-secondary mt-1 uppercase">
-                    ID: #{midia.id} • ORDEM: {midia.ordem}
-                  </p>
+                  <div className="mt-2 space-y-2">
+                    <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block">Data de Expiração</label>
+                    <input
+                      type="date"
+                      value={midia.data_expiracao || ''}
+                      onChange={(e) => handleUpdate(midia.id, { data_expiracao: e.target.value || null })}
+                      className="w-full px-2 py-1 text-xs font-bold rounded bg-surface-variant border border-outline-variant outline-none"
+                    />
+                    <div className="flex items-center justify-between pt-2">
+                      <button
+                        onClick={() => handleUpdate(midia.id, { ativo: midia.ativo === 1 ? 0 : 1 })}
+                        className={`text-xs font-bold uppercase tracking-widest px-2 py-1 rounded ${midia.ativo === 1 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'}`}
+                      >
+                        {midia.ativo === 1 ? 'Visível' : 'Oculto'}
+                      </button>
+                      <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded ${midia.status === 'ativo' ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-ink-secondary'}`}>
+                        {midia.status}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <button 
-                  onClick={() => handleDelete(midia.id)}
-                  className="text-outline-variant hover:text-error transition-colors p-2 opacity-0 group-hover:opacity-100 outline-none"
-                >
-                  <span className="material-symbols-outlined">delete</span>
-                </button>
               </div>
+              <button 
+                onClick={() => handleDelete(midia.id)}
+                className="absolute bottom-4 right-4 bg-error/10 text-error hover:bg-error hover:text-white transition-colors p-2 rounded-lg opacity-0 group-hover:opacity-100 outline-none"
+                title="Excluir"
+              >
+                <span className="material-symbols-outlined text-sm">delete</span>
+              </button>
             </div>
           ))}
 

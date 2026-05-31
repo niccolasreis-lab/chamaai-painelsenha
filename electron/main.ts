@@ -231,8 +231,45 @@ ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
 
+ipcMain.handle('check-update-status', async () => {
+  try {
+    const db = getDb();
+    db.exec(`CREATE TABLE IF NOT EXISTS configuracoes (
+      chave TEXT PRIMARY KEY,
+      valor TEXT,
+      atualizado_em TEXT
+    )`);
+    const currentVersion = app.getVersion();
+    const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'versao_registrada'").get() as any;
+    let justUpdated = false;
+    let previousVersion = null;
+    if (row && row.valor) {
+      previousVersion = row.valor;
+      if (previousVersion !== currentVersion) {
+        justUpdated = true;
+      }
+    } else {
+      // Se não houver versão anterior registrada, significa que o usuário
+      // estava em uma versão antiga (ex: 1.0.101) e acaba de atualizar para a 1.0.102!
+      justUpdated = true;
+      previousVersion = "1.0.101";
+    }
+    db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('versao_registrada', ?, datetime('now'))").run(currentVersion);
+    return {
+      justUpdated,
+      previousVersion,
+      currentVersion
+    };
+  } catch (err) {
+    console.error('[UPDATE STATUS] Erro ao verificar status de atualização:', err);
+    return { justUpdated: false, currentVersion: app.getVersion() };
+  }
+});
+
+
 ipcMain.handle('check-for-updates', async () => {
-  if (!app.isPackaged) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
+  const isPackagedOrTesting = app.isPackaged || fs.existsSync(path.join(app.getAppPath(), 'dev-app-update.yml'));
+  if (!isPackagedOrTesting) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
   try {
     const result = await autoUpdater.checkForUpdates();
     if (result && result.updateInfo) {
@@ -247,60 +284,114 @@ ipcMain.handle('check-for-updates', async () => {
   }
 });
 
-ipcMain.handle('install-update', async () => {
-  if (!app.isPackaged) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
+function getDownloadedInstallerPath(): string | null {
   try {
-    console.log('[UPDATE] Iniciando Graceful Shutdown pré-atualização...');
+    const localAppData = process.env.LOCALAPPDATA || path.join(require('os').homedir(), 'AppData', 'Local');
+    const pendingDir = path.join(localAppData, 'chamaai-novo', 'pending');
+    if (fs.existsSync(pendingDir)) {
+      const files = fs.readdirSync(pendingDir);
+      const exeFile = files.find(f => f.endsWith('.exe') && f.startsWith('ChamaAi-Setup'));
+      if (exeFile) {
+        return path.join(pendingDir, exeFile);
+      }
+    }
+  } catch (e) {
+    console.error('[UPDATE] Erro ao buscar instalador físico:', e);
+  }
+  return null;
+}
+
+ipcMain.handle('install-update', async () => {
+  const isPackagedOrTesting = app.isPackaged || fs.existsSync(path.join(app.getAppPath(), 'dev-app-update.yml'));
+  if (!isPackagedOrTesting) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
+  try {
+    console.log('[UPDATE] Iniciando shutdown via Script Separado (Option C)...');
     
-    // Define as flags para que o listener de before-quit não tente fazer double-close
+    // 1. Busca o caminho do instalador físico baixado
+    const installerPath = getDownloadedInstallerPath();
+    if (!installerPath || !fs.existsSync(installerPath)) {
+      console.error('[UPDATE] Instalador não encontrado física no disco.');
+      return { success: false, message: 'Arquivo do instalador não encontrado no disco. Tente verificar atualizações novamente.' };
+    }
+    
+    console.log('[UPDATE] Instalador encontrado em:', installerPath);
+    
+    // 2. Desativa flags e inicia shutdown gracioso do app
     isQuitting = true;
-    
-    // Libera recursos e para o servidor Express de forma síncrona com o processo de atualização
     globalShortcut.unregisterAll();
     
     if (!isServerStopped) {
       try { 
         await stopServer(); 
         isServerStopped = true;
-        console.log('[UPDATE] Graceful shutdown concluído com sucesso antes da atualização.');
+        console.log('[UPDATE] Graceful shutdown do Express concluído.');
       } catch (e) { 
-        console.error('[UPDATE] Erro no stopServer antes do quitAndInstall:', e); 
+        console.error('[UPDATE] Erro no stopServer:', e); 
       }
     }
     
-    // Garante que a conexão do SQLite foi encerrada de forma redundante e segura
     try {
       closeDatabase();
-      console.log('[UPDATE] Banco de dados SQLite fechado com segurança antes da atualização.');
+      console.log('[UPDATE] Banco de dados SQLite fechado com segurança.');
     } catch (e) {
-      console.error('[UPDATE] Erro ao fechar banco de dados antes da atualização:', e);
+      console.error('[UPDATE] Erro ao fechar banco de dados:', e);
     }
     
-    // Aguarda o OS liberar os handles de arquivo (critical para o better-sqlite3.node)
-    // Sem esse delay, o NSIS tenta deletar o .node enquanto o Windows ainda tem o handle aberto
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // 3. Caminho temporário para o arquivo .bat de atualização em C:\ChamaAi
+    const userDataPath = 'C:\\ChamaAi';
+    if (!fs.existsSync(userDataPath)) {
+      fs.mkdirSync(userDataPath, { recursive: true });
+    }
+    const batPath = path.join(userDataPath, 'executar_atualizacao.bat');
     
-    // Em ambientes com domínio corporativo, instalações silenciosas são bloqueadas por GPO.
-    // Rodamos o instalador de forma INTERATIVA para que o UAC/SmartScreen possa ser aprovado pelo usuário.
-    // O instalador OneClick é rápido — aparece brevemente e some sozinho.
-    const isSilent = false;
+    // 4. Cria o conteúdo do Script Separado de atualização (.bat)
+    // Esse script espera 2s, força o encerramento do ChamaAi por completo e roda o instalador.
+    let restartPath = process.execPath;
+    if (!app.isPackaged) {
+      try {
+        const localAppData = process.env.LOCALAPPDATA || path.join(require('os').homedir(), 'AppData', 'Local');
+        const installedExe = path.join(localAppData, 'Programs', 'chamaai-novo', 'ChamaAi.exe');
+        if (fs.existsSync(installedExe)) {
+          restartPath = installedExe;
+        }
+      } catch (e) {}
+    }
+
+    const batContent = `@echo off
+title INSTALANDO ATUALIZACAO - CHAMAAI
+echo Aguardando encerramento do processo pai...
+timeout /t 2 /nobreak >nul
+echo Forcando encerramento de eventuais instancias do ChamaAi...
+taskkill /F /IM "ChamaAi.exe" /T >nul 2>&1
+taskkill /F /IM "chamaai-novo.exe" /T >nul 2>&1
+echo Iniciando o instalador...
+start /wait "" "${installerPath}"
+echo Reiniciando o aplicativo atualizado...
+start "" "${restartPath}"
+echo Limpando script temporario...
+del "%~f0"
+exit
+`;
     
-    console.log(`[UPDATE] Chamando quitAndInstall. MODO SILENCIOSO: ${isSilent}`);
+    fs.writeFileSync(batPath, batContent, 'utf8');
+    console.log('[UPDATE] Script de atualização .bat gravado em:', batPath);
     
-    // Agora que o servidor Express foi desligado, o DB fechado
-    // e todas as portas/arquivos liberados, iniciamos o quitAndInstall.
-    autoUpdater.quitAndInstall(isSilent, true);
+    // 5. Executa o Script Separado via explorer.exe para garantir que ele rode no foreground interativo
+    const { spawn } = require('child_process');
+    const child = spawn('explorer.exe', [batPath], {
+      detached: true,
+      stdio: 'ignore'
+    });
+    child.unref();
     
-    // Fallback: se por qualquer motivo quitAndInstall não matar o processo em 10s, forçamos a saída
-    setTimeout(() => {
-      console.log('[UPDATE] Fallback: forçando saída do processo após timeout.');
-      app.exit(0);
-    }, 10000);
+    // 6. Encerra o Electron de forma instantânea
+    console.log('[UPDATE] Saindo da aplicação imediatamente para liberação de arquivos.');
+    app.exit(0);
     
     return { success: true };
   } catch (err: any) {
     console.error('[UPDATE] Erro crítico no install-update:', err);
-    return { success: false, message: `Erro ao preparar instalação: ${err.message}` };
+    return { success: false, message: `Erro ao preparar atualização: ${err.message}` };
   }
 });
 
@@ -385,7 +476,8 @@ if (!gotTheLock) {
       }
 
       // Inicializa o verificador de atualizações silencioso
-      if (app.isPackaged) {
+      const isPackagedOrTesting = app.isPackaged || fs.existsSync(path.join(app.getAppPath(), 'dev-app-update.yml'));
+      if (isPackagedOrTesting) {
         const updateLogPath = 'C:\\ChamaAi\\autoupdate.log';
         const writeLog = (logMsg: string) => {
           try {
@@ -421,6 +513,10 @@ if (!gotTheLock) {
 
         autoUpdateLogger.info('Iniciando configuração do autoUpdater...');
         autoUpdater.logger = autoUpdateLogger;
+
+        if (!app.isPackaged) {
+          autoUpdater.forceDevUpdateConfig = true;
+        }
 
         // Configuração dinâmica de atualização local/offline
         const localUpdatePath = getCustomUpdatePath();

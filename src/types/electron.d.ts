@@ -16,6 +16,7 @@ export interface ElectronAPI {
   setAutoLaunch: (enable: boolean, route: string) => Promise<any>;
   createShortcut: (route: string, title: string) => Promise<any>;
   getAppVersion: () => Promise<string>;
+  checkUpdateStatus: () => Promise<{ justUpdated: boolean; previousVersion: string | null; currentVersion: string }>;
   checkForUpdates: () => Promise<{ success: boolean; message: string }>;
   installUpdate: () => Promise<{ success: boolean; message?: string }>;
   ping: () => string;

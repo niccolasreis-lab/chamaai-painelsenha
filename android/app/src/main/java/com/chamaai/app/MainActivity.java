@@ -42,10 +42,8 @@ public class MainActivity extends BridgeActivity {
             window.getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
         }
 
-        // Android TV ou Telão: manter tela sempre ligada (telão 24/7)
-        if (isTelao) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        }
+        // Manter tela sempre ligada para o telão e o operador touch
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         // 2. Configurações de Adaptação, Bloqueio de Scroll e Padronização de Botões
         this.getBridge().getWebView().post(() -> {

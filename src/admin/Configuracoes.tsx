@@ -18,6 +18,7 @@ export default function Configuracoes() {
   const [isMasterRemote, setIsMasterRemote] = useState(false);
   const [newMasterPwd, setNewMasterPwd] = useState('');
   const [masterPwdMsg, setMasterPwdMsg] = useState('');
+  const [restoredBackupName, setRestoredBackupName] = useState<string | null>(null);
   const API_URL = getApiUrl();
   const [config, setConfig] = useState<Record<string, string>>({
     tempo_destaque_senha: '5',
@@ -58,6 +59,11 @@ export default function Configuracoes() {
   });
 
   useEffect(() => {
+    const restored = localStorage.getItem('restored_backup_name');
+    if (restored) {
+      setRestoredBackupName(restored);
+      localStorage.removeItem('restored_backup_name');
+    }
     fetchAdminStatus();
     fetchConfig();
     fetchBackups();
@@ -323,6 +329,7 @@ export default function Configuracoes() {
         body: formData,
       });
       if (res.ok) {
+        localStorage.setItem('restored_backup_name', file.name);
         alert('Sistema restaurado com sucesso! Recarregando...');
         window.location.reload();
       } else {
@@ -339,6 +346,7 @@ export default function Configuracoes() {
     try {
       const res = await fetch(`${API_URL}/api/admin/backups/${filename}/restore`, { method: 'POST' });
       if (res.ok) {
+        localStorage.setItem('restored_backup_name', filename);
         alert('Backup restaurado com sucesso! Recarregando...');
         window.location.reload();
       } else {
@@ -374,7 +382,29 @@ export default function Configuracoes() {
 
   return (
     <AdminLayout>
-      <div className="max-w-6xl mx-auto font-sans space-y-8">
+      <div className="max-w-6xl mx-auto font-sans space-y-8 animate-fade-in">
+        {restoredBackupName && (
+          <div className="bg-emerald-50 border-l-4 border-emerald-500 p-5 rounded-r-2xl shadow-sm flex items-start justify-between gap-4 animate-fade-in">
+            <div className="flex gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
+                <span className="material-symbols-outlined text-2xl">settings_backup_restore</span>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-emerald-800 uppercase tracking-widest leading-none">Backup Restaurado</h3>
+                <p className="text-xs text-emerald-600 font-semibold mt-2 leading-relaxed">
+                  O backup do arquivo <strong className="font-mono text-emerald-700 bg-emerald-500/10 px-1.5 py-0.5 rounded break-all">{restoredBackupName}</strong> foi restaurado com sucesso!
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setRestoredBackupName(null)}
+              className="text-emerald-700 hover:bg-emerald-500/10 p-1 rounded-lg transition-colors shrink-0 flex items-center"
+            >
+              <span className="material-symbols-outlined text-lg leading-none">close</span>
+            </button>
+          </div>
+        )}
+
         {/* Master Server Banner */}
         {!isMasterServer && (
           <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-xl shadow-sm">

@@ -19,12 +19,15 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
   const filterKey = JSON.stringify(categoriasFiltro);
 
   const [activeCategories, setActiveCategories] = useState<any[]>([]);
+  const [temaDinâmico, setTemaDinamico] = useState<any>(null);
 
   useEffect(() => {
     Promise.all([
       fetch(`${API_URL}/api/toledo/produtos`).then(r => r.json()),
-      fetch(`${API_URL}/api/categorias`).then(r => r.json())
-    ]).then(([prodData, catData]) => {
+      fetch(`${API_URL}/api/categorias`).then(r => r.json()),
+      fetch(`${API_URL}/api/telao/tema-atual`).then(r => r.json().catch(() => null))
+    ]).then(([prodData, catData, temaData]) => {
+      setTemaDinamico(temaData);
       const activeCats = catData.filter((c: any) => c.ativo);
       setActiveCategories(activeCats);
 
@@ -201,6 +204,17 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
     glowClass = 'from-lime-400 to-green-600 shadow-lime-500/30';
   }
 
+  // Se houver um tema dinâmico ativo, sobrescreve o fundo
+  let dynamicBgStyle = {};
+  if (temaDinâmico && temaDinâmico.imagem_fundo) {
+    dynamicBgStyle = {
+      backgroundImage: `url(${API_URL}${temaDinâmico.imagem_fundo})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    };
+    bgGradient = ''; // Limpa o gradiente para mostrar a imagem
+  }
+
   // CSS custom properties for proportional scaling
   const descFont = config.toledo_fonte_descricao || '1.25rem';
   const priceFont = config.toledo_fonte_preco || '1.75rem';
@@ -213,7 +227,12 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
   const accentColor = accentBgClass.split('-')[1];
 
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden animate-fade-in" style={{ background: bgGradient, ...cssVars }}>
+    <div className="h-full w-full flex flex-col overflow-hidden animate-fade-in" style={{ background: bgGradient || 'transparent', ...dynamicBgStyle, ...cssVars }}>
+      {/* Se tiver imagem de fundo dinâmico, coloca um overlay escuro por cima para leitura */}
+      {temaDinâmico && <div className="absolute inset-0 bg-black/60 z-0"></div>}
+      
+      {/* Envolve o conteúdo em uma div com z-index para ficar sobre o overlay */}
+      <div className="relative z-10 flex flex-col h-full w-full overflow-hidden">
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="shrink-0 px-2 pt-6 pb-4 flex items-center justify-between">
         <div className="flex items-center gap-5">
@@ -344,6 +363,7 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
           to { width: 100%; }
         }
       `}</style>
+      </div>
     </div>
   );
 }
