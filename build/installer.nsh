@@ -3,10 +3,11 @@
 !endif
 
 !macro customCheckAppRunning
-  ; Matamos o processo ChamaAi.exe no início do instalador/desinstalador
-  ; Isso garante que o desinstalador anterior (caso exista) encontre o processo morto
-  ; e não exiba a tela "Não é possível fechar o ChamaAi".
+  ; Matamos os possíveis nomes de processos do ChamaAi no início do instalador/desinstalador
+  ; Isso garante que qualquer instância anterior (seja pelo nome do produto ou pelo nome do pacote) seja liberada
   nsProcess::_KillProcess "ChamaAi.exe"
+  Pop $R0
+  nsProcess::_KillProcess "chamaai-novo.exe"
   Pop $R0
   Sleep 2000
 !macroend
@@ -17,8 +18,10 @@
 !macroend
 
 !macro customUnInstall
-  ; Garante encerramento completo na desinstalação
+  ; Garante encerramento completo de todas as instâncias na desinstalação
   nsProcess::_KillProcess "ChamaAi.exe"
+  Pop $R0
+  nsProcess::_KillProcess "chamaai-novo.exe"
   Pop $R0
   Sleep 2000
 !macroend
