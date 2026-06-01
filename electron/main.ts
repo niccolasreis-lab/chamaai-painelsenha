@@ -92,13 +92,18 @@ function getCustomUpdatePath(): string | null {
     const db = getDb();
     const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'update_path'").get() as any;
     if (row && row.valor) {
-      return row.valor;
+      // Verifica se o path personalizado contém latest.yml
+      const customYml = path.join(row.valor, 'latest.yml');
+      if (fs.existsSync(customYml)) {
+        return row.valor;
+      }
     }
   } catch (e) {}
 
-  // Fallback: pasta padrão local
+  // Fallback: pasta padrão local — só ativa se latest.yml existir dentro dela
   const defaultLocalPath = 'C:\\ChamaAi_Atualizacoes';
-  if (fs.existsSync(defaultLocalPath)) {
+  const defaultYml = path.join(defaultLocalPath, 'latest.yml');
+  if (fs.existsSync(defaultYml)) {
     return defaultLocalPath;
   }
   return null;
