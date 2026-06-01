@@ -197,7 +197,7 @@ function Home() {
       )}
 
       <div className="mt-8 text-ink-secondary text-xs opacity-50 font-bold uppercase tracking-widest">
-        ChamaAí v1.0.55
+        ChamaAí v1.0.115
       </div>
     </div>
   );
