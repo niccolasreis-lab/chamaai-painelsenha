@@ -49,10 +49,11 @@ export default function Login() {
       // Se havia uma página anterior tentando ser acessada, volta pra ela
       const state = location.state as any;
       const appMode = localStorage.getItem('app_mode');
+      const isElectron = !!(window as any).electronAPI;
       
-      if (appMode === 'touch') {
+      if (isElectron && appMode === 'touch') {
         navigate('/operador-touch');
-      } else if (appMode === 'tv') {
+      } else if (isElectron && appMode === 'tv') {
         navigate('/telao');
       } else if (state && state.from) {
         navigate(state.from.pathname);

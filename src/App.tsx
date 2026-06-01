@@ -43,11 +43,14 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
 }
 
 function Home() {
+  // Só redireciona automaticamente dentro do Electron (app empacotado).
+  // No navegador web (localhost), sempre mostra o menu de seleção.
+  const isElectron = !!(window as any).electronAPI;
   const appMode = localStorage.getItem('app_mode');
-  if (appMode === 'touch') {
+  if (isElectron && appMode === 'touch') {
     return <Navigate to="/operador-touch" replace />;
   }
-  if (appMode === 'tv') {
+  if (isElectron && appMode === 'tv') {
     return <Navigate to="/telao" replace />;
   }
 
