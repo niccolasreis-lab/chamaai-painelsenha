@@ -370,6 +370,14 @@ export default function Emissao() {
         <p className="text-ink-secondary/40 text-lg font-medium">Chamaaí © {new Date().getFullYear()}</p>
         
         <button 
+          onClick={() => navigate('/')}
+          className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-500/5 text-slate-500/50 hover:text-slate-700 hover:bg-slate-500/10 transition-all text-xs font-bold uppercase tracking-widest"
+        >
+          <span className="material-symbols-outlined text-base">arrow_back</span>
+          Voltar ao Menu
+        </button>
+
+        <button 
           onClick={() => setShowConfigModal(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 text-primary/40 hover:text-primary hover:bg-primary/10 transition-all text-xs font-bold uppercase tracking-widest"
         >

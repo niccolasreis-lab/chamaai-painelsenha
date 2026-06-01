@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import SenhaChamada from './SenhaChamada';
 import EncartePrecos from './EncartePrecos';
 import EncarteGranel from './EncarteGranel';
@@ -115,11 +116,29 @@ export default function MediaIndoor() {
     } catch (err) {}
   };
 
+  const fetchRecentCalls = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/chamadas/recentes`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setHistorico(data.slice(0, 5));
+          if (data.length > 0) {
+            setUltimaSenha(data[0]);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao buscar histórico de chamadas:', err);
+    }
+  };
+
   // Run initializations
   useEffect(() => {
     fetchConfig();
     fetchMidias();
     fetchAguardando();
+    fetchRecentCalls();
 
     if (telaoCode) {
       fetchPerfil(telaoCode);
@@ -135,10 +154,9 @@ export default function MediaIndoor() {
     };
   }, [telaoCode]);
 
-  // Connect to correct SSE channel
+  // Connect only to paired screen SSE channel (which receives all pairing + queue events)
   const sseUrl = telaoCode ? `${API_URL}/api/telao/sse/${telaoCode}` : null;
   const { data: telaoSseEvent } = useSSE(sseUrl);
-  const { data: globalSseEvent } = useSSE(`${API_URL}/events`);
 
   const playBell = () => {
     try {
@@ -150,12 +168,12 @@ export default function MediaIndoor() {
     }
   };
 
-  // Watch global events (ticket calling, config modifications, etc.)
+  // Watch unified SSE events (pairing events + queue/calling events)
   useEffect(() => {
-    if (!globalSseEvent) return;
+    if (!telaoSseEvent) return;
 
-    if (globalSseEvent.event === 'NOVA_SENHA_CHAMADA') {
-      const payload = globalSseEvent.data;
+    if (telaoSseEvent.event === 'NOVA_SENHA_CHAMADA') {
+      const payload = telaoSseEvent.data;
       setUltimaSenha(payload);
       
       setHistorico(prev => {
@@ -176,32 +194,26 @@ export default function MediaIndoor() {
         setShowMedia(true);
       }, 6000);
 
-    } else if (globalSseEvent.event === 'NOVA_SENHA_EMITIDA' || globalSseEvent.event === 'SENHA_ESTORNADA') {
+    } else if (telaoSseEvent.event === 'NOVA_SENHA_EMITIDA' || telaoSseEvent.event === 'SENHA_ESTORNADA') {
       fetchAguardando();
-      if (globalSseEvent.event === 'SENHA_ESTORNADA') {
-        setHistorico(prev => prev.filter(s => s.id !== globalSseEvent.data?.id));
+      if (telaoSseEvent.event === 'SENHA_ESTORNADA') {
+        setHistorico(prev => prev.filter(s => s.id !== telaoSseEvent.data?.id));
       }
-    } else if (globalSseEvent.event === 'CONFIG_ATUALIZADA') {
+    } else if (telaoSseEvent.event === 'queue-update') {
+      const { geral, preferencial } = telaoSseEvent.data || {};
+      setPessoasAguardando((geral || 0) + (preferencial || 0));
+    } else if (telaoSseEvent.event === 'CONFIG_ATUALIZADA') {
       fetchConfig();
-    } else if (globalSseEvent.event === 'MIDIAS_ATUALIZADAS') {
+    } else if (telaoSseEvent.event === 'MIDIAS_ATUALIZADAS') {
       fetchMidias();
-    } else if (globalSseEvent.event === 'TOLEDO_PRECOS_ATUALIZADOS') {
+    } else if (telaoSseEvent.event === 'TOLEDO_PRECOS_ATUALIZADOS') {
       setEncarteRefreshKey(prev => prev + 1);
-    } else if (globalSseEvent.event === 'RECARREGAR_PAGINA') {
-      window.location.reload();
-    } else if (globalSseEvent.event === 'SISTEMA_RESETADO') {
+    } else if (telaoSseEvent.event === 'SISTEMA_RESETADO') {
       setUltimaSenha(null);
       setHistorico([]);
       setShowMedia(true);
       fetchAguardando();
-    }
-  }, [globalSseEvent]);
-
-  // Watch telao-specific SSE pairing events
-  useEffect(() => {
-    if (!telaoSseEvent) return;
-
-    if (telaoSseEvent.event === 'TELAO_VINCULADO' || telaoSseEvent.event === 'TELAO_ATUALIZADO') {
+    } else if (telaoSseEvent.event === 'TELAO_VINCULADO' || telaoSseEvent.event === 'TELAO_ATUALIZADO') {
       const data = telaoSseEvent.data;
       setPerfil(data);
       
@@ -282,10 +294,10 @@ export default function MediaIndoor() {
 
   // Apply real-time consolidated waiting count
   useEffect(() => {
-    if (globalSseEvent?.aguardando_count !== undefined) {
-      setPessoasAguardando(globalSseEvent.aguardando_count);
+    if (telaoSseEvent?.data?.aguardando_count !== undefined) {
+      setPessoasAguardando(telaoSseEvent.data.aguardando_count);
     }
-  }, [globalSseEvent]);
+  }, [telaoSseEvent]);
 
   if (perfilLoading) {
     return (
@@ -313,9 +325,16 @@ export default function MediaIndoor() {
 
   return (
     <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-sans text-ink">
-      {/* Top Header Area */}
       <header className="h-32 bg-white border-b border-outline-variant/30 flex items-center justify-between px-8 shrink-0">
         <div className="flex items-center gap-4">
+          <Link 
+            to="/" 
+            onClick={() => localStorage.removeItem('app_mode')}
+            className="p-2 mr-2 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center outline-none" 
+            title="Voltar ao Menu Principal"
+          >
+            <span className="material-symbols-outlined text-2xl font-bold">arrow_back</span>
+          </Link>
           {config.logo_cliente ? (
             <img src={`${API_URL}${config.logo_cliente}`} className="h-20 object-contain" alt="Logo" />
           ) : (
@@ -519,7 +538,7 @@ export default function MediaIndoor() {
       {/* Fullscreen Call Overlay (Only if ticket calling is enabled in profile modules) */}
       {!showMedia && ultimaSenha && activeModules.includes('painel') && (
         <div className="absolute inset-0 z-50">
-          <SenhaChamada ultimaSenha={ultimaSenha} />
+          <SenhaChamada ultimaSenha={ultimaSenha} config={config} />
         </div>
       )}
     </div>

@@ -6,6 +6,28 @@ import { startServer, stopServer } from '../server/index';
 import { PrinterService, PrinterConfig } from './services/printer';
 import { autoUpdater } from 'electron-updater';
 
+function logUpdate(level: 'INFO' | 'WARN' | 'ERROR', message: string) {
+  try {
+    const updateLogPath = 'C:\\ChamaAi\\autoupdate.log';
+    const logMsg = `[${new Date().toISOString()}] [${level}] ${message}\n`;
+    console.log(`[UPDATE] [${level}]`, message);
+    if (fs.existsSync(updateLogPath)) {
+      const stats = fs.statSync(updateLogPath);
+      if (stats.size > 5 * 1024 * 1024) {
+        try { if (fs.existsSync(`${updateLogPath}.bak`)) fs.unlinkSync(`${updateLogPath}.bak`); } catch(e) {}
+        fs.renameSync(updateLogPath, `${updateLogPath}.bak`);
+      }
+    } else {
+      const parentDir = path.dirname(updateLogPath);
+      if (!fs.existsSync(parentDir)) {
+        fs.mkdirSync(parentDir, { recursive: true });
+      }
+    }
+    fs.appendFileSync(updateLogPath, logMsg, 'utf8');
+  } catch (e) {}
+}
+
+
 // Disable node integration in all webcontents for security
 app.on('web-contents-created', (event, contents) => {
   contents.on('will-attach-webview', (event, webPreferences, params) => {
@@ -82,12 +104,22 @@ function getCustomUpdatePath(): string | null {
   return null;
 }
 
-function createWindow() {
-  // Initialize printer with DB config
-  const printerCfg = loadPrinterConfig();
-  printerService = new PrinterService(printerCfg);
+function sendToAllWindows(channel: string, ...args: any[]) {
+  BrowserWindow.getAllWindows().forEach(win => {
+    if (!win.isDestroyed()) {
+      win.webContents.send(channel, ...args);
+    }
+  });
+}
 
-  mainWindow = new BrowserWindow({
+function createWindow(customRoute?: string) {
+  // Initialize printer with DB config
+  if (!printerService) {
+    const printerCfg = loadPrinterConfig();
+    printerService = new PrinterService(printerCfg);
+  }
+
+  const newWindow = new BrowserWindow({
     width: 1280,
     height: 720,
     webPreferences: {
@@ -98,14 +130,27 @@ function createWindow() {
     autoHideMenuBar: true,
   });
 
-  // Detecta se é Telão ou Totem para modo tela cheia
-  const argsEarly = process.argv.slice(1);
-  const isTelao = argsEarly.some(arg => arg.includes('--telao'));
-  const isTotem = argsEarly.some(arg => arg.includes('--totem'));
+  if (!mainWindow) {
+    mainWindow = newWindow;
+  }
+
+  // Detect route from command line arguments or custom parameter
+  let route = customRoute || '';
+  if (customRoute === undefined) {
+    const args = process.argv.slice(1);
+    if (args.includes('--telao')) route = 'telao';
+    else if (args.includes('--totem')) route = 'totem';
+    else if (args.includes('--operador')) route = 'operador';
+    else if (args.includes('--operador-touch')) route = 'operador-touch';
+    else if (args.includes('--admin')) route = 'admin';
+  }
+
+  const isTotem = route === 'totem';
+  const isTelao = route === 'telao';
 
   if (isTotem) {
-    mainWindow.setKiosk(true);
-    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    newWindow.setKiosk(true);
+    newWindow.setAlwaysOnTop(true, 'screen-saver');
 
     // Blindagem de teclas (Kiosk Mode Restrito)
     globalShortcut.register('CommandOrControl+W', () => { console.log('[BLINDAGEM] Bloqueado: Ctrl+W'); });
@@ -114,42 +159,36 @@ function createWindow() {
     globalShortcut.register('Alt+F4', () => { console.log('[BLINDAGEM] Bloqueado: Alt+F4'); });
     
     // Força o foco de volta se o usuário tentar abrir o menu iniciar ou alt+tab
-    mainWindow.on('blur', () => {
+    newWindow.on('blur', () => {
       setTimeout(() => {
-        if (mainWindow && !mainWindow.isFocused()) {
-          mainWindow.focus();
+        if (newWindow && !newWindow.isDestroyed() && !newWindow.isFocused()) {
+          newWindow.focus();
         }
       }, 100);
     });
   } else if (isTelao) {
-    mainWindow.setFullScreen(true);
+    newWindow.setFullScreen(true);
   }
-
-  // Detect route from command line arguments (e.g. --telao, --totem)
-  // We use .slice(1) because the first arg is the executable path
-  const args = process.argv.slice(1);
-  let route = '';
-  if (args.includes('--telao')) route = 'telao';
-  else if (args.includes('--totem')) route = 'totem';
-  else if (args.includes('--operador')) route = 'operador';
-  else if (args.includes('--operador-touch')) route = 'operador-touch';
-  else if (args.includes('--admin')) route = 'admin';
 
   // Load the local URL for development or the local file for production
   if (app.isPackaged) {
     const indexPath = path.join(__dirname, '../../dist/index.html');
-    mainWindow.loadFile(indexPath, { hash: route }).catch(err => {
+    newWindow.loadFile(indexPath, { hash: route }).catch(err => {
       console.error('Failed to load local file:', err);
     });
   } else {
     const devUrl = process.env.VITE_DEV_SERVER_URL;
     const base = devUrl || 'https://localhost:5173';
-    mainWindow.loadURL(`${base}#/${route}`);
+    newWindow.loadURL(`${base}#/${route}`);
   }
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-    app.quit(); // Garante que todos os processos ocultos (ex: impressora) sejam finalizados
+  newWindow.on('closed', () => {
+    if (newWindow === mainWindow) {
+      mainWindow = null;
+    }
+    if (BrowserWindow.getAllWindows().length === 0) {
+      app.quit(); // Garante que todos os processos ocultos sejam finalizados quando todas as janelas forem fechadas
+    }
   });
 }
 
@@ -287,16 +326,55 @@ ipcMain.handle('check-for-updates', async () => {
 function getDownloadedInstallerPath(): string | null {
   try {
     const localAppData = process.env.LOCALAPPDATA || path.join(require('os').homedir(), 'AppData', 'Local');
-    const pendingDir = path.join(localAppData, 'chamaai-novo', 'pending');
-    if (fs.existsSync(pendingDir)) {
-      const files = fs.readdirSync(pendingDir);
-      const exeFile = files.find(f => f.endsWith('.exe') && f.startsWith('ChamaAi-Setup'));
-      if (exeFile) {
-        return path.join(pendingDir, exeFile);
+    const dirs = [
+      path.join(localAppData, 'chamaai-novo-updater', 'pending'),
+      path.join(localAppData, 'chamaai-novo', 'pending')
+    ];
+    
+    const candidateFiles: { path: string; mtime: number; version: string }[] = [];
+    
+    for (const pendingDir of dirs) {
+      if (fs.existsSync(pendingDir)) {
+        const files = fs.readdirSync(pendingDir);
+        for (const file of files) {
+          if (file.toLowerCase().endsWith('.exe') && file.toLowerCase().includes('setup')) {
+            const filePath = path.join(pendingDir, file);
+            try {
+              const stats = fs.statSync(filePath);
+              const match = file.match(/(\d+\.\d+\.\d+)/);
+              const version = match ? match[1] : '0.0.0';
+              candidateFiles.push({
+                path: filePath,
+                mtime: stats.mtimeMs,
+                version: version
+              });
+            } catch (e) {}
+          }
+        }
       }
     }
-  } catch (e) {
-    console.error('[UPDATE] Erro ao buscar instalador físico:', e);
+    
+    if (candidateFiles.length > 0) {
+      // Sort by version (highest first), then by modification time (newest first)
+      candidateFiles.sort((a, b) => {
+        const partsA = a.version.split('.').map(Number);
+        const partsB = b.version.split('.').map(Number);
+        for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+          const valA = partsA[i] || 0;
+          const valB = partsB[i] || 0;
+          if (valA !== valB) return valB - valA;
+        }
+        return b.mtime - a.mtime;
+      });
+      
+      logUpdate('INFO', `Candidatos de instaladores encontrados: ${JSON.stringify(candidateFiles.map(c => `${c.version} (${c.path})`))}`);
+      logUpdate('INFO', `Instalador selecionado para execução: ${candidateFiles[0].path}`);
+      return candidateFiles[0].path;
+    } else {
+      logUpdate('WARN', 'Nenhum instalador físico (.exe com setup no nome) encontrado nas pastas pending.');
+    }
+  } catch (e: any) {
+    logUpdate('ERROR', `Erro ao buscar instalador físico: ${e.message || e}`);
   }
   return null;
 }
@@ -305,16 +383,16 @@ ipcMain.handle('install-update', async () => {
   const isPackagedOrTesting = app.isPackaged || fs.existsSync(path.join(app.getAppPath(), 'dev-app-update.yml'));
   if (!isPackagedOrTesting) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
   try {
-    console.log('[UPDATE] Iniciando shutdown via Script Separado (Option C)...');
+    logUpdate('INFO', 'Iniciando shutdown via Script Separado (Option C)...');
     
     // 1. Busca o caminho do instalador físico baixado
     const installerPath = getDownloadedInstallerPath();
     if (!installerPath || !fs.existsSync(installerPath)) {
-      console.error('[UPDATE] Instalador não encontrado física no disco.');
+      logUpdate('ERROR', 'Instalador físico não encontrado no disco.');
       return { success: false, message: 'Arquivo do instalador não encontrado no disco. Tente verificar atualizações novamente.' };
     }
     
-    console.log('[UPDATE] Instalador encontrado em:', installerPath);
+    logUpdate('INFO', `Instalador encontrado em: ${installerPath}`);
     
     // 2. Desativa flags e inicia shutdown gracioso do app
     isQuitting = true;
@@ -324,17 +402,17 @@ ipcMain.handle('install-update', async () => {
       try { 
         await stopServer(); 
         isServerStopped = true;
-        console.log('[UPDATE] Graceful shutdown do Express concluído.');
-      } catch (e) { 
-        console.error('[UPDATE] Erro no stopServer:', e); 
+        logUpdate('INFO', 'Graceful shutdown do Express concluído.');
+      } catch (e: any) { 
+        logUpdate('ERROR', `Erro no stopServer: ${e.message || e}`); 
       }
     }
     
     try {
       closeDatabase();
-      console.log('[UPDATE] Banco de dados SQLite fechado com segurança.');
-    } catch (e) {
-      console.error('[UPDATE] Erro ao fechar banco de dados:', e);
+      logUpdate('INFO', 'Banco de dados SQLite fechado com segurança.');
+    } catch (e: any) {
+      logUpdate('ERROR', `Erro ao fechar banco de dados: ${e.message || e}`);
     }
     
     // 3. Caminho temporário para o arquivo .bat de atualização em C:\ChamaAi
@@ -374,23 +452,25 @@ exit
 `;
     
     fs.writeFileSync(batPath, batContent, 'utf8');
-    console.log('[UPDATE] Script de atualização .bat gravado em:', batPath);
+    logUpdate('INFO', `Script de atualização .bat gravado em: ${batPath}`);
     
-    // 5. Executa o Script Separado via explorer.exe para garantir que ele rode no foreground interativo
+    // 5. Executa o Script Separado via cmd.exe para garantir execução direta na estação
     const { spawn } = require('child_process');
-    const child = spawn('explorer.exe', [batPath], {
+    const comspec = process.env.ComSpec || 'cmd.exe';
+    const child = spawn(comspec, ['/c', 'start', '""', batPath], {
       detached: true,
-      stdio: 'ignore'
+      stdio: 'ignore',
+      windowsHide: false
     });
     child.unref();
     
     // 6. Encerra o Electron de forma instantânea
-    console.log('[UPDATE] Saindo da aplicação imediatamente para liberação de arquivos.');
+    logUpdate('INFO', 'Saindo da aplicação imediatamente para liberação de arquivos.');
     app.exit(0);
     
     return { success: true };
   } catch (err: any) {
-    console.error('[UPDATE] Erro crítico no install-update:', err);
+    logUpdate('ERROR', `Erro crítico no install-update: ${err.message || err}`);
     return { success: false, message: `Erro ao preparar atualização: ${err.message}` };
   }
 });
@@ -436,25 +516,19 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', (event, commandLine) => {
-    if (mainWindow) {
+    // Lê os argumentos passados pelo atalho clicado e redireciona a tela abrindo uma nova janela se for o caso
+    let newRoute = '';
+    if (commandLine.includes('--telao')) newRoute = 'telao';
+    else if (commandLine.includes('--totem')) newRoute = 'totem';
+    else if (commandLine.includes('--operador')) newRoute = 'operador';
+    else if (commandLine.includes('--operador-touch')) newRoute = 'operador-touch';
+    else if (commandLine.includes('--admin')) newRoute = 'admin';
+    
+    if (newRoute) {
+      createWindow(newRoute);
+    } else if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
-      
-      // Lê os argumentos passados pelo atalho clicado e redireciona a tela
-      let newRoute = '';
-      if (commandLine.includes('--telao')) newRoute = 'telao';
-      else if (commandLine.includes('--totem')) newRoute = 'totem';
-      else if (commandLine.includes('--admin')) newRoute = 'admin';
-      
-      if (newRoute) {
-        if (app.isPackaged) {
-          const indexPath = require('path').join(__dirname, '../../dist/index.html');
-          mainWindow.loadFile(indexPath, { hash: newRoute });
-        } else {
-          const devUrl = process.env.VITE_DEV_SERVER_URL || 'https://localhost:5173';
-          mainWindow.loadURL(`${devUrl}#/${newRoute}`);
-        }
-      }
     }
   });
 
@@ -513,6 +587,7 @@ if (!gotTheLock) {
 
         autoUpdateLogger.info('Iniciando configuração do autoUpdater...');
         autoUpdater.logger = autoUpdateLogger;
+        autoUpdater.autoInstallOnAppQuit = false;
 
         if (!app.isPackaged) {
           autoUpdater.forceDevUpdateConfig = true;
@@ -533,28 +608,20 @@ if (!gotTheLock) {
         autoUpdater.on('checking-for-update', () => autoUpdateLogger.info('Verificando se há atualizações...'));
         autoUpdater.on('update-available', (info) => {
           autoUpdateLogger.info(`Atualização disponível: ${info.version}`);
-          if (mainWindow) {
-            mainWindow.webContents.send('update-available', info);
-          }
+          sendToAllWindows('update-available', info);
         });
         autoUpdater.on('update-not-available', () => autoUpdateLogger.info('Nenhuma atualização encontrada.'));
         autoUpdater.on('error', (err) => {
           autoUpdateLogger.error(`Erro no autoUpdater: ${err.message || err}`);
-          if (mainWindow) {
-            mainWindow.webContents.send('update-error', err.message);
-          }
+          sendToAllWindows('update-error', err.message);
         });
         autoUpdater.on('download-progress', (progress) => {
           autoUpdateLogger.info(`Progresso do Download: ${Math.round(progress.percent || 0)}%`);
-          if (mainWindow) {
-            mainWindow.webContents.send('download-progress', progress);
-          }
+          sendToAllWindows('download-progress', progress);
         });
         autoUpdater.on('update-downloaded', (info) => {
           autoUpdateLogger.info('Atualização baixada e pronta para instalar.');
-          if (mainWindow) {
-            mainWindow.webContents.send('update-downloaded', info);
-          }
+          sendToAllWindows('update-downloaded', info);
         });
 
         autoUpdater.checkForUpdates();

@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
 import { getApiUrl } from '../shared/apiConfig';
 
-export default function SenhaChamada({ ultimaSenha = null }: { ultimaSenha?: any }) {
+export default function SenhaChamada({ ultimaSenha = null, config: propConfig }: { ultimaSenha?: any; config?: any }) {
   const [pulse, setPulse] = useState(false);
-  const [config, setConfig] = useState<any>({});
+  const [config, setConfig] = useState<any>(propConfig || {});
   const API_URL = getApiUrl();
 
   useEffect(() => {
+    if (propConfig) {
+      setConfig(propConfig);
+      return;
+    }
     const fetchConfig = async () => {
       try {
         const res = await fetch(`${API_URL}/api/configuracoes`);
@@ -15,7 +19,7 @@ export default function SenhaChamada({ ultimaSenha = null }: { ultimaSenha?: any
       } catch (err) {}
     };
     fetchConfig();
-  }, [API_URL]);
+  }, [propConfig, API_URL]);
 
   useEffect(() => {
     if (ultimaSenha) {

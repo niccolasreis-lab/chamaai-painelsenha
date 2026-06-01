@@ -56,6 +56,7 @@ export default function Configuracoes() {
     backup_agendado_ativo: '0',
     backup_frequencia: 'diario',
     backup_destino: '',
+    update_path: '',
   });
 
   useEffect(() => {
@@ -980,6 +981,20 @@ export default function Configuracoes() {
                 Atualização do Sistema
               </h2>
               <div className="grid grid-cols-1 gap-4">
+                <div className="mb-2">
+                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">Pasta de Atualizações Locais (Offline)</label>
+                  <input
+                    name="update_path"
+                    value={config.update_path || ''}
+                    onChange={handleChange}
+                    placeholder="C:\ChamaAi_Atualizacoes (padrão)"
+                    className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold font-mono text-sm"
+                    type="text"
+                  />
+                  <p className="text-[10px] text-ink-secondary/60 mt-1 font-medium">
+                    Se for informado, o sistema buscará atualizações localmente nesta pasta em vez de baixar do GitHub.
+                  </p>
+                </div>
                 <button 
                   onClick={async () => {
                     const api = (window as any).api;

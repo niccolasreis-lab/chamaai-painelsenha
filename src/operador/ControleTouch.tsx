@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useSSE } from '../shared/useSSE';
 
 export default function ControleTouch() {
@@ -139,7 +140,16 @@ export default function ControleTouch() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ guiche }),
       });
-      if (!res.ok) {
+      if (res.ok) {
+        const result = await res.json();
+        if (result.success && result.data) {
+          setSenhaAtual({
+            id: result.data.id,
+            numero: result.data.numero,
+            preferencial: result.data.preferencial,
+          });
+        }
+      } else {
         if (res.status === 404) {
           alert('Fila vazia! Nenhuma senha aguardando.');
         } else {
@@ -247,7 +257,7 @@ export default function ControleTouch() {
             <button
               onClick={handleConnect}
               disabled={isValidating}
-              className="w-full bg-[#2563EB] text-white py-4 rounded-2xl font-bold uppercase tracking-widest hover:bg-[#1D4ED8] transition-all active:scale-[0.98] shadow-lg shadow-[#2563EB]/15 flex items-center justify-center gap-3 disabled:opacity-50"
+              className="w-full bg-[#2563EB] text-white py-4 rounded-2xl font-bold uppercase tracking-widest hover:bg-[#1D4ED8] transition-all active:scale-[0.98] shadow-lg shadow-[#2563EB]/15 flex items-center justify-center gap-3 disabled:opacity-50 outline-none"
             >
               {isValidating ? (
                 <>
@@ -261,6 +271,15 @@ export default function ControleTouch() {
                 </>
               )}
             </button>
+
+            {/* Back Button */}
+            <Link
+              to="/"
+              onClick={() => localStorage.removeItem('app_mode')}
+              className="w-full border border-slate-200 text-slate-500 py-3 rounded-2xl font-bold uppercase tracking-widest hover:bg-slate-50 transition-all text-center text-xs block outline-none"
+            >
+              Voltar ao Menu Principal
+            </Link>
           </div>
         </div>
       </div>
@@ -287,13 +306,23 @@ export default function ControleTouch() {
               </span>
             </div>
           </div>
-          <button
-            onClick={() => setIsSetup(false)}
-            className="w-12 h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all active:scale-95"
-            title="Voltar à Tela de Conexão"
-          >
-            <span className="material-symbols-outlined text-2xl">settings</span>
-          </button>
+          <div className="flex gap-2">
+            <Link
+              to="/"
+              onClick={() => localStorage.removeItem('app_mode')}
+              className="w-12 h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all active:scale-95 outline-none"
+              title="Voltar ao Menu Principal"
+            >
+              <span className="material-symbols-outlined text-2xl">arrow_back</span>
+            </Link>
+            <button
+              onClick={() => setIsSetup(false)}
+              className="w-12 h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all active:scale-95 outline-none"
+              title="Voltar à Tela de Conexão"
+            >
+              <span className="material-symbols-outlined text-2xl">settings</span>
+            </button>
+          </div>
         </div>
 
         {/* Card 2: Senha em Atendimento */}

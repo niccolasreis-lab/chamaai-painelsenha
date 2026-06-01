@@ -1,7 +1,7 @@
 {
   "name": "chamaai-novo",
   "private": true,
-  "version": "1.0.106",
+  "version": "1.0.111",
   "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev:vite": "vite --host",
@@ -23,7 +23,7 @@
     "appId": "com.chamaai.app",
     "productName": "ChamaAi",
     "directories": {
-      "output": "release"
+      "output": "C:/ChamaAi_Build"
     },
     "files": [
       "dist/**/*",

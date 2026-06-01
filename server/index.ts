@@ -153,6 +153,8 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 let sseClients: express.Response[] = [];
 const telaoSseClients: Record<string, express.Response[]> = {};
+let heartbeatInterval: NodeJS.Timeout | null = null;
+
 
 export function startServer() {
   const PORT = 3000;
@@ -194,26 +196,41 @@ export function startServer() {
     }
   }));
 
-  // Serve compiled offline updates locally over HTTP to bypass file:// protocol download errors
-  const LOCAL_UPDATES_DIR = 'C:\\ChamaAi_Atualizacoes';
-  if (!fs.existsSync(LOCAL_UPDATES_DIR)) {
-    try { fs.mkdirSync(LOCAL_UPDATES_DIR, { recursive: true }); } catch (e) {}
+  // Resolve o diretório de atualizações locais de forma dinâmica
+  function getLocalUpdatesDir(): string {
+    try {
+      const db = getDb();
+      const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'update_path'").get() as any;
+      if (row && row.valor) {
+        return row.valor;
+      }
+    } catch (e) {}
+    return 'C:\\ChamaAi_Atualizacoes';
   }
+
+  // Serve compiled offline updates locally over HTTP to bypass file:// protocol download errors
   app.use('/local-updates', (req, res, next) => {
+    const localUpdatesDir = getLocalUpdatesDir();
     if (req.path.endsWith('.exe') && req.path.includes('-')) {
       const spacePath = req.path.replace(/-/g, ' ');
-      const fullPath = path.join(LOCAL_UPDATES_DIR, spacePath.substring(1));
+      const fullPath = path.join(localUpdatesDir, spacePath.substring(1));
       if (fs.existsSync(fullPath)) {
         req.url = spacePath;
       }
     }
     next();
   });
-  app.use('/local-updates', express.static(LOCAL_UPDATES_DIR, {
-    setHeaders: (res) => {
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  app.use('/local-updates', (req, res, next) => {
+    const localUpdatesDir = getLocalUpdatesDir();
+    if (!fs.existsSync(localUpdatesDir)) {
+      try { fs.mkdirSync(localUpdatesDir, { recursive: true }); } catch (e) {}
     }
-  }));
+    express.static(localUpdatesDir, {
+      setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      }
+    })(req, res, next);
+  });
 
   // Serve frontend static files from dist folder
   const DIST_DIR = path.join(__dirname, '../../dist');
@@ -453,9 +470,10 @@ export function startServer() {
   });
 
   app.get('/events', (req, res) => {
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
     sseClients.push(res);
@@ -468,9 +486,10 @@ export function startServer() {
   // --- TELÕES (Musardos) ---
   app.get('/api/telao/sse/:code', (req, res) => {
     const code = req.params.code.toUpperCase();
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
     if (!telaoSseClients[code]) {
@@ -588,8 +607,36 @@ export function startServer() {
   app.get('/api/senhas', (req, res) => {
     try {
       const db = getDb();
-      const senhas = db.prepare('SELECT * FROM senhas ORDER BY id DESC LIMIT 50').all();
+      const senhas = db.prepare(`
+        SELECT s.*, c.guiche 
+        FROM senhas s
+        LEFT JOIN (
+          SELECT senha_id, guiche, MAX(id) as max_id 
+          FROM chamadas 
+          GROUP BY senha_id
+        ) latest_c ON s.id = latest_c.senha_id
+        LEFT JOIN chamadas c ON latest_c.max_id = c.id
+        ORDER BY s.id DESC 
+        LIMIT 50
+      `).all();
       res.json(senhas);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/chamadas/recentes', (req, res) => {
+    try {
+      const db = getDb();
+      const recent = db.prepare(`
+        SELECT s.id, s.numero, s.preferencial, s.status, c.guiche, b.nome as balcao_nome, s.chamada_em
+        FROM chamadas c
+        JOIN senhas s ON c.senha_id = s.id
+        JOIN balcoes b ON s.balcao_id = b.id
+        ORDER BY c.id DESC
+        LIMIT 5
+      `).all();
+      res.json(recent);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -2124,9 +2171,9 @@ export function startServer() {
   const frontendPath = path.join(__dirname, '../../dist');
   if (fs.existsSync(frontendPath)) {
     app.use(express.static(frontendPath));
-    // Middleware para SPA: se não for API ou uploads, manda o index.html
+    // Middleware para SPA: se não for API, uploads ou atualizações locais, manda o index.html
     app.use((req, res, next) => {
-      if (req.url.startsWith('/api') || req.url.startsWith('/uploads')) {
+      if (req.url.startsWith('/api') || req.url.startsWith('/uploads') || req.url.startsWith('/local-updates')) {
         return next();
       }
       res.sendFile(path.join(frontendPath, 'index.html'));
@@ -2310,6 +2357,19 @@ export function startServer() {
   });
 
   serverInstance = server;
+
+  // Heartbeat para manter as conexões SSE ativas e evitar timeouts
+  heartbeatInterval = setInterval(() => {
+    const pingPayload = `:\n\n`;
+    sseClients.forEach(client => {
+      try { client.write(pingPayload); } catch (e) {}
+    });
+    Object.keys(telaoSseClients).forEach(code => {
+      telaoSseClients[code].forEach(client => {
+        try { client.write(pingPayload); } catch (e) {}
+      });
+    });
+  }, 15000);
 
   server.on('connection', (socket: any) => {
     serverSockets.add(socket);
@@ -2630,7 +2690,26 @@ async function limparBackupsAntigos(backupDir: string, diasReter: number) {
 
 export function broadcastEvent(event: string, data: any) {
   const payload = `data: ${JSON.stringify({ event, data })}\n\n`;
-  sseClients.forEach(client => client.write(payload));
+  
+  // Envia para os clientes SSE globais
+  sseClients.forEach(client => {
+    try {
+      client.write(payload);
+    } catch (e) {
+      console.error('[SSE] Erro ao enviar evento para cliente global:', e);
+    }
+  });
+
+  // Envia para os telões específicos
+  Object.keys(telaoSseClients).forEach(code => {
+    telaoSseClients[code].forEach(client => {
+      try {
+        client.write(payload);
+      } catch (e) {
+        console.error(`[SSE] Erro ao enviar evento para telão ${code}:`, e);
+      }
+    });
+  });
 }
 
 let serverInstance: any = null;
@@ -2640,6 +2719,11 @@ let toledoWatcherCleanup: (() => void) | null | undefined = null;
 export function stopServer(): Promise<void> {
   return new Promise((resolve) => {
     console.log('[SERVER] Iniciando desligamento gracioso...');
+    
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+    }
     
     // Fechar todas as conexões SSE ativas
     if (sseClients && sseClients.length > 0) {

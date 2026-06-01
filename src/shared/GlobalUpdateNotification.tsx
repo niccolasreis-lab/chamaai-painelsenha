@@ -4,7 +4,7 @@ export default function GlobalUpdateNotification() {
   const [updateState, setUpdateState] = useState<'idle' | 'available' | 'downloading' | 'downloaded' | 'error'>('idle');
   const [progress, setProgress] = useState(0);
   const [versionInfo, setVersionInfo] = useState<any>(null);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorMessage] = useState('');
   const [dismissed, setDismissed] = useState(false);
 
   // Estados para exibir aviso pós-atualização
@@ -56,9 +56,9 @@ export default function GlobalUpdateNotification() {
     });
 
     const cleanupError = api.onUpdateError((err: any) => {
-      console.error('[UPDATE] Erro:', err);
-      setUpdateState('error');
-      setErrorMessage(err || 'Erro desconhecido');
+      console.error('[UPDATE] Erro silencioso em background:', err);
+      // Mantemos o erro de segundo plano silencioso na interface geral.
+      // Erros de atualização só serão mostrados em formato de alerta quando buscados manualmente em Configurações.
     });
 
     // Check for updates periodically (e.g. every 1 hour)

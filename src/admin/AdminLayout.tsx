@@ -5,6 +5,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
 
   const navLinks = [
+    { name: 'Voltar ao Menu', path: '/', icon: 'arrow_back' },
     { name: 'Dashboard', path: '/admin', icon: 'dashboard' },
     { name: 'Queue', path: '/admin/queue', icon: 'list_alt' },
     { name: 'Operators', path: '/admin/operators', icon: 'badge' },

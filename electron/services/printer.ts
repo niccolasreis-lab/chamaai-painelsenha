@@ -61,6 +61,8 @@ export class PrinterService {
   private simulationMode: boolean;
   private printWindow: any = null;
   private lastPrintedTicket: TicketData | null = null;
+  private queue: { data: TicketData; resolve: (res: any) => void }[] = [];
+  private processingQueue = false;
 
   constructor(config?: Partial<PrinterConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -123,7 +125,9 @@ export class PrinterService {
     if (this.simulationMode) {
       return this.printSimulation(data);
     }
-    return this.printReal(data);
+    return new Promise((resolve) => {
+      this.queuePrintJob(data, resolve);
+    });
   }
 
   async reprintLastTicket(): Promise<{ success: boolean; error?: string }> {
@@ -134,13 +138,55 @@ export class PrinterService {
     if (this.simulationMode) {
       return this.printSimulation(this.lastPrintedTicket);
     }
-    return this.printReal(this.lastPrintedTicket);
+    return new Promise((resolve) => {
+      this.queuePrintJob(this.lastPrintedTicket!, resolve);
+    });
+  }
+
+  private queuePrintJob(data: TicketData, resolve: (res: any) => void) {
+    this.queue.push({ data, resolve });
+    this.processQueue();
+  }
+
+  private async processQueue() {
+    if (this.processingQueue) return;
+    this.processingQueue = true;
+
+    while (this.queue.length > 0) {
+      const job = this.queue[0];
+      try {
+        const result = await this.printReal(job.data);
+        job.resolve(result);
+      } catch (err: any) {
+        job.resolve({ success: false, error: err.message || 'Erro na fila de impressão' });
+      }
+      this.queue.shift();
+    }
+
+    this.processingQueue = false;
   }
 
   private async printReal(data: TicketData): Promise<{ success: boolean; error?: string }> {
     console.log(`[PrinterService] Preparando ticket (Modo Nativo) para: ${this.config.interface}`);
 
     return new Promise(async (resolve) => {
+      let resolved = false;
+      const safeResolve = (result: { success: boolean; error?: string }) => {
+        if (!resolved) {
+          resolved = true;
+          if (this.printWindow) {
+            this.printWindow.webContents.removeAllListeners('did-finish-load');
+            this.printWindow.webContents.removeAllListeners('did-fail-load');
+          }
+          resolve(result);
+        }
+      };
+
+      // Timeout de segurança: 15 segundos para a impressão completar
+      const timeoutId = setTimeout(() => {
+        safeResolve({ success: false, error: 'A impressão expirou por lentidão no hardware ou driver.' });
+      }, 15000);
+
       try {
         this.initPrintWindow();
 
@@ -158,7 +204,7 @@ export class PrinterService {
               const relativePath = logoRow.valor.replace(/^\//, ''); // remove barra inicial se existir
               const absolutePath = path.join('C:\\ChamaAi', relativePath);
               if (fs.existsSync(absolutePath)) {
-                const base64 = fs.readFileSync(absolutePath, 'base64');
+                const base64 = await fs.promises.readFile(absolutePath, 'base64');
                 const ext = path.extname(absolutePath).toLowerCase().replace('.', '');
                 const mimeType = ext === 'svg' ? 'image/svg+xml' : `image/${ext}`;
                 const dataUrl = `data:${mimeType};base64,${base64}`;
@@ -172,7 +218,7 @@ export class PrinterService {
           // Se não achou logo_cliente ou não existe o arquivo, usa o logoPath de fallback da config convertido para base64
           if (!logoHtml && this.config.logoPath && fs.existsSync(this.config.logoPath)) {
             try {
-              const base64 = fs.readFileSync(this.config.logoPath, 'base64');
+              const base64 = await fs.promises.readFile(this.config.logoPath, 'base64');
               const ext = path.extname(this.config.logoPath).toLowerCase().replace('.', '');
               const mimeType = ext === 'svg' ? 'image/svg+xml' : `image/${ext}`;
               const dataUrl = `data:${mimeType};base64,${base64}`;
@@ -284,7 +330,10 @@ export class PrinterService {
           </html>
         `;
 
-        this.printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+        this.printWindow.webContents.once('did-fail-load', () => {
+          clearTimeout(timeoutId);
+          safeResolve({ success: false, error: 'Falha ao carregar o conteúdo da janela de impressão.' });
+        });
 
         this.printWindow.webContents.once('did-finish-load', async () => {
           try {
@@ -323,22 +372,28 @@ export class PrinterService {
                 height: heightMicrons
               }
             }, (success: boolean, failureReason: any) => {
+              clearTimeout(timeoutId);
               if (!success) {
                 console.error('[PrinterService] ❌ Falha na impressão:', failureReason);
-                resolve({ success: false, error: `A impressora '${this.config.interface}' rejeitou o documento. Verifique se ela está online e com papel.` });
+                safeResolve({ success: false, error: `A impressora '${this.config.interface}' rejeitou o documento. Verifique se ela está online e com papel.` });
               } else {
                 console.log(`[PrinterService] ✅ Enviado com sucesso via Driver Nativo.`);
-                resolve({ success: true });
+                safeResolve({ success: true });
               }
             });
           } catch (e: any) {
+            clearTimeout(timeoutId);
             console.error('[PrinterService] Erro ao processar tamanho do ticket:', e);
-            resolve({ success: false, error: 'Erro interno ao calcular tamanho do papel.' });
+            safeResolve({ success: false, error: 'Erro interno ao calcular tamanho do papel.' });
           }
         });
+
+        this.printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+
       } catch (err: any) {
+        clearTimeout(timeoutId);
         console.error('[PrinterService] Erro geral:', err);
-        resolve({ success: false, error: err.message || 'Erro desconhecido na impressora.' });
+        safeResolve({ success: false, error: err.message || 'Erro desconhecido na impressora.' });
       }
     });
   }

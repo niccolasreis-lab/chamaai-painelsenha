@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { getApiUrl, setServerIp } from '../shared/apiConfig';
 import { useSSE } from '../shared/useSSE';
 
@@ -142,12 +143,15 @@ export default function Controle() {
     <div className={`min-h-screen w-full font-sans flex justify-center transition-colors duration-300
       ${theme === 'dark' ? 'bg-[#020617] text-white' : 'bg-[#f8fafc] text-slate-900'}`}>
       
-      <div className="w-full max-w-[500px] h-screen flex flex-col p-4 gap-4 overflow-hidden">
+      <div className="w-full max-w-[500px] h-screen flex flex-col p-4 gap-4 overflow-y-auto overflow-x-hidden">
         
         {/* Header Superior */}
         <div className={`flex items-center justify-between p-4 rounded-3xl border shadow-sm transition-all
           ${theme === 'dark' ? 'bg-slate-800/50 border-white/10' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center gap-3">
+            <Link to="/" onClick={() => localStorage.removeItem('app_mode')} className="p-2 rounded-full hover:bg-slate-500/10 text-slate-500 flex items-center justify-center outline-none" title="Voltar ao Menu Principal">
+              <span className="material-symbols-outlined text-xl">arrow_back</span>
+            </Link>
             <span className={`material-symbols-outlined text-xl ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>storefront</span>
             <span className="font-sans text-lg font-bold uppercase tracking-wide">{guiche}</span>
           </div>
@@ -234,11 +238,13 @@ export default function Controle() {
 
         {/* Botões de Ação */}
         <div className="flex flex-col gap-3 pb-4">
-          <button 
-            onClick={repetirChamada}
-            className="py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-3xl font-bold text-lg shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3">
-            <span className="material-symbols-outlined">refresh</span> REPETIR
-          </button>
+          {senhaAtual && (
+            <button 
+              onClick={repetirChamada}
+              className="py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-3xl font-bold text-lg shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3">
+              <span className="material-symbols-outlined">refresh</span> REPETIR
+            </button>
+          )}
           
           <button 
             onClick={chamarProxima}
@@ -246,12 +252,14 @@ export default function Controle() {
             <span className="material-symbols-outlined text-4xl">campaign</span> PRÓXIMO
           </button>
 
-          <button 
-            onClick={estornar}
-            className={`w-full py-4 rounded-3xl font-bold text-base flex items-center justify-center gap-3 transition-all active:scale-[0.95] border-2
-              ${theme === 'dark' ? 'bg-amber-600/20 border-amber-500/50 text-amber-500' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
-            <span className="material-symbols-outlined">undo</span> DEVOLVER À FILA
-          </button>
+          {senhaAtual && (
+            <button 
+              onClick={estornar}
+              className={`w-full py-4 rounded-3xl font-bold text-base flex items-center justify-center gap-3 transition-all active:scale-[0.95] border-2
+                ${theme === 'dark' ? 'bg-amber-600/20 border-amber-500/50 text-amber-500' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
+              <span className="material-symbols-outlined">undo</span> DEVOLVER À FILA
+            </button>
+          )}
         </div>
 
       </div>

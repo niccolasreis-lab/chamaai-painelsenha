@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { getApiUrl } from '../shared/apiConfig';
 
 interface TelaoEsperaProps {
@@ -142,13 +143,24 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
             </span>
           </div>
 
-          <button
-            onClick={() => setShowIpModal(true)}
-            className="text-[10px] text-white/40 hover:text-white/80 font-bold uppercase tracking-widest mt-2 flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-xs">hub</span>
-            Configurar Conexão (Atual: {localStorage.getItem('server_ip_override') || 'Localhost'})
-          </button>
+          <div className="flex items-center gap-4 mt-2">
+            <button
+              onClick={() => setShowIpModal(true)}
+              className="text-[10px] text-white/40 hover:text-white/80 font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
+            >
+              <span className="material-symbols-outlined text-xs">hub</span>
+              Configurar Conexão (Atual: {localStorage.getItem('server_ip_override') || 'Localhost'})
+            </button>
+            <span className="text-white/20 text-[10px] font-bold">|</span>
+            <Link
+              to="/"
+              onClick={() => localStorage.removeItem('app_mode')}
+              className="text-[10px] text-white/40 hover:text-white/80 font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
+            >
+              <span className="material-symbols-outlined text-xs">arrow_back</span>
+              Voltar ao Menu
+            </Link>
+          </div>
         </div>
       </div>
 
