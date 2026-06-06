@@ -63,10 +63,23 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
         <h2 className="font-sans text-[3rem] font-semibold text-white/50 tracking-[0.3em] uppercase mb-4">
           Senha Atual
         </h2>
-        
-        <div className={`font-sans text-[25rem] font-black leading-none tracking-tight text-white transition-all duration-300 drop-shadow-[0_0_50px_rgba(255,255,255,0.2)] ${pulse ? 'animate-pulse-call text-white' : ''}`}>
+
+        <div 
+          className={`font-sans text-[25rem] font-black leading-none tracking-tight text-white ${pulse ? 'animate-pulse-call' : ''}`}
+          style={{
+            willChange: 'transform, opacity',
+            transform: 'translateZ(0)',
+            textShadow: '0 0 30px rgba(255, 255, 255, 0.2)'
+          }}
+        >
           {senhaFormatada}
         </div>
+
+        {ultimaSenha.nome_cliente && (
+          <div className="font-sans text-3xl font-semibold text-white/70 mt-2 select-none">
+            {ultimaSenha.nome_cliente}
+          </div>
+        )}
 
         {config.telao_ocultar_guiche !== '1' && (
           <div className="mt-8 flex flex-col items-center justify-center gap-4">

@@ -1,19 +1,38 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { getApiUrl } from '../shared/apiConfig';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const [showQueue, setShowQueue] = useState(false);
+  const API_URL = getApiUrl();
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/configuracoes`);
+        if (res.ok) {
+          const data = await res.json();
+          setShowQueue(data.habilitar_filas_avancadas === '1');
+        }
+      } catch (err) {
+        console.error('Erro ao buscar configurações no layout:', err);
+      }
+    };
+    fetchConfig();
+  }, [API_URL]);
 
   const navLinks = [
     { name: 'Voltar ao Menu', path: '/', icon: 'arrow_back' },
     { name: 'Dashboard', path: '/admin', icon: 'dashboard' },
-    { name: 'Queue', path: '/admin/queue', icon: 'list_alt' },
+    ...(showQueue ? [{ name: 'Queue', path: '/admin/queue', icon: 'list_alt' }] : []),
     { name: 'Operators', path: '/admin/operators', icon: 'badge' },
     { name: 'Devices', path: '/admin/devices', icon: 'settings_input_component' },
     { name: 'Gerenciar Mídias', path: '/admin/midias', icon: 'perm_media' },
     { name: 'Toledo / Encarte', path: '/admin/toledo', icon: 'scale' },
     { name: 'Avançado Encarte', path: '/admin/encarte', icon: 'style' },
-    { name: 'Relatórios', path: '/admin/relatorios', icon: 'analytics' },
+    {name: 'Relatórios', path: '/admin/relatorios', icon: 'analytics' },
+    { name: 'Segurança', path: '/admin/seguranca', icon: 'security' },
     { name: 'Settings', path: '/admin/settings', icon: 'settings' },
   ];
 

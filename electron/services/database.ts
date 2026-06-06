@@ -62,6 +62,8 @@ export function initDatabase() {
       INSERT OR IGNORE INTO configuracoes VALUES ('rotulo_local', '', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('rotulo_atendimento_geral', 'Atendimento Geral', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('rotulo_atendimento_prioritario', 'Atendimento Prioritário', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('habilitar_filas_avancadas', '0', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('acesso_local_exige_auth', '0', datetime('now'));
       
       -- Force clear it if it was the old default
       UPDATE configuracoes SET valor = '' WHERE chave = 'rotulo_local' AND valor = 'Guichê';
@@ -72,9 +74,23 @@ export function initDatabase() {
       INSERT OR IGNORE INTO configuracoes VALUES ('impressora_width', '48', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('impressora_footer', 'Obrigado pela preferência!', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('impressora_logoPath', '', datetime('now'));
+
+      -- Personalização e Recursos Avançados
+      INSERT OR IGNORE INTO configuracoes VALUES ('cor_primaria', '#2563eb', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('totem_screensaver_ativo', '0', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('totem_screensaver_timeout', '120', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('totem_screensaver_intervalo', '10', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('totem_solicita_nome', '0', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_ativo', '0', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_voz', 'Feminina', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('telao_ticker_texto', '', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('sync_pendente_cor_primaria', '0', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('auth_local_obrigatorio', '0', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('totem_screensaver_modo', 'ambos', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('telao_agendamento_ativo', '0', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('telao_agendamento_regras', '[]', datetime('now'));
     `);
 
-    // Balcões
     db.exec(`
       CREATE TABLE IF NOT EXISTS balcoes (
         id                  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,21 +116,38 @@ export function initDatabase() {
         chamada_em   TEXT,
         atendida_em  TEXT
       );
+      CREATE INDEX IF NOT EXISTS idx_senhas_status ON senhas(status);
+      CREATE INDEX IF NOT EXISTS idx_senhas_balcao_id ON senhas(balcao_id);
     `);
 
     // Operadores
     db.exec(`
       CREATE TABLE IF NOT EXISTS operadores (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome       TEXT NOT NULL,
-        login      TEXT NOT NULL UNIQUE,
-        senha_hash TEXT NOT NULL,
-        perfil     TEXT NOT NULL,
-        ativo      INTEGER NOT NULL DEFAULT 1,
-        criado_em  TEXT NOT NULL DEFAULT (datetime('now'))
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome            TEXT NOT NULL,
+        login           TEXT NOT NULL UNIQUE,
+        senha_hash      TEXT NOT NULL,
+        perfil          TEXT NOT NULL,
+        ativo           INTEGER NOT NULL DEFAULT 1,
+        criado_em       TEXT NOT NULL DEFAULT (datetime('now')),
+        primeiro_acesso INTEGER DEFAULT 1
       );
-      INSERT OR IGNORE INTO operadores (id, nome, login, senha_hash, perfil, ativo) VALUES (1, 'Administrador', 'admin', 'admin', 'admin', 1);
+      INSERT OR IGNORE INTO operadores (id, nome, login, senha_hash, perfil, ativo) VALUES (1, 'Administrador', 'admin', 'scrypt$6bf314aac0b385bd65ce743adf9d8d84$ff1ac8cc8d26a680a25da61a69f1decd3c0038dcb805a65548181a3c6b77b970bbb924c5d2dcb7a557fb2dc850d901ab9b73db85059b005762bb16887a5e1498', 'admin', 1);
+      
+      CREATE TABLE IF NOT EXISTS sessoes_operador (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        token TEXT UNIQUE NOT NULL,
+        operador_id INTEGER NOT NULL REFERENCES operadores(id),
+        criado_em TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        expira_em TEXT NOT NULL
+      );
     `);
+
+    // Add primeiro_acesso if it doesn't exist
+    try {
+      db.exec('ALTER TABLE operadores ADD COLUMN primeiro_acesso INTEGER DEFAULT 1;');
+      console.log("[DATABASE] Coluna 'primeiro_acesso' adicionada à tabela operadores.");
+    } catch (e) {}
 
     // Mídias
     db.exec(`
@@ -139,6 +172,8 @@ export function initDatabase() {
         tentativa   INTEGER NOT NULL DEFAULT 1,
         criado_em   TEXT NOT NULL DEFAULT (datetime('now'))
       );
+      CREATE INDEX IF NOT EXISTS idx_chamadas_senha_id ON chamadas(senha_id);
+      CREATE INDEX IF NOT EXISTS idx_chamadas_operador_id ON chamadas(operador_id);
     `);
 
     // Toledo — Produtos de balança (preços por KG)
@@ -174,6 +209,8 @@ export function initDatabase() {
     } catch (e) {
       // Ignorar se a coluna já existe
     }
+
+
 
     // Seed das novas categorias oficiais
     try {
@@ -290,6 +327,57 @@ export function initDatabase() {
       db.prepare("ALTER TABLE midias ADD COLUMN status TEXT DEFAULT 'ativo'").run();
       console.log("[DATABASE] Coluna 'status' adicionada à tabela midias.");
     } catch (e) {}
+
+    try {
+      db.prepare("ALTER TABLE teloes ADD COLUMN template_layout TEXT DEFAULT 'classic'").run();
+      console.log("[DATABASE] Coluna 'template_layout' adicionada à tabela teloes.");
+    } catch (e) {}
+
+    try {
+      db.prepare("ALTER TABLE senhas ADD COLUMN nome_cliente TEXT").run();
+      console.log("[DATABASE] Coluna 'nome_cliente' adicionada à tabela senhas.");
+    } catch (e) {}
+
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS usuarios (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          login TEXT NOT NULL UNIQUE,
+          senha_hash TEXT NOT NULL,
+          perfil TEXT NOT NULL DEFAULT 'operador',
+          primeiro_acesso INTEGER NOT NULL DEFAULT 1,
+          criado_em TEXT DEFAULT (datetime('now'))
+        );
+      `);
+
+      // Migration: Add primeiro_acesso to usuarios if it doesn't exist
+      try {
+        db.exec('ALTER TABLE usuarios ADD COLUMN primeiro_acesso INTEGER NOT NULL DEFAULT 1;');
+        console.log("[DATABASE] Coluna 'primeiro_acesso' adicionada à tabela usuarios.");
+      } catch (err) {}
+
+      const userCount = db.prepare('SELECT count(*) as count FROM usuarios').get() as any;
+      if (userCount && userCount.count === 0) {
+        const bcrypt = require('bcryptjs');
+        const hash = bcrypt.hashSync('admin', 10);
+        db.prepare('INSERT INTO usuarios (login, senha_hash, perfil, primeiro_acesso) VALUES (?, ?, ?, ?)').run('admin', hash, 'admin', 1);
+        console.log("[DATABASE] Tabela 'usuarios' populada com admin/admin.");
+      }
+
+      // Migrar operadores legados para a tabela usuarios
+      try {
+        const operadores = db.prepare('SELECT login, senha_hash, perfil, primeiro_acesso FROM operadores').all() as any[];
+        const insertStmt = db.prepare('INSERT OR IGNORE INTO usuarios (login, senha_hash, perfil, primeiro_acesso) VALUES (?, ?, ?, ?)');
+        for (const op of operadores) {
+          insertStmt.run(op.login, op.senha_hash, op.perfil || 'operador', op.primeiro_acesso !== undefined ? op.primeiro_acesso : 1);
+        }
+        console.log("[DATABASE] Operadores antigos migrados para a tabela usuarios.");
+      } catch (err) {
+        console.error("[DATABASE] Erro ao migrar operadores antigos:", err);
+      }
+    } catch (e) {
+      console.error("[DATABASE] Erro ao inicializar a tabela usuarios:", e);
+    }
 
     console.log('SQLite Database initialized at', dbPath);
     return db;

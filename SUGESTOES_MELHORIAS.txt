@@ -1,0 +1,43 @@
+SUGESTÕES DE MELHORIAS E PERSONALIZAÇÃO - CHAMAAÍ
+
+1. EXPERIÊNCIA DO CLIENTE (CUSTOMER EXPERIENCE)
+- Agendamento Prévio (Check-in via QR Code): Permitir que o cliente agende ou retire a senha de casa pelo celular. Ao chegar no estabelecimento, ele apenas aproxima o celular do leitor do Totem (ou digita um código) para validar a presença e entrar na fila real.
+- Avisos via WhatsApp/SMS: Integração (via Evolution API, Z-API, ou Twilio) para enviar uma mensagem ao cliente quando faltarem, por exemplo, 3 senhas para a dele. Isso elimina a necessidade do cliente ficar preso à sala de espera.
+- Pesquisa de Satisfação (NPS): Logo após o término do atendimento, enviar um link para o cliente ou exibir no Totem uma tela rápida para avaliar a experiência (NPS de 1 a 5).
+
+2. PERSONALIZAÇÃO VISUAL (WHITE-LABELING AVANÇADO)
+- Temas Dinâmicos (Colors & Brands): Um "Color Picker" nas configurações onde o cliente escolhe a Cor Primária da marca dele. O sistema (usando variáveis CSS) adaptaria todo o layout do Totem, Telão e Portal instantaneamente.
+- Múltiplos Templates de Telão:
+  * Template 1: Senha gigante centralizada (clássico).
+  * Template 2: 70% da tela tocando vídeo/mídia e 30% barra lateral com as últimas senhas.
+  * Template 3: Modo L (senha no canto, mídia no centro, ticker de notícias/clima rodando no rodapé).
+- Screensaver (Modo Descanso) no Totem: Se o Totem ficar ocioso por mais de 2 minutos, ele passa a exibir um vídeo institucional ou banners promocionais, voltando à tela de senhas ao toque.
+
+3. GESTÃO E BUSINESS INTELLIGENCE (BI)
+- Métricas de TMA e TME: Dashboards avançados mostrando o Tempo Médio de Espera (TME) e Tempo Médio de Atendimento (TMA) por operador e por guichê.
+- Heatmap de Horários de Pico: Gráfico mostrando os dias e horários em que o estabelecimento tem maior movimento, auxiliando na escala de funcionários.
+- Relatórios Automatizados: Geração automática de relatórios em PDF/Excel enviados para o e-mail do gestor no fim do dia ou da semana.
+
+4. TECNOLOGIA E INTEGRAÇÃO
+- Chamada Nominal Dinâmica (Text-to-Speech Avançado): Integrar APIs de voz (Google/Azure/Web Speech API) para anunciar nomes em vez de apenas senhas ("Senha P014. João da Silva. Dirija-se ao Guichê 2").
+- Multi-lojas na Nuvem (Sync): Sincronizar o banco de dados local (SQLite) com um painel Master na nuvem (ex: Supabase), permitindo que donos de redes de lojas gerenciem todas as filiais via web.
+- Triagem Inteligente: Criação de filas personalizadas no Totem (ex: "Financeiro", "Retirada", "Atendimento"). Cada botão roteia a senha exclusivamente para os guichês designados.
+
+5. SEGURANÇA E AUDITORIA (AUDIT TRAIL & BACKUPS)
+- Logs de Atividades (Audit Trail): Registro de ações críticas no sistema (criação/edição de usuários, exclusão de dados e reinicializações de banco de dados), permitindo que o administrador saiba quem executou cada ação.
+- UI Administrativa de Backup & Restore: Interface direta no painel do administrador para que ele faça o download do banco de dados (SQLite) e restaure backups facilmente, sem precisar acessar arquivos do servidor manualmente.
+
+6. OPERABILIDADE E ESTABILIDADE (ADMIN & OPERADOR)
+- Atalhos de Teclado para o Operador: Facilidade de uso com teclas rápidas (ex: F2 para Chamar Próximo, F3 para Chamar Novamente, F4 para Pausar) no painel do operador, agilizando o atendimento.
+- Painel de Diagnóstico e Saúde (Health Check): Tela de status indicando em tempo real se a balança Toledo, a impressora térmica de senhas e a sincronização com o Supabase estão online.
+- Monitoramento de Impressora (Alerta de Papel): O totem de senhas monitora o estado físico da impressora térmica. Caso o papel acabe ou a impressora se desconecte, exibe na tela um aviso amigável "Fora de serviço" e alerta o administrador.
+- Painel de Configurações de Áudio: Permite alterar na interface o som do gongo (ex: clássico, moderno, suave) e o volume do telão de forma centralizada.
+
+7. BUSINESS INTELLIGENCE E PRODUTIVIDADE AVANÇADA
+- Ranking e Gamificação de Operadores: Estatísticas na tela de administração mostrando os operadores com melhores métricas de atendimento (maior volume de atendimentos e menor TMA) para incentivo de produtividade.
+- Alertas de Estouro de SLA (Fila Parada): Configurar tempos máximos de tolerância para cada fila. Caso uma senha prioritária fique mais de X minutos sem ser chamada, o sistema envia um alerta visual ao painel do gerente.
+- Modo Operador Mobile PWA: Aplicativo leve (PWA) para celular que permite ao operador chamar, repetir ou encerrar atendimentos diretamente do smartphone, eliminando a necessidade de um PC completo no guichê.
+
+8. ACESSIBILIDADE E GLOBALIZAÇÃO
+- Acessibilidade no Totem de Senhas: Modo de alto contraste, layout adaptado para idosos (letras maiores) e compatibilidade com leitores de tela na emissão de senhas.
+- Internacionalização (Multilíngue): Tradução dinâmica de textos de totem e portal de senhas para outros idiomas (ex: Inglês e Espanhol), ideal para estabelecimentos que atendem estrangeiros.

@@ -1,3 +1,4 @@
+require('dotenv').config();
 import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -53,6 +54,8 @@ if (isTotemEarly) {
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
+// Ignora erros de SSL causados pelo certificado autoassinado do Vite/mkcert
+app.commandLine.appendSwitch('ignore-certificate-errors');
 
 let mainWindow: BrowserWindow | null = null;
 let printerService: PrinterService;
@@ -135,6 +138,17 @@ function createWindow(customRoute?: string) {
     autoHideMenuBar: true,
   });
 
+  // Captura logs do console do renderer e imprime no terminal para depuração rápida
+  newWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    const levels = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
+    console.log(`[RENDERER ${levels[level] || 'LOG'}] ${message} (${path.basename(sourceId)}:${line})`);
+  });
+
+  // Captura falhas de carregamento de recursos/páginas
+  newWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[RENDERER FAILED LOAD] Code: ${errorCode}, Description: ${errorDescription}, URL: ${validatedURL}`);
+  });
+
   if (!mainWindow) {
     mainWindow = newWindow;
   }
@@ -184,7 +198,11 @@ function createWindow(customRoute?: string) {
   } else {
     const devUrl = process.env.VITE_DEV_SERVER_URL;
     const base = devUrl || 'https://localhost:5173';
-    newWindow.loadURL(`${base}#/${route}`);
+    newWindow.loadURL(`${base}#/${route}`).then(() => {
+      newWindow.webContents.openDevTools();
+    }).catch(err => {
+      console.error('Failed to load dev URL:', err);
+    });
   }
 
   newWindow.on('closed', () => {
@@ -201,7 +219,14 @@ function createWindow(customRoute?: string) {
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
   const { dialog } = require('electron');
-  dialog.showErrorBox('Erro no Processo Principal', error.message || String(error));
+  try {
+    dialog.showErrorBox('Erro no Processo Principal', error.message || String(error));
+  } catch (e) {}
+  app.exit(1);
+});
+
+ipcMain.on('renderer-error', (_event, data) => {
+  console.error('[RENDERER EXCEPTION]', data);
 });
 
 // Register IPC Handlers
@@ -518,6 +543,7 @@ ipcMain.handle('test-printer', async () => {
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
+  console.log('[SYSTEM] Outra instância já está rodando. Encerrando (SingleInstanceLock)...');
   app.quit();
 } else {
   app.on('second-instance', (event, commandLine) => {
@@ -632,8 +658,9 @@ if (!gotTheLock) {
         autoUpdater.checkForUpdates();
       }
     } catch (err: any) {
+      console.error('[SYSTEM] Erro Fatal na Inicialização:', err);
       const { dialog } = require('electron');
-      dialog.showErrorBox('Erro na Inicialização', err.message || String(err));
+      try { dialog.showErrorBox('Erro na Inicialização', err.message || String(err)); } catch(e) {}
       app.quit();
     }
 
@@ -646,8 +673,10 @@ if (!gotTheLock) {
 }
 
 app.on('window-all-closed', () => {
+  console.log('[SYSTEM] window-all-closed acionado. Verificando se deve fechar...');
   const isServerOnly = process.argv.some(arg => arg.includes('--server'));
   if (process.platform !== 'darwin' && !isServerOnly) {
+    console.log('[SYSTEM] Fechando a aplicação porque as janelas fecharam.');
     app.quit();
   }
 });

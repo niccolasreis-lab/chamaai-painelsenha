@@ -15,7 +15,8 @@ export default function Devices() {
     modulo_painel: true,
     modulo_encarte: false,
     modulo_midia: false,
-    encarte_categorias: ''
+    encarte_categorias: '',
+    template_layout: 'classic'
   });
 
   const API_URL = getApiUrl();
@@ -85,7 +86,8 @@ export default function Devices() {
       modulo_painel: true,
       modulo_encarte: false,
       modulo_midia: false,
-      encarte_categorias: ''
+      encarte_categorias: '',
+      template_layout: 'classic'
     });
     setIsModalOpen(true);
   };
@@ -98,7 +100,8 @@ export default function Devices() {
       modulo_painel: !!telao.modulo_painel,
       modulo_encarte: !!telao.modulo_encarte,
       modulo_midia: !!telao.modulo_midia,
-      encarte_categorias: telao.encarte_categorias || ''
+      encarte_categorias: telao.encarte_categorias || '',
+      template_layout: telao.template_layout || 'classic'
     });
     setIsModalOpen(true);
   };
@@ -153,7 +156,7 @@ export default function Devices() {
           </div>
           <button 
             onClick={openVincular}
-            className="bg-primary text-white px-8 py-4 rounded-xl font-bold shadow-lg transition-all hover:bg-primary-hover active:scale-95 flex items-center space-x-2 outline-none uppercase tracking-widest text-sm"
+            className="bg-primary text-on-primary px-8 py-4 rounded-xl font-bold shadow-lg transition-all hover:bg-primary-hover active:scale-95 flex items-center space-x-2 outline-none uppercase tracking-widest text-sm"
           >
             <span className="material-symbols-outlined">add_link</span>
             <span>Vincular Novo Telão</span>
@@ -167,7 +170,7 @@ export default function Devices() {
               {pendentes.map(p => (
                 <div key={p.code} className="bg-surface-variant border border-outline-variant rounded-xl p-4 flex items-center gap-4">
                   <div className="text-2xl font-black text-ink tracking-widest">{p.code}</div>
-                  <button onClick={() => { openVincular(); setFormData(prev => ({...prev, code: p.code})) }} className="bg-primary text-white px-4 py-2 rounded-lg font-bold text-xs uppercase hover:bg-primary-hover">Vincular</button>
+                  <button onClick={() => { openVincular(); setFormData(prev => ({...prev, code: p.code})) }} className="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold text-xs uppercase hover:bg-primary-hover">Vincular</button>
                 </div>
               ))}
             </div>
@@ -202,6 +205,9 @@ export default function Devices() {
                     {device.modulo_painel ? <span className="bg-ink/5 text-ink px-2 py-1 rounded text-[10px] font-bold uppercase">Painel</span> : null}
                     {device.modulo_encarte ? <span className="bg-ink/5 text-ink px-2 py-1 rounded text-[10px] font-bold uppercase">Encarte</span> : null}
                     {device.modulo_midia ? <span className="bg-ink/5 text-ink px-2 py-1 rounded text-[10px] font-bold uppercase">Mídia</span> : null}
+                  </div>
+                  <div className="text-[10px] text-ink-secondary/70 font-bold uppercase tracking-wider mt-2">
+                    Layout: {device.template_layout === 'sidebar' ? 'Mídia + Fila' : device.template_layout === 'l-shape' ? 'Modo L' : 'Clássico'}
                   </div>
                   {device.modulo_encarte && device.encarte_categorias && (
                     <div className="mt-2 text-xs text-ink-secondary font-semibold">
@@ -266,6 +272,18 @@ export default function Devices() {
                   className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 text-ink font-bold focus:border-primary outline-none"
                   placeholder="Nome do Telão"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-2">Layout do Telão</label>
+                <select
+                  value={formData.template_layout || 'classic'}
+                  onChange={e => setFormData({...formData, template_layout: e.target.value})}
+                  className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 text-ink font-bold focus:border-primary outline-none"
+                >
+                  <option value="classic">Clássico ( classic )</option>
+                  <option value="sidebar">Mídia + Fila Lateral ( sidebar )</option>
+                  <option value="l-shape">Modo L ( l-shape )</option>
+                </select>
               </div>
 
               <div className="space-y-3 pt-4 border-t border-outline-variant/30">
@@ -340,7 +358,7 @@ export default function Devices() {
                             onClick={toggleCategory}
                             className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border font-bold text-xs uppercase tracking-wide transition-all text-left outline-none ${
                               isSelected
-                                ? 'bg-primary text-white border-primary shadow-sm'
+                                ? 'bg-primary text-on-primary border-primary shadow-sm'
                                 : 'bg-surface hover:bg-surface-variant border-outline-variant/40 text-ink'
                             }`}
                           >
@@ -361,7 +379,7 @@ export default function Devices() {
 
               <button 
                 type="submit" 
-                className="w-full py-4 bg-primary text-white rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-primary-hover active:scale-95 transition-all outline-none mt-8"
+                className="w-full py-4 bg-primary text-on-primary rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-primary-hover active:scale-95 transition-all outline-none mt-8"
               >
                 Salvar Configuração
               </button>

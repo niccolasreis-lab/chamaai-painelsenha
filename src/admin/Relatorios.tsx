@@ -16,6 +16,8 @@ interface Stats {
   atendidas: number;
   canceladas: number;
   tempoMedioEspera: number; // em minutos
+  porHora?: { hora: string, quantidade: number }[];
+  porBalcao?: { nome: string, quantidade: number }[];
 }
 
 export default function Relatorios() {
@@ -173,26 +175,27 @@ export default function Relatorios() {
               <h3 className="font-sans text-xl font-bold text-ink uppercase tracking-widest">Horários de Pico</h3>
             </div>
             <div className="h-48 flex items-end justify-between gap-2 mt-4">
-              {[
-                { time: '08h', val: 30 }, { time: '10h', val: 85 }, { time: '12h', val: 100 }, 
-                { time: '14h', val: 60 }, { time: '16h', val: 90 }, { time: '18h', val: 40 }
-              ].map((item, i) => (
+              {(stats.porHora || []).map((item, i) => {
+                // max logic for percentage
+                const max = Math.max(...(stats.porHora || []).map(x => x.quantidade), 1);
+                const pct = (item.quantidade / max) * 100;
+                return (
                 <div key={i} className="flex flex-col items-center flex-1 group">
                   <div className="w-full relative flex justify-center h-full items-end">
                     <div 
                       className="w-full bg-primary/20 rounded-t-lg group-hover:bg-primary transition-all duration-300 relative overflow-hidden" 
-                      style={{ height: `${item.val}%` }}
+                      style={{ height: `${pct}%` }}
                     >
                       <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-primary/50 to-transparent h-1/2"></div>
                     </div>
                     {/* Tooltip on hover */}
                     <span className="absolute -top-8 bg-ink text-white text-xs font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                      {Math.floor((item.val / 100) * stats.total) || item.val}
+                      {item.quantidade}
                     </span>
                   </div>
-                  <span className="text-ink-secondary text-xs font-bold mt-3 uppercase">{item.time}</span>
+                  <span className="text-ink-secondary text-xs font-bold mt-3 uppercase">{item.hora}h</span>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
 
@@ -206,22 +209,21 @@ export default function Relatorios() {
             </div>
             
             <div className="space-y-6">
-              {[
-                { name: 'Açougue', color: 'bg-red-500', pct: 45 },
-                { name: 'Frios', color: 'bg-yellow-400', pct: 30 },
-                { name: 'Padaria', color: 'bg-amber-500', pct: 15 },
-                { name: 'Hortifruti', color: 'bg-emerald-500', pct: 10 },
-              ].map((setor, i) => (
+              {(stats.porBalcao || []).map((setor, i) => {
+                const total = stats.porBalcao?.reduce((acc, curr) => acc + curr.quantidade, 0) || 1;
+                const pct = ((setor.quantidade / total) * 100).toFixed(1);
+                const colors = ['bg-blue-500', 'bg-green-500', 'bg-red-500', 'bg-yellow-500', 'bg-purple-500'];
+                return (
                 <div key={i}>
                   <div className="flex justify-between mb-2">
-                    <span className="text-sm font-bold text-ink uppercase tracking-wider">{setor.name}</span>
-                    <span className="text-sm font-bold text-ink-secondary">{setor.pct}%</span>
+                    <span className="text-sm font-bold text-ink uppercase tracking-wider">{setor.nome}</span>
+                    <span className="text-sm font-bold text-ink-secondary">{pct}% ({setor.quantidade})</span>
                   </div>
                   <div className="w-full h-3 bg-surface-variant rounded-full overflow-hidden">
-                    <div className={`h-full ${setor.color} rounded-full transition-all duration-1000`} style={{ width: `${setor.pct}%` }}></div>
+                    <div className={`h-full ${colors[i % colors.length]} rounded-full transition-all duration-1000`} style={{ width: `${pct}%` }}></div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         </div>

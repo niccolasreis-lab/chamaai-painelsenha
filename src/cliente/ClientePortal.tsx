@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { getApiUrl } from '../shared/apiConfig';
 import { gerarPDFLista } from '../shared/gerarPDF';
 import { ShoppingCart, Search, FileText, AlertTriangle, Plus, Trash2 } from 'lucide-react';
-import { playNotificationSound } from '../shared/sounds';
+import { playNotificationSound, preLoadCustomAudio } from '../shared/sounds';
 import { Bell, Volume2 } from 'lucide-react';
 
 interface Produto {
@@ -93,6 +93,9 @@ export default function ClientePortal() {
         if (res.ok) {
           const data = await res.json();
           setConfig(data);
+          
+          if (data.portal_som_prestes_chamar) preLoadCustomAudio(data.portal_som_prestes_chamar);
+          if (data.portal_som_sua_vez) preLoadCustomAudio(data.portal_som_sua_vez);
         }
       } catch (err) {
         console.error('Erro ao carregar configurações da loja', err);
@@ -137,10 +140,14 @@ export default function ClientePortal() {
             )) {
               ultimoAlertaPosicao.current = data.posicao;
               try {
-                const tipoSom = config.tipo_som || 'chime';
-                const volume = parseInt(config.volume_audio || '80');
-                const customUrl = config.som_personalizado ? `${API_URL}${config.som_personalizado}` : undefined;
-                playNotificationSound(tipoSom as any, volume, customUrl);
+                if (config.portal_som_prestes_chamar) {
+                  playNotificationSound('custom', 100, config.portal_som_prestes_chamar);
+                } else {
+                  const tipoSom = config.tipo_som || 'chime';
+                  const volume = parseInt(config.volume_audio || '80');
+                  const customUrl = config.som_personalizado ? `${API_URL}${config.som_personalizado}` : undefined;
+                  playNotificationSound(tipoSom as any, volume, customUrl);
+                }
               } catch (e) {
                 // Silencioso se o navegador bloquear autoplay
               }
@@ -158,6 +165,14 @@ export default function ClientePortal() {
         } else {
           // Senha foi chamada — manter banner por 4 segundos antes de mudar status
           if (ticketStatus === 'aguardando' && queuePosition !== null && queuePosition <= 3) {
+            try {
+              if (config.portal_som_sua_vez) {
+                playNotificationSound('custom', 100, config.portal_som_sua_vez);
+              } else {
+                playNotificationSound('bell', 80);
+              }
+            } catch (e) {}
+
             if ('Notification' in window && Notification.permission === 'granted') {
               try {
                 new Notification('Sua vez chegou!', {
@@ -410,7 +425,7 @@ export default function ClientePortal() {
               </div>
               <button
                 onClick={gerarPDF}
-                className="w-full bg-primary text-white font-bold rounded-xl py-4 flex items-center justify-center gap-2"
+                className="w-full bg-primary text-on-primary font-bold rounded-xl py-4 flex items-center justify-center gap-2"
               >
                 <FileText className="w-5 h-5" />
                 GERAR PDF DA LISTA
@@ -469,7 +484,7 @@ export default function ClientePortal() {
                 onClick={() => setCategoriaAtiva(cat)}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border whitespace-nowrap transition-all duration-300 ${
                   isActive
-                    ? 'bg-primary text-white border-primary shadow-md shadow-primary/15 scale-[1.03]'
+                    ? 'bg-primary text-on-primary border-primary shadow-md shadow-primary/15 scale-[1.03]'
                     : 'bg-surface-variant/40 border-outline-variant/60 text-ink hover:bg-surface-variant'
                 }`}
               >
@@ -492,7 +507,7 @@ export default function ClientePortal() {
               onClick={() => {
                 Notification.requestPermission().then(perm => setNotifPermission(perm));
               }}
-              className="w-full bg-primary text-white font-bold rounded-xl py-3 active:scale-95 transition-transform"
+              className="w-full bg-primary text-on-primary font-bold rounded-xl py-3 active:scale-95 transition-transform"
             >
               ATIVAR AGORA
             </button>
@@ -606,7 +621,7 @@ export default function ClientePortal() {
 
                       <div className="shrink-0 ml-2">
                         {isSelected ? (
-                          <div className="bg-primary text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md shadow-primary/20">
+                          <div className="bg-primary text-on-primary w-10 h-10 rounded-full flex items-center justify-center shadow-md shadow-primary/20">
                             <span className="material-symbols-outlined text-lg font-bold">edit</span>
                           </div>
                         ) : (
@@ -682,7 +697,7 @@ export default function ClientePortal() {
                         }}
                         className={`py-2.5 px-1 text-xs font-bold rounded-xl border transition-all ${
                           drawerQuantidade === grams
-                            ? 'bg-primary text-white border-primary shadow-sm shadow-primary/20 scale-[1.03]'
+                            ? 'bg-primary text-on-primary border-primary shadow-sm shadow-primary/20 scale-[1.03]'
                             : 'bg-surface-variant/40 border-outline-variant/50 text-ink hover:bg-surface-variant'
                         }`}
                       >
@@ -741,7 +756,7 @@ export default function ClientePortal() {
                         setDrawerQuantidade(newVal);
                         setDrawerInputManual(newVal.toString());
                       }}
-                      className="w-12 h-12 bg-primary text-white hover:bg-primary-hover rounded-xl flex items-center justify-center font-black text-xl shadow-md shadow-primary/10 active:scale-95 transition-all"
+                      className="w-12 h-12 bg-primary text-on-primary hover:bg-primary-hover rounded-xl flex items-center justify-center font-black text-xl shadow-md shadow-primary/10 active:scale-95 transition-all"
                     >
                       +
                     </button>
@@ -797,7 +812,7 @@ export default function ClientePortal() {
                       setDrawerQuantidade(newVal);
                       setDrawerInputManual(newVal.toString());
                     }}
-                    className="w-12 h-12 bg-primary text-white hover:bg-primary-hover rounded-xl flex items-center justify-center font-black text-xl shadow-md shadow-primary/10 active:scale-95 transition-all"
+                    className="w-12 h-12 bg-primary text-on-primary hover:bg-primary-hover rounded-xl flex items-center justify-center font-black text-xl shadow-md shadow-primary/10 active:scale-95 transition-all"
                   >
                     +
                   </button>
@@ -832,7 +847,7 @@ export default function ClientePortal() {
               <button
                 type="button"
                 onClick={() => handleSaveItem(selectedProduct)}
-                className="w-full bg-primary hover:bg-primary-hover text-white py-4 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-primary/10 active:scale-95 transition-transform"
+                className="w-full bg-primary hover:bg-primary-hover text-on-primary py-4 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-primary/10 active:scale-95 transition-transform"
               >
                 <span className="material-symbols-outlined text-lg">check_circle</span>
                 {carrinho[selectedProduct.plu] ? 'Atualizar na Lista' : 'Confirmar e Adicionar'}
@@ -935,7 +950,7 @@ export default function ClientePortal() {
                       ⚠️ <strong>Aviso Importante:</strong> Valores e gramaturas são apenas estimativas para referência. O peso e valor oficial cobrado final serão aferidos na balança do caixa de atendimento.
                     </p>
                   </div>
-                  <button onClick={gerarPDF} className="w-full bg-primary text-white py-3.5 rounded-xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-md">
+                  <button onClick={gerarPDF} className="w-full bg-primary text-on-primary py-3.5 rounded-xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-md">
                     <FileText className="w-5 h-5" /> GERAR PDF DA LISTA
                   </button>
                 </div>

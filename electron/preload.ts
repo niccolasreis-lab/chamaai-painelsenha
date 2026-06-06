@@ -1,5 +1,25 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+// Encaminha erros globais e rejeições de promessa não tratadas para o processo principal
+window.addEventListener('error', (event) => {
+  ipcRenderer.send('renderer-error', {
+    type: 'error',
+    message: event.message,
+    source: event.filename,
+    line: event.lineno,
+    col: event.colno,
+    error: event.error ? event.error.stack : null
+  });
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  ipcRenderer.send('renderer-error', {
+    type: 'rejection',
+    message: event.reason ? (event.reason.message || String(event.reason)) : 'Unhandled Promise Rejection',
+    error: event.reason ? event.reason.stack : null
+  });
+});
+
 // Expose safe APIs to the renderer process
 contextBridge.exposeInMainWorld('api', {
   printTicket: (data: any) => ipcRenderer.invoke('print-ticket', data),

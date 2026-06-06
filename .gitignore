@@ -42,3 +42,7 @@ ios/
 .env
 *.apk
 *.bat
+
+# Release build outputs
+release-build-*/
+ChamaAiTelao/

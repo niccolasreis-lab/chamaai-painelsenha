@@ -21,21 +21,45 @@ export default function AdminEncarte() {
   const [temaDataInicio, setTemaDataInicio] = useState('');
   const [temaDataFim, setTemaDataFim] = useState('');
 
+  // Simulação de visualização premium de TV
+  const [selectedTheme, setSelectedTheme] = useState<any | null>(null);
+  const [previewProducts, setPreviewProducts] = useState<any[]>([]);
+  const [previewConfig, setPreviewConfig] = useState<any>({});
+  const [simulatedStyle, setSimulatedStyle] = useState<'kg' | 'granel'>('kg');
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [resFiltros, resNomes, resTemas] = await Promise.all([
+      const [resFiltros, resNomes, resTemas, resConfig] = await Promise.all([
         fetch(`${API_URL}/api/admin/encarte-filtros`),
         fetch(`${API_URL}/api/admin/encarte-nomes`),
-        fetch(`${API_URL}/api/admin/encarte-temas`)
+        fetch(`${API_URL}/api/admin/encarte-temas`),
+        fetch(`${API_URL}/api/configuracoes`)
       ]);
       setFiltros(resFiltros.ok ? await resFiltros.json() : []);
       setNomes(resNomes.ok ? await resNomes.json() : []);
       setTemas(resTemas.ok ? await resTemas.json() : []);
+      setPreviewConfig(resConfig.ok ? await resConfig.json() : {});
     } catch (err) {
       console.error('Erro ao buscar dados do encarte', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openPreview = async (theme: any) => {
+    setSelectedTheme(theme);
+    setSimulatedStyle((previewConfig.toledo_encarte_estilo as any) || 'kg');
+    try {
+      const res = await fetch(`${API_URL}/api/toledo/produtos`);
+      if (res.ok) {
+        const prods = await res.json();
+        // Filtrar produtos com preço maior que zero
+        const availableProds = prods.filter((p: any) => Number(p.preco || 0) > 0);
+        setPreviewProducts(availableProds.slice(0, 6));
+      }
+    } catch (err) {
+      console.error('Erro ao carregar produtos para a simulação:', err);
     }
   };
 
@@ -338,9 +362,16 @@ export default function AdminEncarte() {
                           Fim: {t.data_fim || 'Sem limite'}
                         </p>
                       </div>
-                      <div className="p-4 border-t border-outline-variant/30 flex justify-end">
-                        <button onClick={() => deleteTema(t.id)} className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors flex items-center gap-2 font-bold text-sm uppercase tracking-widest">
-                          <span className="material-symbols-outlined">delete</span> Excluir
+                      <div className="p-4 border-t border-outline-variant/30 flex justify-between items-center">
+                        <button 
+                          onClick={() => openPreview(t)}
+                          className="text-primary hover:bg-primary/5 px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider outline-none"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">visibility</span>
+                          <span>Visualizar</span>
+                        </button>
+                        <button onClick={() => deleteTema(t.id)} className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors flex items-center gap-1 font-bold text-xs uppercase tracking-wider">
+                          <span className="material-symbols-outlined text-[16px]">delete</span> Excluir
                         </button>
                       </div>
                     </div>
@@ -351,6 +382,173 @@ export default function AdminEncarte() {
           </>
         )}
       </div>
+
+      {selectedTheme && (
+        <div className="fixed inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-6 backdrop-blur-md">
+          {/* Top Control Bar */}
+          <div className="w-full max-w-5xl mb-4 flex justify-between items-center bg-surface border border-outline-variant p-4 rounded-2xl shadow-lg">
+            <div className="flex items-center gap-4">
+              <span className="font-bold text-ink text-sm uppercase tracking-wider">Simulador de TV ({selectedTheme.nome})</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSimulatedStyle('kg')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider border transition-all ${
+                    simulatedStyle === 'kg'
+                      ? 'bg-primary text-white border-primary shadow-sm shadow-primary/20'
+                      : 'bg-surface-variant border-outline-variant/65 text-ink hover:bg-surface-variant'
+                  }`}
+                >
+                  🌙 Preço por KG (Escuro)
+                </button>
+                <button
+                  onClick={() => setSimulatedStyle('granel')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider border transition-all ${
+                    simulatedStyle === 'granel'
+                      ? 'bg-primary text-white border-primary shadow-sm shadow-primary/20'
+                      : 'bg-surface-variant border-outline-variant/65 text-ink hover:bg-surface-variant'
+                  }`}
+                >
+                  🌿 Granel Premium (Claro)
+                </button>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => setSelectedTheme(null)}
+              className="px-4 py-2 bg-error text-white font-bold text-xs rounded-xl uppercase tracking-widest hover:bg-error-dark active:scale-95 transition-all shadow-md flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined text-[16px]">close</span> Fechar
+            </button>
+          </div>
+
+          {/* 16:9 TV Container */}
+          <div className="w-full max-w-5xl aspect-video bg-black relative rounded-3xl overflow-hidden shadow-2xl border-[6px] border-zinc-800 flex flex-col justify-between p-8 text-white select-none">
+            
+            {/* Background Theme Image */}
+            {selectedTheme.imagem_fundo && (
+              <div 
+                className="absolute inset-0 bg-cover bg-center pointer-events-none"
+                style={{ backgroundImage: `url(${API_URL}${selectedTheme.imagem_fundo})` }}
+              />
+            )}
+            
+            {/* Custom Overlay (Style Specific) */}
+            <div className={`absolute inset-0 pointer-events-none transition-all duration-300 ${
+              simulatedStyle === 'kg'
+                ? 'bg-black/75 backdrop-blur-[2px]'
+                : 'bg-gradient-to-br from-white/92 via-white/88 to-white/94 backdrop-blur-[1px]'
+            }`} />
+
+            {/* Simulated Content Area (Above Background/Overlay) */}
+            <div className="relative z-10 w-full h-full flex flex-col justify-between">
+              
+              {/* Simulator Header */}
+              <div className="flex justify-between items-center border-b pb-4 mb-4" style={{ borderColor: simulatedStyle === 'kg' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
+                <div className="flex items-center gap-3">
+                  {previewConfig.logo_cliente ? (
+                    <img 
+                      src={`${API_URL}${previewConfig.logo_cliente}`} 
+                      alt="Logo" 
+                      className="h-12 w-auto object-contain bg-white/20 backdrop-blur-sm p-1 rounded" 
+                    />
+                  ) : (
+                    <div className={`w-10 h-10 rounded flex items-center justify-center ${simulatedStyle === 'kg' ? 'bg-primary/20 text-primary' : 'bg-primary text-white'}`}>
+                      <span className="material-symbols-outlined font-bold text-xl">storefront</span>
+                    </div>
+                  )}
+                  <div>
+                    <h2 className={`font-black text-xl uppercase tracking-widest ${simulatedStyle === 'kg' ? 'text-white' : 'text-zinc-900'}`}>
+                      {previewConfig.nome_estabelecimento || 'ChamaAí'}
+                    </h2>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${simulatedStyle === 'kg' ? 'text-white/60' : 'text-zinc-500'}`}>
+                      Ofertas e Destaques do Dia
+                    </p>
+                  </div>
+                </div>
+
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${
+                  simulatedStyle === 'kg' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-red-500 text-white shadow-lg'
+                }`}>
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></span>
+                  AO VIVO NO PAINEL
+                </div>
+              </div>
+
+              {/* Product Grid Area */}
+              <div className="flex-1 grid grid-cols-3 gap-6 overflow-hidden items-center pb-4">
+                {previewProducts.length === 0 ? (
+                  <div className="col-span-full text-center py-10">
+                    <p className={`font-bold text-lg ${simulatedStyle === 'kg' ? 'text-white/40' : 'text-zinc-400'}`}>
+                      Nenhum produto cadastrado para simular. Adicione itens na aba Toledo primeiro.
+                    </p>
+                  </div>
+                ) : (
+                  previewProducts.map((p) => {
+                    const isOferta = p.descricao.includes('* OFERTA *') || p.descricao.includes('OFERTA') || p.descricao.includes('*');
+                    const descClean = p.descricao.replace(/\* OFERTA \*/g, '').replace(/OFERTA/g, '').replace(/\*/g, '').trim();
+                    const formattedPreco = `R$ ${Math.floor(p.preco / 100)},${String(p.preco % 100).padStart(2, '0')}`;
+
+                    return (
+                      <div 
+                        key={p.plu}
+                        className={`p-4 rounded-2xl flex flex-col justify-between border-2 transition-all shadow-md relative overflow-hidden h-[120px] ${
+                          simulatedStyle === 'kg'
+                            ? isOferta
+                              ? 'bg-red-950/40 border-red-500/80 shadow-lg shadow-red-500/5'
+                              : 'bg-zinc-900/60 border-zinc-800'
+                            : isOferta
+                              ? 'bg-red-50/90 border-red-500/80 shadow-lg'
+                              : 'bg-white/80 backdrop-blur-sm border-zinc-200'
+                        }`}
+                      >
+                        {isOferta && (
+                          <div className="absolute top-0 right-0 bg-red-600 text-white font-black text-[9px] uppercase tracking-widest px-2.5 py-0.5 rounded-bl-lg shadow">
+                            OFERTA
+                          </div>
+                        )}
+                        <div>
+                          <span className={`text-[9px] font-mono font-bold block mb-1 ${simulatedStyle === 'kg' ? 'text-white/40' : 'text-zinc-400'}`}>
+                            PLU {p.plu}
+                          </span>
+                          <h4 className={`font-bold leading-snug line-clamp-2 text-sm uppercase tracking-wide ${
+                            simulatedStyle === 'kg'
+                              ? isOferta ? 'text-red-200' : 'text-white'
+                              : isOferta ? 'text-red-900' : 'text-zinc-900'
+                          }`}>
+                            {descClean}
+                          </h4>
+                        </div>
+                        <div className="flex justify-between items-baseline mt-2">
+                          <span className={`font-black text-xl ${
+                            simulatedStyle === 'kg'
+                              ? isOferta ? 'text-red-400' : 'text-emerald-400'
+                              : isOferta ? 'text-red-600' : 'text-emerald-600'
+                          }`}>
+                            {formattedPreco}
+                          </span>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${simulatedStyle === 'kg' ? 'text-white/40' : 'text-zinc-500'}`}>
+                            / kg
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Simulator Footer */}
+              <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider pt-2 border-t border-dashed" style={{ borderColor: simulatedStyle === 'kg' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
+                <span className={simulatedStyle === 'kg' ? 'text-white/40' : 'text-zinc-500'}>
+                  Toledo MGV Integrador Oficial
+                </span>
+                <span className={simulatedStyle === 'kg' ? 'text-white/40' : 'text-zinc-500'}>
+                  Senha Atual Telão: <span className="bg-primary/20 text-primary px-2 py-0.5 rounded font-mono text-xs">M042</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getApiUrl } from './shared/apiConfig';
 
@@ -10,8 +10,41 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Modal para forçar troca de senha no primeiro acesso
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [tempToken, setTempToken] = useState('');
+  const [tempPerfil, setTempPerfil] = useState('');
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmaNovaSenha, setConfirmaNovaSenha] = useState('');
+  const [changeError, setChangeError] = useState('');
+  const [changeLoading, setChangeLoading] = useState(false);
+
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [tempIp, setTempIp] = useState(localStorage.getItem('server_ip_override') || '');
+
+  // Se já tiver token válido em sessionStorage, tenta ir direto pro painel
+  useEffect(() => {
+    const checkLogged = async () => {
+      const token = sessionStorage.getItem('user_token');
+      if (!token) return;
+
+      try {
+        const API_URL = getApiUrl();
+        const res = await fetch(`${API_URL}/api/auth/me`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          redirecionarUsuario(data.perfil);
+        } else {
+          sessionStorage.clear();
+        }
+      } catch (err) {
+        console.error('Falha ao validar login existente:', err);
+      }
+    };
+    checkLogged();
+  }, []);
 
   const handleSaveConnection = () => {
     if (tempIp.trim() === '') {
@@ -21,6 +54,20 @@ export default function Login() {
     }
     setShowSettingsModal(false);
     window.location.reload();
+  };
+
+  const redirecionarUsuario = (perfil: string) => {
+    const state = location.state as any;
+    if (state && state.from) {
+      navigate(state.from.pathname);
+    } else {
+      if (perfil === 'admin') {
+        navigate('/admin');
+      } else {
+        const isMobile = window.innerWidth < 1024;
+        navigate(isMobile ? '/balcao' : '/balcao'); // Rota operacional padrão
+      }
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -36,41 +83,77 @@ export default function Login() {
         body: JSON.stringify({ login, senha })
       });
 
-      const data = await res.ok ? await res.json() : null;
+      const data = await res.json();
 
       if (!res.ok) {
-        const errorData = data || { error: 'Erro de conexão com o servidor' };
-        throw new Error(errorData.error || 'Erro ao fazer login. Verifique se o servidor principal está rodando e se o IP configurado está correto.');
+        throw new Error(data.error || data.erro || 'Erro ao efetuar login.');
       }
 
-      // Salva a sessão
-      localStorage.setItem('user_session', JSON.stringify(data));
-
-      // Se havia uma página anterior tentando ser acessada, volta pra ela
-      const state = location.state as any;
-      const appMode = localStorage.getItem('app_mode');
-      const isElectron = !!(window as any).electronAPI;
-      
-      if (isElectron && appMode === 'touch') {
-        navigate('/operador-touch');
-      } else if (isElectron && appMode === 'tv') {
-        navigate('/telao');
-      } else if (state && state.from) {
-        navigate(state.from.pathname);
+      if (data.primeiro_acesso === 1) {
+        // Guarda credenciais temporárias para forçar a troca
+        setTempToken(data.token);
+        setTempPerfil(data.perfil);
+        setShowChangePassword(true);
       } else {
-        // Redirecionamento padrão baseado no perfil
-        if (data.user.perfil === 'admin') {
-          navigate('/admin');
-        } else {
-          // Para mobile, podemos checar se a tela é pequena
-          const isMobile = window.innerWidth < 1024;
-          navigate(isMobile ? '/mobile' : '/operador');
-        }
+        // Login direto
+        sessionStorage.setItem('user_token', data.token);
+        sessionStorage.setItem('user_perfil', data.perfil);
+        localStorage.setItem('user_session', JSON.stringify({ token: data.token }));
+        redirecionarUsuario(data.perfil);
       }
     } catch (err: any) {
       setError(err.message || 'Falha de conexão com o servidor principal.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChangeError('');
+
+    if (novaSenha.length < 6) {
+      setChangeError('A nova senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+
+    if (novaSenha !== confirmaNovaSenha) {
+      setChangeError('As senhas não coincidem.');
+      return;
+    }
+
+    setChangeLoading(true);
+
+    try {
+      const API_URL = getApiUrl();
+      const res = await fetch(`${API_URL}/api/auth/senha`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tempToken}`
+        },
+        body: JSON.stringify({ 
+          senha_atual: senha, // A senha que ele acabou de usar para logar
+          nova_senha: novaSenha 
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || data.erro || 'Erro ao trocar a senha.');
+      }
+
+      // Senha alterada com sucesso! Loga o usuário.
+      sessionStorage.setItem('user_token', tempToken);
+      sessionStorage.setItem('user_perfil', tempPerfil);
+      localStorage.setItem('user_session', JSON.stringify({ token: tempToken }));
+      setShowChangePassword(false);
+      redirecionarUsuario(tempPerfil);
+    } catch (err: any) {
+      setChangeError(err.message || 'Falha ao alterar senha.');
+    } finally {
+      setChangeLoading(false);
     }
   };
 
@@ -171,6 +254,69 @@ export default function Login() {
         </button>
       </div>
 
+      {/* Modal de Forçar Troca de Senha no Primeiro Acesso */}
+      {showChangePassword && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[99] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col gap-6 relative z-50">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mb-4">
+                <span className="material-symbols-outlined text-amber-500 text-3xl animate-pulse">lock_reset</span>
+              </div>
+              <h3 className="font-sans text-2xl font-bold text-white uppercase mb-2">Primeiro Acesso</h3>
+              <p className="text-sm font-sans text-slate-400 font-medium">
+                Por questões cruciais de segurança, é necessário alterar sua senha temporária antes de continuar.
+              </p>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
+              {changeError && (
+                <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold p-3 rounded-xl text-center uppercase tracking-wider">
+                  {changeError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-slate-400 text-xs font-bold uppercase tracking-widest mb-2 ml-1">Nova Senha</label>
+                <input 
+                  type="password" 
+                  value={novaSenha}
+                  onChange={(e) => setNovaSenha(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 text-white font-bold text-lg placeholder:text-slate-700"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 text-xs font-bold uppercase tracking-widest mb-2 ml-1">Confirmar Nova Senha</label>
+                <input 
+                  type="password" 
+                  value={confirmaNovaSenha}
+                  onChange={(e) => setConfirmaNovaSenha(e.target.value)}
+                  placeholder="Repita a nova senha"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 text-white font-bold text-lg placeholder:text-slate-700"
+                  required
+                />
+              </div>
+
+              <button 
+                type="submit"
+                disabled={changeLoading}
+                className="w-full py-4 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold uppercase tracking-widest text-sm rounded-xl transition-all shadow-lg shadow-amber-900/10 flex justify-center items-center gap-2"
+              >
+                {changeLoading ? (
+                  <span className="material-symbols-outlined animate-spin">refresh</span>
+                ) : (
+                  'Alterar Senha e Entrar'
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Configurar IP do Servidor */}
       {showSettingsModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col gap-6 relative z-50">

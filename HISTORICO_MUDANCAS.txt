@@ -1,0 +1,136 @@
+===============================================================================
+                       CHAMA-AÍ - HISTÓRICO DE MUDANÇAS E MELHORIAS
+===============================================================================
+
+Este documento contém o relatório detalhado de todas as alterações estruturais, 
+correções de bugs e implementações de segurança efetuadas no sistema ChamaAí.
+As modificações foram validadas e testadas via compilação completa com sucesso.
+
+-------------------------------------------------------------------------------
+1. ATUALIZAÇÃO DO BANCO DE DADOS (SQLite)
+-------------------------------------------------------------------------------
+* Arquivo modificado: electron/services/database.ts
+* Alterações:
+  - Adição automática da coluna 'primeiro_acesso' (INTEGER DEFAULT 1) na tabela
+    'operadores' durante a inicialização do sistema, usando 'ALTER TABLE'.
+  - Garantia de que a migração ocorra de forma segura sem perda de dados.
+  - Preservação da senha padrão 'admin' criptografada ou texto plano inicial.
+
+-------------------------------------------------------------------------------
+2. CRIPTOGRAFIA E COMPATIBILIDADE DE SENHAS
+-------------------------------------------------------------------------------
+* Arquivos modificados: server/index.ts
+* Alterações:
+  - Implementação de hashing seguro usando o algoritmo nativo Scrypt do Node.js.
+  - Padrão de armazenamento estruturado em string 'scrypt$salt$hash'.
+  - Mecanismo de fallback robusto para senhas antigas em texto plano: caso a senha
+    armazenada não inicie com 'scrypt$', o sistema faz uma comparação direta, 
+    evitando bloqueios de acesso a operadores legados.
+
+-------------------------------------------------------------------------------
+3. APIS ADMINISTRATIVAS E OPERADORAS
+-------------------------------------------------------------------------------
+* Arquivo modificado: server/index.ts
+* Alterações:
+  - Criação do endpoint 'PUT /api/operadores/:id' para permitir edição de nome, 
+    login e redefinição/hashing de senha, desativando o sinalizador 'primeiro_acesso'.
+  - Inserção de chaves de configuração adicionais na inicialização automática
+    ('habilitar_filas_avancadas' e 'acesso_local_exige_auth').
+  - Atualização do endpoint '/api/admin/status' para retornar informações sobre 
+    sessões locais, novos logins e senhas padrão de instalação ('isNewInstall').
+
+-------------------------------------------------------------------------------
+4. REFACTORING DO REPRODUTOR DE ÁUDIO WEB AUDIO API
+-------------------------------------------------------------------------------
+* Arquivos modificados: src/shared/sounds.ts
+* Alterações:
+  - Substituição total do reprodutor tradicional 'new Audio().play()' por uma 
+    arquitetura baseada na Web Audio API utilizando 'AudioContext' e 'GainNode'.
+  - Normalização e atenuação de ganho fixada em 0.75 para eliminar distorções de 
+    áudio (clipping) em conversores DAC de hardware limitado, como a Xiaomi Mi Box S.
+  - Sistema de cache em memória 'AudioBuffer' para evitar atrasos na decodificação.
+
+-------------------------------------------------------------------------------
+5. OTIMIZAÇÃO DA ANIMAÇÃO DE CHAMADA NA TV (SEM STUTTERING)
+-------------------------------------------------------------------------------
+* Arquivos modificados:
+  - src/telao/MediaIndoor.tsx
+  - src/telao/SenhaChamada.tsx
+  - src/index.css
+* Alterações:
+  - Desacoplamento completo entre a renderização da tela de chamada e a reprodução 
+    sonora (atraso intencional de 300ms na campainha para priorizar a renderização).
+  - Atualização do estado de transição visual usando 'requestAnimationFrame' para 
+    evitar gargalos em threads de processamento lento.
+  - Implementação de propriedades CSS 'will-change' e transformações aceleradas 
+    por GPU ('transform: translateZ(0)') no número chamado.
+  - Substituição de filtros CSS pesados ('drop-shadow') por sombras textuais otimizadas
+    ('text-shadow') na classe de pulso (.animate-pulse-call).
+
+-------------------------------------------------------------------------------
+6. SINCRONIZAÇÃO DE ÁUDIO E PORTAL DO CLIENTE (PWA VERCEL)
+-------------------------------------------------------------------------------
+* Arquivos modificados:
+  - src/cliente/ClientePortal.tsx
+  - chamacliente/src/App.tsx
+* Alterações:
+  - Integração do novo player Web Audio API com decodificação direta de Base64 e 
+    URL remota no portal do cliente e no app hospedado na Vercel.
+  - Pré-carregamento dos áudios personalizados ('portal_som_sua_vez' e 
+    'portal_som_prestes_chamar') no carregamento da tela para reprodução instantânea.
+
+-------------------------------------------------------------------------------
+7. EDIÇÃO INLINE DE PRODUTOS TOLEDO
+-------------------------------------------------------------------------------
+* Arquivo modificado: src/admin/ToledoConfig.tsx
+* Alterações:
+  - Criação de estados para edição de PLUs específicos e entrada de dados inline.
+  - Ativação de edição inline ao dar duplo clique sobre a descrição de um produto.
+  - Exibição de um ícone de edição (lápis) ao passar o mouse sobre o item.
+  - Salvamento automático ao pressionar 'Enter' ou perder o foco do campo ('onBlur'), 
+    enviando os dados para a API SQLite e atualizando a interface instantaneamente.
+
+-------------------------------------------------------------------------------
+8. SIMULADOR DE TV PREMIUM E ENCARTE
+-------------------------------------------------------------------------------
+* Arquivo modificado: src/admin/AdminEncarte.tsx
+* Alterações:
+  - Adição de um botão "Visualizar com produtos" na lista de temas do encarte.
+  - Desenvolvimento de um modal premium em proporção de TV widescreen (16:9) 
+    simulando exatamente o comportamento físico da mídia indoor.
+  - Exibição de 6 produtos reais integrados, com suporte a troca rápida de layout
+    (Preços por KG em tom escuro ou Granel Premium em tom claro) no simulador.
+  - Destaque em neon e bordas personalizadas para produtos definidos como oferta.
+
+-------------------------------------------------------------------------------
+9. CONTROLES DE SEGURANÇA E PERSONALIZAÇÃO DE FILAS
+-------------------------------------------------------------------------------
+* Arquivos modificados:
+  - src/admin/Configuracoes.tsx
+  - src/admin/AdminLayout.tsx
+* Alterações:
+  - Inserção de uma nova seção dedicada a "Recursos & Segurança" no menu principal.
+  - Checkboxes para habilitar ou desabilitar o módulo avançado de filas e forçar 
+    a autenticação de operador em conexões de rede locais.
+  - Carregamento dinâmico no menu lateral administrativo, ocultando ou exibindo 
+    o botão "Queue" de forma inteligente e integrada com o estado atual.
+
+-------------------------------------------------------------------------------
+10. ROUTE GUARDS E ALERTA DE SEGURANÇA CONTRA INVASÃO
+-------------------------------------------------------------------------------
+* Arquivos modificados:
+  - src/App.tsx
+  - src/Login.tsx
+  - src/admin/Dashboard.tsx
+* Alterações:
+  - Rota '/admin/queue' protegida pelo wrapper 'ProtectedRouteQueue' para impedir
+    acesso direto via URL quando o módulo de filas avançadas estiver desligado.
+  - Configuração do 'ProtectedRoute' para checar conexões de rede locais e liberar
+    automaticamente o login se a chave de segurança local estiver desativada.
+  - Banners de aviso chamativos nas telas de Login e Painel Principal caso o 
+    sistema detecte o uso da senha de fábrica 'admin/admin', incentivando a troca
+    imediata para garantir a conformidade de segurança.
+
+===============================================================================
+                    FIM DO RELATÓRIO - COMPILAÇÃO CONCLUÍDA
+===============================================================================

@@ -12,6 +12,27 @@ export default function ControleTouch() {
   const [queueCounts, setQueueCounts] = useState({ geral: 0, preferencial: 0 });
   const [showConfirmDevolver, setShowConfirmDevolver] = useState(false);
   const [isActionPending, setIsActionPending] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  // Listen to beforeinstallprompt for PWA install capability
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallPWA = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    }
+  };
 
   // Validate server connection on initial load if configuration already exists
   useEffect(() => {
@@ -272,6 +293,17 @@ export default function ControleTouch() {
               )}
             </button>
 
+            {/* PWA Install Button */}
+            {deferredPrompt && (
+              <button
+                onClick={handleInstallPWA}
+                className="w-full bg-[#16A34A] text-white py-3.5 rounded-2xl font-bold uppercase tracking-widest hover:bg-[#15803D] transition-all active:scale-[0.98] shadow-lg shadow-[#16A34A]/15 flex items-center justify-center gap-3 outline-none"
+              >
+                <span className="material-symbols-outlined text-xl">download_for_offline</span>
+                Instalar no Aparelho
+              </button>
+            )}
+
             {/* Back Button */}
             <Link
               to="/"
@@ -307,6 +339,15 @@ export default function ControleTouch() {
             </div>
           </div>
           <div className="flex gap-2">
+            {deferredPrompt && (
+              <button
+                onClick={handleInstallPWA}
+                className="w-12 h-12 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#16A34A] flex items-center justify-center transition-all active:scale-95 outline-none border-none"
+                title="Instalar Aplicativo (PWA)"
+              >
+                <span className="material-symbols-outlined text-2xl font-bold">download</span>
+              </button>
+            )}
             <Link
               to="/"
               onClick={() => localStorage.removeItem('app_mode')}

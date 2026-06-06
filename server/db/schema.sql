@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS senhas (
   chamada_em   TEXT,
   atendida_em  TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_senhas_status ON senhas(status);
+CREATE INDEX IF NOT EXISTS idx_senhas_balcao_id ON senhas(balcao_id);
 
 -- Registro de cada chamada feita pelo operador
 CREATE TABLE IF NOT EXISTS chamadas (
@@ -42,6 +44,8 @@ CREATE TABLE IF NOT EXISTS chamadas (
   tentativa   INTEGER NOT NULL DEFAULT 1,
   criado_em   TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_chamadas_senha_id ON chamadas(senha_id);
+CREATE INDEX IF NOT EXISTS idx_chamadas_operador_id ON chamadas(operador_id);
 
 -- Mídias do telão (imagens e vídeos locais)
 CREATE TABLE IF NOT EXISTS midias (
@@ -77,7 +81,7 @@ INSERT OR IGNORE INTO configuracoes VALUES ('fila_preferencial_ativa', '1', date
 INSERT OR IGNORE INTO balcoes (id, nome, prefixo_senha, preferencial_ativo) VALUES (1, 'Balcão Geral', 'N', 1);
 
 -- Admin Padrão (senha: admin)
-INSERT OR IGNORE INTO operadores (id, nome, login, senha_hash, perfil) VALUES (1, 'Administrador', 'admin', 'admin', 'admin');
+INSERT OR IGNORE INTO operadores (id, nome, login, senha_hash, perfil) VALUES (1, 'Administrador', 'admin', 'scrypt$6bf314aac0b385bd65ce743adf9d8d84$ff1ac8cc8d26a680a25da61a69f1decd3c0038dcb805a65548181a3c6b77b970bbb924c5d2dcb7a557fb2dc850d901ab9b73db85059b005762bb16887a5e1498', 'admin');
 
 -- Telões configurados por código (Musardos)
 CREATE TABLE IF NOT EXISTS teloes (

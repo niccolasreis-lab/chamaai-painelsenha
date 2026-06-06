@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getApiUrl } from './shared/apiConfig';
 import { HashRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import Emissao from './totem/Emissao';
 import Confirmacao from './totem/Confirmacao';
@@ -15,6 +16,7 @@ import Operators from './admin/Operators';
 import Relatorios from './admin/Relatorios';
 import ToledoConfig from './admin/ToledoConfig';
 import AdminEncarte from './admin/AdminEncarte';
+import Seguranca from './admin/Seguranca';
 import MobileOperador from './operador/MobileOperador';
 import Bridge from './operador/Bridge';
 import Login from './Login';
@@ -23,23 +25,95 @@ import LicenseGate from './shared/LicenseGate';
 import GlobalUpdateNotification from './shared/GlobalUpdateNotification';
 
 function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) {
-  const session = localStorage.getItem('user_session');
+  const [checking, setChecking] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const location = useLocation();
+  const API_URL = getApiUrl();
 
-  if (!session) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+  useEffect(() => {
+    const verifyToken = async () => {
+      const token = sessionStorage.getItem('user_token');
+      try {
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const res = await fetch(`${API_URL}/api/auth/me`, { headers });
+        if (res.ok) {
+          const profile = await res.json();
+          setUserProfile(profile);
+          
+          if (requireAdmin && profile.perfil !== 'admin') {
+            setAuthorized(false);
+          } else {
+            setAuthorized(true);
+          }
+        } else {
+          sessionStorage.clear();
+          setAuthorized(false);
+        }
+      } catch (err) {
+        console.error('Erro de rede ao validar autenticação:', err);
+        setAuthorized(false);
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    verifyToken();
+  }, [API_URL, requireAdmin]);
+
+  if (checking) {
+    return (
+      <div className="h-screen w-full flex flex-col gap-4 items-center justify-center font-sans text-slate-400 bg-slate-950 font-bold uppercase tracking-widest text-xs">
+        <span className="material-symbols-outlined animate-spin text-4xl text-blue-500">refresh</span>
+        Verificando credenciais...
+      </div>
+    );
   }
 
-  try {
-    const data = JSON.parse(session);
-    if (requireAdmin && data.user.perfil !== 'admin') {
+  if (!authorized) {
+    if (userProfile && requireAdmin && userProfile.perfil !== 'admin') {
       return <Navigate to="/operador" replace />;
     }
-    return <>{children}</>;
-  } catch (e) {
-    localStorage.removeItem('user_session');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
+
+  return <>{children}</>;
+}
+
+function ProtectedRouteQueue({ children }: { children: React.ReactNode }) {
+  const [checking, setChecking] = useState(true);
+  const [enabled, setEnabled] = useState(false);
+  const API_URL = getApiUrl();
+
+  useEffect(() => {
+    const checkQueueStatus = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/configuracoes`);
+        if (res.ok) {
+          const data = await res.json();
+          setEnabled(data.habilitar_filas_avancadas === '1');
+        }
+      } catch (err) {
+        console.error('Falha ao verificar permissões de fila:', err);
+      }
+      setChecking(false);
+    };
+    checkQueueStatus();
+  }, [API_URL]);
+
+  if (checking) {
+    return <div className="h-screen w-full flex items-center justify-center font-sans text-ink-secondary bg-background font-bold uppercase tracking-widest text-xs">Verificando módulo...</div>;
+  }
+
+  if (!enabled) {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 function Home() {
@@ -202,8 +276,92 @@ function Home() {
     </div>
   );
 }
+function hexToHsl(hex: string): [number, number, number] {
+  const num = parseInt(hex.replace('#', ''), 16);
+  let r = (num >> 16) / 255;
+  let g = ((num >> 8) & 0xff) / 255;
+  let b = (num & 0xff) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100; l /= 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))));
+  return `#${[f(0), f(8), f(4)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function getContrastColor(hexColor: string): string {
+  const cleanHex = hexColor.replace('#', '');
+  const r = parseInt(cleanHex.substring(0, 2), 16);
+  const g = parseInt(cleanHex.substring(2, 4), 16);
+  const b = parseInt(cleanHex.substring(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) {
+    return '#ffffff';
+  }
+  const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+  return yiq >= 128 ? '#0f172a' : '#ffffff';
+}
+
+function hexToRgb(hexColor: string): [number, number, number] {
+  const cleanHex = hexColor.replace('#', '');
+  const r = parseInt(cleanHex.substring(0, 2), 16);
+  const g = parseInt(cleanHex.substring(2, 4), 16);
+  const b = parseInt(cleanHex.substring(4, 6), 16);
+  return [isNaN(r) ? 37 : r, isNaN(g) ? 99 : g, isNaN(b) ? 235 : b];
+}
 
 export default function App() {
+  useEffect(() => {
+    const applyPrimaryColor = async () => {
+      try {
+        const API_URL = getApiUrl();
+        const res = await fetch(`${API_URL}/api/configuracoes`);
+        if (res.ok) {
+          const config = await res.json();
+          const corOriginal = config.cor_primaria || '#2563eb';
+          const [h, s, l] = hexToHsl(corOriginal);
+          const hoverColor = hslToHex(h, s, Math.max(0, l - 12));
+          const [r_val, g_val, b_val] = hexToRgb(corOriginal);
+          document.documentElement.style.setProperty('--color-primary', corOriginal);
+          document.documentElement.style.setProperty('--color-primary-hover', hoverColor);
+          document.documentElement.style.setProperty('--color-on-primary', getContrastColor(corOriginal));
+          document.documentElement.style.setProperty('--color-primary-rgb', `${r_val}, ${g_val}, ${b_val}`);
+        }
+      } catch (err) {
+        console.error('Failed to load primary color config:', err);
+      }
+    };
+    applyPrimaryColor();
+
+    const handleConfigUpdated = (e: any) => {
+      if (e.detail?.cor_primaria) {
+        const corOriginal = e.detail.cor_primaria;
+        const [h, s, l] = hexToHsl(corOriginal);
+        const hoverColor = hslToHex(h, s, Math.max(0, l - 12));
+        const [r_val, g_val, b_val] = hexToRgb(corOriginal);
+        document.documentElement.style.setProperty('--color-primary', corOriginal);
+        document.documentElement.style.setProperty('--color-primary-hover', hoverColor);
+        document.documentElement.style.setProperty('--color-on-primary', getContrastColor(corOriginal));
+        document.documentElement.style.setProperty('--color-primary-rgb', `${r_val}, ${g_val}, ${b_val}`);
+      }
+    };
+    window.addEventListener('CONFIG_ATUALIZADA', handleConfigUpdated);
+    return () => window.removeEventListener('CONFIG_ATUALIZADA', handleConfigUpdated);
+  }, []);
+
   return (
     <LicenseGate>
       <HashRouter>
@@ -228,9 +386,10 @@ export default function App() {
           
           <Route path="/admin" element={<ProtectedRoute requireAdmin><Dashboard /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><Configuracoes /></ProtectedRoute>} />
+          <Route path="/admin/seguranca" element={<ProtectedRoute requireAdmin><Seguranca /></ProtectedRoute>} />
           <Route path="/admin/midias" element={<ProtectedRoute requireAdmin><GerenciarMidias /></ProtectedRoute>} />
           <Route path="/admin/devices" element={<ProtectedRoute requireAdmin><Devices /></ProtectedRoute>} />
-          <Route path="/admin/queue" element={<ProtectedRoute requireAdmin><Queue /></ProtectedRoute>} />
+          <Route path="/admin/queue" element={<ProtectedRoute requireAdmin><ProtectedRouteQueue><Queue /></ProtectedRouteQueue></ProtectedRoute>} />
           <Route path="/admin/operators" element={<ProtectedRoute requireAdmin><Operators /></ProtectedRoute>} />
           <Route path="/admin/relatorios" element={<ProtectedRoute requireAdmin><Relatorios /></ProtectedRoute>} />
           <Route path="/admin/toledo" element={<ProtectedRoute requireAdmin><ToledoConfig /></ProtectedRoute>} />

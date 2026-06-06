@@ -57,7 +57,19 @@ export default function Configuracoes() {
     backup_frequencia: 'diario',
     backup_destino: '',
     update_path: '',
+    habilitar_filas_avancadas: '0',
+    acesso_local_exige_auth: '0',
+    cor_primaria: '#2563eb',
+    totem_screensaver_ativo: '0',
+    totem_screensaver_timeout: '120',
+    totem_screensaver_intervalo: '10',
+    totem_screensaver_modo: 'ambos',
+    totem_solicita_nome: '0',
+    telao_agendamento_ativo: '0',
+    telao_agendamento_regras: '[]',
   });
+
+  const [agendamentoRegras, setAgendamentoRegras] = useState<{ hora: string; layout: string }[]>([]);
 
   useEffect(() => {
     const restored = localStorage.getItem('restored_backup_name');
@@ -185,6 +197,15 @@ export default function Configuracoes() {
         }
         
         setConfig(prev => ({ ...prev, ...mergedData }));
+
+        // Parse de agendamentoRegras
+        try {
+          if (mergedData.telao_agendamento_regras) {
+            setAgendamentoRegras(JSON.parse(mergedData.telao_agendamento_regras));
+          }
+        } catch (e) {
+          console.error('Erro ao ler regras de agendamento:', e);
+        }
       }
     } catch (err) {
       console.error('Erro ao buscar configurações', err);
@@ -204,6 +225,13 @@ export default function Configuracoes() {
   };
 
   const handleSave = async () => {
+    if (config.cor_primaria && !/^#[0-9A-Fa-f]{6}$/.test(config.cor_primaria)) {
+      alert('A cor primária da marca deve ser um código hexadecimal válido (ex: #2563eb).');
+      return;
+    }
+    // Serializa as regras para salvar
+    config.telao_agendamento_regras = JSON.stringify(agendamentoRegras);
+    
     setSaving(true);
     try {
       const res = await fetch(`${API_URL}/api/configuracoes`, {
@@ -287,6 +315,26 @@ export default function Configuracoes() {
       alert('Erro ao processar arquivo de áudio.');
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleTestAudioPortal = (tipo: 'sua_vez' | 'prestes_chamar') => {
+    const portalBase = (config.portal_cliente_url && config.portal_cliente_url.trim() !== '') 
+      ? config.portal_cliente_url.trim() 
+      : 'http://localhost:3000/#/cliente';
+    
+    let targetUrl: string;
+    if (portalBase.includes('#')) {
+      targetUrl = portalBase.includes('?') 
+        ? `${portalBase}&testAudio=${tipo}` 
+        : `${portalBase}?testAudio=${tipo}`;
+    } else {
+      const endsWithSlash = portalBase.endsWith('/');
+      targetUrl = endsWithSlash 
+        ? `${portalBase}#/?testAudio=${tipo}` 
+        : `${portalBase}/#/?testAudio=${tipo}`;
+    }
+    
+    window.open(targetUrl, '_blank');
   };
 
   const handleTestSound = () => {
@@ -490,7 +538,7 @@ export default function Configuracoes() {
             <button
               onClick={handleSave}
               disabled={saving || !isMasterServer}
-              className={`px-8 py-4 bg-primary text-white rounded-xl font-bold shadow-xl transition-all outline-none uppercase tracking-widest text-sm ${saving || !isMasterServer ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-hover active:scale-95'}`}
+              className={`px-8 py-4 bg-primary text-on-primary rounded-xl font-bold shadow-xl transition-all outline-none uppercase tracking-widest text-sm ${saving || !isMasterServer ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-hover active:scale-95'}`}
             >
               {saving ? 'Salvando...' : 'Salvar Alterações'}
             </button>
@@ -640,6 +688,244 @@ export default function Configuracoes() {
                 </div>
               </div>
             </div>
+
+            {/* Identidade Visual & Cores */}
+            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+              <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-primary">palette</span>
+                Identidade Visual & Cores
+              </h2>
+              <div className="space-y-6">
+                <div>
+                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">COR PRIMÁRIA DA MARCA</label>
+                  <div className="flex gap-4 items-center">
+                    <div className="relative w-16 h-12 rounded-xl overflow-hidden border border-outline-variant/50 cursor-pointer shrink-0">
+                      <input
+                        type="color"
+                        name="cor_primaria"
+                        value={config.cor_primaria || '#2563eb'}
+                        onChange={handleChange}
+                        className="absolute inset-0 w-full h-full scale-150 cursor-pointer border-none p-0"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <input
+                        name="cor_primaria"
+                        value={config.cor_primaria || '#2563eb'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setConfig(prev => ({ ...prev, cor_primaria: val }));
+                        }}
+                        placeholder="#2563eb"
+                        className={`w-full bg-surface-variant border rounded-xl px-4 py-3 focus:outline-none text-ink font-semibold font-mono ${
+                          /^#[0-9A-Fa-f]{6}$/.test(config.cor_primaria || '') 
+                            ? 'border-outline-variant/50 focus:border-primary' 
+                            : 'border-error focus:border-error'
+                        }`}
+                        type="text"
+                        maxLength={7}
+                      />
+                      {!/^#[0-9A-Fa-f]{6}$/.test(config.cor_primaria || '') && (
+                        <p className="text-error text-[10px] font-bold mt-1 uppercase tracking-wider">
+                          Formato de cor inválido. Use o formato hexadecimal (ex: #2563eb).
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-ink-secondary/60 mt-2 font-medium">
+                    A cor primária define a identidade visual do Totem, Telão, Operador e Portal do Cliente.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Totem & Autoatendimento */}
+            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+              <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-primary">touch_app</span>
+                Totem & Autoatendimento
+              </h2>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30 col-span-2">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-ink text-sm uppercase">Ativar Modo Descanso (Screensaver)</span>
+                      <span className="text-[10px] text-ink-secondary/60 font-medium mt-1">Exibe mídia ou relógio quando o totem fica ocioso.</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        name="totem_screensaver_ativo" 
+                        checked={config.totem_screensaver_ativo === '1'} 
+                        onChange={handleChange} 
+                        className="sr-only peer" 
+                      />
+                      <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                    </label>
+                  </div>
+
+                  {config.totem_screensaver_ativo === '1' && (
+                    <>
+                      <div>
+                        <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">TEMPO DE INATIVIDADE (SEGUNDOS)</label>
+                        <input
+                          name="totem_screensaver_timeout"
+                          value={config.totem_screensaver_timeout || '120'}
+                          onChange={handleChange}
+                          className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold"
+                          type="number"
+                          min="10"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">INTERVALO DAS MÍDIAS (SEGUNDOS)</label>
+                        <input
+                          name="totem_screensaver_intervalo"
+                          value={config.totem_screensaver_intervalo || '10'}
+                          onChange={handleChange}
+                          className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold"
+                          type="number"
+                          min="3"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">MODO DE EXIBIÇÃO DO SCREENSAVER</label>
+                        <select
+                          name="totem_screensaver_modo"
+                          value={config.totem_screensaver_modo || 'ambos'}
+                          onChange={handleChange}
+                          className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 text-ink font-bold focus:border-primary"
+                        >
+                          <option value="midia">Apenas Mídias (Imagens/Vídeos)</option>
+                          <option value="relogio">Apenas Relógio Digital Grande com Data</option>
+                          <option value="ambos">Mídias em loop com Relógio em Overlay</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+                  
+                  <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30 col-span-2">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-ink text-sm uppercase">Solicitar Nome do Cliente</span>
+                      <span className="text-[10px] text-ink-secondary/60 font-medium mt-1">Exibe teclado virtual no totem para o cliente digitar o nome.</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        name="totem_solicita_nome" 
+                        checked={config.totem_solicita_nome === '1'} 
+                        onChange={handleChange} 
+                        className="sr-only peer" 
+                      />
+                      <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Agendamento de Layouts do Telão */}
+            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+              <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-primary">schedule</span>
+                Agendamento de Layouts do Telão
+              </h2>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30">
+                  <div className="flex flex-col">
+                    <span className="font-bold text-ink text-sm uppercase">Ativar Troca Automática por Horário</span>
+                    <span className="text-[10px] text-ink-secondary/60 font-medium mt-1">Altera o layout padrão dos telões automaticamente ao longo do dia.</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      name="telao_agendamento_ativo" 
+                      checked={config.telao_agendamento_ativo === '1'} 
+                      onChange={handleChange} 
+                      className="sr-only peer" 
+                    />
+                    <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                  </label>
+                </div>
+
+                {config.telao_agendamento_ativo === '1' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="block font-bold tracking-widest text-ink-secondary uppercase text-xs">Regras de Agendamento</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAgendamentoRegras(prev => [...prev, { hora: '08:00', layout: 'classic' }]);
+                        }}
+                        className="px-4 py-2 bg-primary text-on-primary rounded-lg font-bold text-xs uppercase hover:bg-primary-hover flex items-center gap-1.5 transition-all active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-xs leading-none">add</span>
+                        Nova Regra
+                      </button>
+                    </div>
+
+                    {agendamentoRegras.length === 0 ? (
+                      <div className="p-8 text-center text-xs font-bold text-ink-secondary/35 uppercase border border-dashed border-outline-variant/50 rounded-2xl bg-surface-variant/30">
+                        Nenhuma regra de agendamento definida. Clique em "Nova Regra" para adicionar.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {agendamentoRegras.map((regra, idx) => (
+                          <div key={idx} className="flex gap-4 items-center bg-surface-variant p-4 rounded-xl border border-outline-variant/30">
+                            <div className="flex-1">
+                              <label className="block text-[10px] font-bold text-ink-secondary uppercase mb-1">Horário</label>
+                              <input
+                                type="time"
+                                value={regra.hora}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setAgendamentoRegras(prev => {
+                                    const next = [...prev];
+                                    next[idx].hora = val;
+                                    return next;
+                                  });
+                                }}
+                                className="w-full bg-white border border-outline-variant/50 rounded-lg px-3 py-2 text-ink font-semibold"
+                              />
+                            </div>
+                            <div className="flex-[2]">
+                              <label className="block text-[10px] font-bold text-ink-secondary uppercase mb-1">Layout do Telão</label>
+                              <select
+                                value={regra.layout}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setAgendamentoRegras(prev => {
+                                    const next = [...prev];
+                                    next[idx].layout = val;
+                                    return next;
+                                  });
+                                }}
+                                className="w-full bg-white border border-outline-variant/50 rounded-lg px-3 py-2 text-ink font-bold"
+                              >
+                                <option value="classic">Clássico ( classic )</option>
+                                <option value="sidebar">Mídia + Fila Lateral ( sidebar )</option>
+                                <option value="l-shape">Modo L ( l-shape )</option>
+                              </select>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAgendamentoRegras(prev => prev.filter((_, i) => i !== idx));
+                              }}
+                              className="mt-5 p-2 bg-error/10 text-error hover:bg-error hover:text-white rounded-lg transition-colors flex items-center justify-center"
+                              title="Excluir Regra"
+                            >
+                              <span className="material-symbols-outlined text-sm leading-none">delete</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Impressora */}
             <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
               <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
@@ -698,24 +984,35 @@ export default function Configuracoes() {
                           {config.portal_som_sua_vez ? 'Alterar Áudio' : 'Escolher Áudio'}
                         </button>
                         {config.portal_som_sua_vez && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const audio = new Audio(config.portal_som_sua_vez);
-                              audio.play();
-                            }}
-                            className="p-2 bg-primary/10 text-primary rounded-lg flex items-center justify-center"
-                            title="Testar Áudio"
-                          >
-                            <span className="material-symbols-outlined text-sm leading-none">play_arrow</span>
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const audio = new Audio(config.portal_som_sua_vez);
+                                audio.play();
+                              }}
+                              className="p-2 bg-primary/10 text-primary rounded-lg flex items-center justify-center active:scale-95 transition-all"
+                              title="Testar Áudio"
+                            >
+                              <span className="material-symbols-outlined text-sm leading-none">play_arrow</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleTestAudioPortal('sua_vez')}
+                              className="px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 rounded-xl text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all active:scale-95"
+                              title="Testar no Portal do Cliente (Celular)"
+                            >
+                              <span className="material-symbols-outlined text-xs leading-none">open_in_new</span>
+                              <span>Testar no Portal</span>
+                            </button>
+                          </>
                         )}
                       </div>
                       <span className="text-[10px] text-ink-secondary/60">
                         {config.portal_som_sua_vez ? '✅ Áudio configurado' : '⚠️ Nenhum áudio enviado (usa TTS como fallback)'}
                       </span>
                     </div>
-
+ 
                     <div className="flex flex-col gap-2">
                       <label className="block font-bold tracking-widest text-ink-secondary uppercase text-[10px]">
                         Áudio "Senha Próxima"
@@ -736,17 +1033,28 @@ export default function Configuracoes() {
                           {config.portal_som_prestes_chamar ? 'Alterar Áudio' : 'Escolher Áudio'}
                         </button>
                         {config.portal_som_prestes_chamar && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const audio = new Audio(config.portal_som_prestes_chamar);
-                              audio.play();
-                            }}
-                            className="p-2 bg-primary/10 text-primary rounded-lg flex items-center justify-center"
-                            title="Testar Áudio"
-                          >
-                            <span className="material-symbols-outlined text-sm leading-none">play_arrow</span>
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const audio = new Audio(config.portal_som_prestes_chamar);
+                                audio.play();
+                              }}
+                              className="p-2 bg-primary/10 text-primary rounded-lg flex items-center justify-center active:scale-95 transition-all"
+                              title="Testar Áudio"
+                            >
+                              <span className="material-symbols-outlined text-sm leading-none">play_arrow</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleTestAudioPortal('prestes_chamar')}
+                              className="px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 rounded-xl text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all active:scale-95"
+                              title="Testar no Portal do Cliente (Celular)"
+                            >
+                              <span className="material-symbols-outlined text-xs leading-none">open_in_new</span>
+                              <span>Testar no Portal</span>
+                            </button>
+                          </>
                         )}
                       </div>
                       <span className="text-[10px] text-ink-secondary/60">
@@ -1207,6 +1515,53 @@ export default function Configuracoes() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Recursos & Segurança */}
+            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+              <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-primary">security</span>
+                Recursos & Segurança
+              </h2>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30">
+                  <div>
+                    <span className="font-bold text-ink text-sm uppercase block">Filas Avançadas</span>
+                    <span className="text-[10px] text-ink-secondary/60 mt-1 block leading-relaxed">
+                      Ativa o módulo avançado de controle e métricas de filas.
+                    </span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input 
+                      type="checkbox" 
+                      name="habilitar_filas_avancadas" 
+                      checked={config.habilitar_filas_avancadas === '1'} 
+                      onChange={handleChange} 
+                      className="sr-only peer" 
+                    />
+                    <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30">
+                  <div>
+                    <span className="font-bold text-ink text-sm uppercase block">Login Local Obrigatório</span>
+                    <span className="text-[10px] text-ink-secondary/60 mt-1 block leading-relaxed">
+                      Exige senha de operador mesmo ao acessar no servidor local (localhost).
+                    </span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input 
+                      type="checkbox" 
+                      name="acesso_local_exige_auth" 
+                      checked={config.acesso_local_exige_auth === '1'} 
+                      onChange={handleChange} 
+                      className="sr-only peer" 
+                    />
+                    <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                  </label>
+                </div>
               </div>
             </div>
 

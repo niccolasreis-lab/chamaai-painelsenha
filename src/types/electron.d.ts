@@ -7,6 +7,7 @@ export interface ElectronAPI {
     preferencial: boolean;
     logo?: string;
     mostraEncarte?: boolean;
+    nome_cliente?: string;
   }) => Promise<{ success: boolean; error?: string }>;
   reprintLastTicket: () => Promise<{ success: boolean; error?: string }>;
   updatePrinterConfig: (config: any) => Promise<any>;

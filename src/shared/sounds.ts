@@ -137,6 +137,82 @@ function playBip(volume: number) {
   }
 }
 
+const customBufferCache = new Map<string, AudioBuffer>();
+
+async function playCustomSound(volume: number, customUrl: string) {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    let audioBuffer = customBufferCache.get(customUrl);
+    
+    if (!audioBuffer) {
+      let arrayBuffer: ArrayBuffer;
+      if (customUrl.startsWith('data:')) {
+        const base64Data = customUrl.split(',')[1] || customUrl;
+        const binaryString = window.atob(base64Data);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        arrayBuffer = bytes.buffer;
+      } else {
+        const response = await fetch(customUrl);
+        arrayBuffer = await response.arrayBuffer();
+      }
+      audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      customBufferCache.set(customUrl, audioBuffer);
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+
+    const gainNode = ctx.createGain();
+    gainNode.gain.setValueAtTime(volume * 0.75, ctx.currentTime);
+
+    const compressor = ctx.createDynamicsCompressor();
+
+    source.connect(gainNode);
+    gainNode.connect(compressor);
+    compressor.connect(ctx.destination);
+
+    source.start(0);
+  } catch (err) {
+    console.error('Erro ao tocar som personalizado via Web Audio API:', err);
+    playBell(volume); // Fallback
+  }
+}
+
+export async function preLoadCustomAudio(customUrl: string) {
+  if (!customUrl) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  
+  if (customBufferCache.has(customUrl)) return;
+  
+  try {
+    let arrayBuffer: ArrayBuffer;
+    if (customUrl.startsWith('data:')) {
+      const base64Data = customUrl.split(',')[1] || customUrl;
+      const binaryString = window.atob(base64Data);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      arrayBuffer = bytes.buffer;
+    } else {
+      const response = await fetch(customUrl);
+      arrayBuffer = await response.arrayBuffer();
+    }
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    customBufferCache.set(customUrl, audioBuffer);
+  } catch (err) {
+    console.warn('[SOUNDS] Falha ao pré-carregar som personalizado:', err);
+  }
+}
+
 export const SOUND_OPTIONS = [
   { id: 'ding', label: 'Ding Clássico' },
   { id: 'bell', label: 'Campainha (Ding Dong)' },
@@ -163,9 +239,7 @@ export function playNotificationSound(type: SoundType, volume: number, customUrl
       break;
     case 'custom':
       if (customUrl) {
-        const audio = new Audio(customUrl);
-        audio.volume = vol;
-        audio.play().catch(err => console.error('Erro ao tocar som personalizado', err));
+        playCustomSound(vol, customUrl);
       } else {
         playBell(vol); // fallback
       }

@@ -4,12 +4,15 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import dgram from 'dgram';
 import cron from 'node-cron';
 import { getDb } from '../electron/services/database';
 import { startToledoWatcher, forceToledoRefresh, reloadCategorias, setBroadcastFn } from './toledo-watcher';
-import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica, startSyncWorker, stopSyncWorker } from './supabase-sync';
+import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica, startSyncWorker, stopSyncWorker, supabase } from './supabase-sync';
 import { migrateDatabaseAndConfigs } from './categorizador';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 const app = express();
 
@@ -27,6 +30,62 @@ function hashPassword(password: string, salt?: string): { hash: string; salt: st
 function verifyPassword(password: string, storedHash: string, storedSalt: string): boolean {
   const { hash } = hashPassword(password, storedSalt);
   return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(storedHash, 'hex'));
+}
+
+function hashOperatorPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derivedKey = crypto.scryptSync(password, salt, 64);
+  return `scrypt$${salt}$${derivedKey.toString('hex')}`;
+}
+
+function verifyOperatorPassword(password: string, storedValue: string): boolean {
+  if (!storedValue) return false;
+  if (!storedValue.startsWith('scrypt$')) {
+    return password === storedValue;
+  }
+  const parts = storedValue.split('$');
+  if (parts.length !== 3) return false;
+  const salt = parts[1];
+  const storedHash = parts[2];
+  const derivedKey = crypto.scryptSync(password, salt, 64);
+  const storedBuffer = Buffer.from(storedHash, 'hex');
+  if (derivedKey.length !== storedBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(derivedKey, storedBuffer);
+}
+
+function verifyUserPassword(password: string, storedValue: string): boolean {
+  try {
+    if (!storedValue) return false;
+    // If it's scrypt (used by legacy operators)
+    if (storedValue.startsWith('scrypt$')) {
+      const parts = storedValue.split('$');
+      if (parts.length !== 3) return false;
+      const salt = parts[1];
+      const storedHash = parts[2];
+      const derivedKey = crypto.scryptSync(password, salt, 64);
+      const storedBuffer = Buffer.from(storedHash, 'hex');
+      if (derivedKey.length !== storedBuffer.length) {
+        return false;
+      }
+      return crypto.timingSafeEqual(derivedKey, storedBuffer);
+    }
+    // If it's plaintext (some legacy setups)
+    if (!storedValue.startsWith('$2b$') && !storedValue.startsWith('$2a$')) {
+      const aBuf = Buffer.from(password);
+      const bBuf = Buffer.from(storedValue);
+      if (aBuf.length !== bBuf.length) {
+        crypto.timingSafeEqual(aBuf, aBuf);
+        return false;
+      }
+      return crypto.timingSafeEqual(aBuf, bBuf);
+    }
+    // Otherwise, it's bcrypt
+    return bcrypt.compareSync(password, storedValue);
+  } catch (e) {
+    return false;
+  }
 }
 
 function isRateLimited(ip: string): boolean {
@@ -142,14 +201,146 @@ function requireMaster(req: express.Request, res: express.Response, next: expres
   });
 }
 
+// Middleware guard: valida token de operador
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  // Se já foi autenticado pelo JWT no remoteAuthMiddleware, permite e define o operador_id
+  if ((req as any).user) {
+    (req as any).operador_id = (req as any).user.id;
+    return next();
+  }
+
+  // Se for master local e não exigir auth, permite
+  if (isRequestLocal(req)) {
+    try {
+      const db = getDb();
+      const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'acesso_local_exige_auth'").get() as any;
+      if (!row || row.valor !== '1') {
+        return next();
+      }
+    } catch (err) {}
+  }
+
+  const token = req.headers['x-operator-token'] as string;
+  if (!token) {
+    return res.status(401).json({ error: 'Token de autenticação não fornecido.' });
+  }
+
+  try {
+    const db = getDb();
+    const session = db.prepare(
+      "SELECT * FROM sessoes_operador WHERE token = ? AND expira_em > datetime('now', 'localtime')"
+    ).get(token) as any;
+
+    if (!session) {
+      return res.status(401).json({ error: 'Sessão expirada ou inválida.' });
+    }
+
+    // Opcional: estender o TTL da sessão aqui
+    (req as any).operador_id = session.operador_id;
+    return next();
+  } catch (err) {
+    console.error('[AUTH] Erro ao validar token de operador:', err);
+    return res.status(500).json({ error: 'Erro interno ao validar autenticação.' });
+  }
+}
+
+function getJwtSecret(): string {
+  if (process.env.JWT_SECRET) {
+    return process.env.JWT_SECRET;
+  }
+  const db = getDb();
+  try {
+    const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'jwt_secret'").get() as any;
+    if (row && row.valor) {
+      return row.valor;
+    } else {
+      const newSecret = crypto.randomBytes(32).toString('hex');
+      db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor) VALUES ('jwt_secret', ?)").run(newSecret);
+      return newSecret;
+    }
+  } catch (err) {
+    console.error('[AUTH] Erro ao obter JWT_SECRET do banco:', err);
+    return 'fallback-secret-chamaai-1234';
+  }
+}
+
+function remoteAuthMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+  // 1. Verificar se req.ip é loopback
+  const clientIP = req.ip || req.socket.remoteAddress || '';
+  const localIPs = getLocalIPs();
+  const isLoopback = clientIP === '127.0.0.1' || clientIP === '::1' || clientIP === '::ffff:127.0.0.1' || localIPs.has(clientIP);
+
+  // Obter a configuração auth_local_obrigatorio
+  let authLocalObrigatorio = false;
+  try {
+    const db = getDb();
+    const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'auth_local_obrigatorio'").get() as any;
+    if (row && row.valor === '1') {
+      authLocalObrigatorio = true;
+    }
+  } catch (e) {}
+
+  if (isLoopback && !authLocalObrigatorio) {
+    return next();
+  }
+
+  // 2. Verificar se a rota é pública
+  const reqPath = req.baseUrl ? req.baseUrl + req.path : req.path;
+  const method = req.method;
+
+  // Lista de rotas sempre públicas:
+  if (
+    reqPath === '/api/login' ||
+    reqPath === '/api/logout' ||
+    reqPath.startsWith('/api/telao/sse') ||
+    reqPath.startsWith('/api/portal')
+  ) {
+    return next();
+  }
+
+  // Ler dados do telão, fila, mídias e chamadas recentes, e criar senha (totem)
+  if (method === 'GET' && (
+    reqPath === '/api/configuracoes' ||
+    reqPath === '/api/midias' ||
+    reqPath === '/api/fila' ||
+    reqPath === '/api/chamadas/recentes' ||
+    reqPath === '/api/telao/init' ||
+    reqPath.startsWith('/api/telao/profile/')
+  )) {
+    return next();
+  }
+
+  // Emissão de senha do Totem (POST)
+  if (method === 'POST' && reqPath === '/api/senhas') {
+    return next();
+  }
+
+  // 3. Caso contrário, verificar token
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Autenticação necessária' });
+  }
+
+  const token = authHeader.substring(7);
+  try {
+    const secret = getJwtSecret();
+    const decoded = jwt.verify(token, secret) as any;
+    (req as any).user = decoded;
+    return next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Autenticação necessária' });
+  }
+}
+
 app.use(cors({
   origin: true,
   credentials: true,
   exposedHeaders: ['X-Is-Master', 'X-Has-Master-Password']
 }));
 app.use(injectMasterHeader);
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
+app.use('/api', remoteAuthMiddleware);
 
 let sseClients: express.Response[] = [];
 const telaoSseClients: Record<string, express.Response[]> = {};
@@ -299,6 +490,53 @@ export function startServer() {
   });
   // -----------------
 
+  // Cron para agendamento de layouts de telão (roda a cada minuto)
+  cron.schedule('* * * * *', () => {
+    try {
+      const db = getDb();
+      // 1. Verificar se o agendamento está ativo
+      const agendamentoAtivo = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'telao_agendamento_ativo'").get() as any;
+      if (!agendamentoAtivo || agendamentoAtivo.valor !== '1') return;
+
+      // 2. Buscar regras do agendamento
+      const agendamentoRegrasRow = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'telao_agendamento_regras'").get() as any;
+      if (!agendamentoRegrasRow || !agendamentoRegrasRow.valor) return;
+
+      let regras: { hora: string; layout: string }[] = [];
+      try {
+        regras = JSON.parse(agendamentoRegrasRow.valor);
+      } catch (parseErr) {
+        console.error('[CRON TELÃO] Erro ao analisar JSON de regras. Desativando agendamento...', parseErr);
+        db.prepare("UPDATE configuracoes SET valor = '0', atualizado_em = datetime('now') WHERE chave = 'telao_agendamento_ativo'").run();
+        broadcastEvent('CONFIG_ATUALIZADA', { telao_agendamento_ativo: '0' });
+        return;
+      }
+
+      if (!Array.isArray(regras) || regras.length === 0) return;
+
+      // 3. Pegar horário local do servidor no formato HH:MM
+      const agora = new Date();
+      const horaStr = String(agora.getHours()).padStart(2, '0') + ':' + String(agora.getMinutes()).padStart(2, '0');
+
+      // 4. Encontrar regra para o horário atual
+      const regraCorrespondente = regras.find(r => r.hora === horaStr);
+      if (regraCorrespondente) {
+        console.log(`[CRON TELÃO] Horário correspondente detectado (${horaStr}). Atualizando layouts para: ${regraCorrespondente.layout}`);
+        
+        // 5. Buscar todos os telões vinculados
+        const teloesVinculados = db.prepare("SELECT code FROM teloes WHERE status = 'vinculado'").all() as any[];
+        
+        for (const device of teloesVinculados) {
+          db.prepare("UPDATE teloes SET template_layout = ? WHERE code = ?").run(regraCorrespondente.layout, device.code);
+          const perfil = db.prepare('SELECT * FROM teloes WHERE code = ?').get(device.code);
+          broadcastToTelao(device.code, 'TELAO_ATUALIZADO', perfil);
+        }
+      }
+    } catch (err) {
+      console.error('[CRON TELÃO] Erro crítico no cron de agendamento de telões:', err);
+    }
+  });
+
   // --- Admin Status Endpoint ---
   app.get('/api/admin/status', (req, res) => {
     const isMasterLocal = isRequestLocal(req);
@@ -324,13 +562,63 @@ export function startServer() {
       hasMasterPassword = !!(row && row.valor);
     } catch (err) {}
     
+    let acessoLocalExigeAuth = false;
+    try {
+      const db = getDb();
+      const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'acesso_local_exige_auth'").get() as any;
+      acessoLocalExigeAuth = row ? row.valor === '1' : false;
+    } catch (err) {}
+
+    let isNewInstall = false;
+    try {
+      const db = getDb();
+      const adminUser = db.prepare("SELECT senha_hash, primeiro_acesso FROM operadores WHERE login = 'admin'").get() as any;
+      if (adminUser) {
+        isNewInstall = adminUser.senha_hash === 'admin' || adminUser.primeiro_acesso === 1;
+      }
+    } catch (err) {}
+    
     res.json({ 
       isMaster: isMasterLocal || isMasterRemote, 
       isMasterLocal,
       isMasterRemote,
       hasMasterPassword,
+      acessoLocalExigeAuth,
+      isNewInstall,
       clientIP: req.ip 
     });
+  });
+
+  // --- Endpoint for Dashboard Charts ---
+  app.get('/api/dashboard/metricas', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      
+      // Senhas por hora (hoje)
+      const porHora = db.prepare(`
+        SELECT strftime('%H', criado_em) as hora, COUNT(*) as quantidade
+        FROM senhas
+        WHERE date(criado_em) = date('now', 'localtime')
+        GROUP BY strftime('%H', criado_em)
+        ORDER BY hora ASC
+      `).all();
+
+      // Senhas por balcão
+      const porBalcao = db.prepare(`
+        SELECT b.nome, COUNT(s.id) as quantidade
+        FROM senhas s
+        JOIN balcoes b ON s.balcao_id = b.id
+        WHERE date(s.criado_em) = date('now', 'localtime')
+        GROUP BY b.id
+      `).all();
+
+      res.json({
+        porHora,
+        porBalcao
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // --- MASTER REMOTO: Autenticação ---
@@ -505,12 +793,12 @@ export function startServer() {
     });
   });
 
-  const broadcastToTelao = (code: string, event: string, data: any) => {
+  function broadcastToTelao(code: string, event: string, data: any) {
     const payload = `data: ${JSON.stringify({ event, data })}\n\n`;
     if (telaoSseClients[code]) {
       telaoSseClients[code].forEach(client => client.write(payload));
     }
-  };
+  }
 
   app.get('/api/telao/init', (req, res) => {
     try {
@@ -548,13 +836,13 @@ export function startServer() {
   app.post('/api/telao/vincular', requireMaster, (req, res) => {
     try {
       const db = getDb();
-      const { code, nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias } = req.body;
+      const { code, nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias, template_layout } = req.body;
       const stmt = db.prepare(`
         UPDATE teloes 
-        SET nome = ?, status = 'vinculado', modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, vinculado_em = datetime('now')
+        SET nome = ?, status = 'vinculado', modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = ?, vinculado_em = datetime('now')
         WHERE code = ?
       `);
-      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', code.toUpperCase());
+      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', template_layout || 'classic', code.toUpperCase());
       
       const perfil = db.prepare('SELECT * FROM teloes WHERE code = ?').get(code.toUpperCase());
       broadcastToTelao(code.toUpperCase(), 'TELAO_VINCULADO', perfil);
@@ -568,13 +856,13 @@ export function startServer() {
     try {
       const db = getDb();
       const code = (req.params.code as string).toUpperCase();
-      const { nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias } = req.body;
+      const { nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias, template_layout } = req.body;
       const stmt = db.prepare(`
         UPDATE teloes 
-        SET nome = ?, modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?
+        SET nome = ?, modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = ?
         WHERE code = ?
       `);
-      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', code);
+      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', template_layout || 'classic', code);
       
       const perfil = db.prepare('SELECT * FROM teloes WHERE code = ?').get(code);
       broadcastToTelao(code, 'TELAO_ATUALIZADO', perfil);
@@ -685,61 +973,70 @@ export function startServer() {
 
   app.post('/api/senhas', (req: express.Request, res: express.Response) => {
     try {
-      const { balcao_id, preferencial } = req.body;
+      const { balcao_id, preferencial, nome_cliente } = req.body;
       const db = getDb();
-      console.log('Emitindo senha para balcão:', balcao_id, 'Preferencial:', preferencial);
+      console.log('Emitindo senha para balcão:', balcao_id, 'Preferencial:', preferencial, 'Nome:', nome_cliente);
       
       const balcaoIdNum = Number(balcao_id);
       
-      // Increment counter with reset at 999
-      const updateBalcao = db.prepare(`
-        UPDATE balcoes 
-        SET contador_atual = CASE 
-          WHEN contador_atual >= 999 THEN 0 
-          ELSE contador_atual + 1 
-        END 
-        WHERE id = ?
-      `);
-      updateBalcao.run(balcaoIdNum);
-      
-      const balcao = db.prepare('SELECT contador_atual FROM balcoes WHERE id = ?').get(balcaoIdNum) as any;
-      console.log('Dados do balcão após incremento:', balcao);
-      
-      if (!balcao) throw new Error('Balcão não encontrado');
-      
-      // Bala de prata: Captura o número independente de maiúsculo/minúsculo ou se é nulo
-      const numero = (balcao.contador_atual !== undefined ? balcao.contador_atual : balcao.CONTADOR_ATUAL) ?? 0;
+      const emitirSenhaTx = db.transaction((balcaoId: number, isPreferencial: number, nomeCliente: string | null) => {
+        // Increment counter with reset at 999
+        db.prepare(`
+          UPDATE balcoes 
+          SET contador_atual = CASE 
+            WHEN contador_atual >= 999 THEN 0 
+            ELSE contador_atual + 1 
+          END 
+          WHERE id = ?
+        `).run(balcaoId);
+        
+        const balcao = db.prepare('SELECT contador_atual FROM balcoes WHERE id = ?').get(balcaoId) as any;
+        if (!balcao) throw new Error('Balcão não encontrado');
+        
+        const numero = (balcao.contador_atual !== undefined ? balcao.contador_atual : balcao.CONTADOR_ATUAL) ?? 0;
+        
+        const result = db.prepare('INSERT INTO senhas (balcao_id, numero, preferencial, status, nome_cliente) VALUES (?, ?, ?, ?, ?)')
+                         .run(balcaoId, numero, isPreferencial, 'aguardando', nomeCliente);
+        
+        const aguardandoCount = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando'").get() as any;
+        const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
+        const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
 
-      const insertSenha = db.prepare('INSERT INTO senhas (balcao_id, numero, preferencial, status) VALUES (?, ?, ?, ?)');
-      const result = insertSenha.run(balcaoIdNum, numero, preferencial ? 1 : 0, 'aguardando');
+        return {
+          id: result.lastInsertRowid,
+          numero,
+          aguardando_count: aguardandoCount.count,
+          geral: countGeral.count,
+          preferencial: countPref.count
+        };
+      });
 
-      const aguardandoCount = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando'").get() as any;
+      const txResult = emitirSenhaTx(balcaoIdNum, preferencial ? 1 : 0, nome_cliente || null);
 
       const novaSenha = {
-        id: result.lastInsertRowid,
+        id: txResult.id,
         balcao_id: balcaoIdNum,
-        numero,
+        numero: txResult.numero,
         preferencial: preferencial ? 1 : 0,
         status: 'aguardando',
-        aguardando_count: aguardandoCount.count
+        aguardando_count: txResult.aguardando_count,
+        nome_cliente: nome_cliente || null
       };
 
       broadcastEvent('NOVA_SENHA_EMITIDA', novaSenha);
 
       // Notifica os contadores de fila dos operadores touch
       try {
-        const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
-        const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
         broadcastEvent('queue-update', {
-          geral: countGeral.count,
-          preferencial: countPref.count
+          geral: txResult.geral,
+          preferencial: txResult.preferencial
         });
       } catch (errQueue) {
         console.error('Erro ao emitir queue-update:', errQueue);
       }
 
       // Sync: espelha a nova senha na nuvem para o Portal do Cliente
-      syncNovaSenha(novaSenha.id, numero, 'aguardando');
+      syncNovaSenha(novaSenha.id, txResult.numero, 'aguardando');
 
       res.status(201).json(novaSenha);
     } catch (err: any) {
@@ -747,21 +1044,213 @@ export function startServer() {
     }
   });
 
-  // OPERADORES ROUTES
+  // OPERADORES & ADMIN LOGIN ROUTES (UNIFIED)
   app.post('/api/login', (req, res) => {
+    const clientIP = req.ip || req.socket.remoteAddress || 'unknown';
+    
+    // Rate limiting check
+    if (isRateLimited(clientIP)) {
+      return res.status(429).json({ 
+        error: 'Muitas tentativas. Tente novamente em 15 minutos.',
+        blockedUntil: loginAttempts.get(clientIP)?.blockedUntil 
+      });
+    }
+
     try {
       const { login, senha } = req.body;
-      const db = getDb();
-      const user = db.prepare('SELECT id, nome, perfil, login FROM operadores WHERE login = ? AND senha_hash = ? AND ativo = 1').get(login, senha) as any;
-      
-      if (!user) {
-        return res.status(401).json({ error: 'Login ou senha incorretos' });
+      if (!login || !senha) {
+        return res.status(400).json({ error: 'Login e senha são obrigatórios.' });
       }
-      
-      // Token simples para uso local
-      const token = Buffer.from(`${user.id}:${Date.now()}`).toString('base64');
-      
-      res.json({ token, user });
+
+      const db = getDb();
+      const user = db.prepare('SELECT * FROM usuarios WHERE login = ?').get(login.trim()) as any;
+
+      if (!user) {
+        recordFailedAttempt(clientIP);
+        const record = loginAttempts.get(clientIP);
+        const remaining = MAX_LOGIN_ATTEMPTS - (record?.count || 0);
+        return res.status(401).json({ 
+          error: `Login ou senha incorretos. ${remaining > 0 ? `${remaining} tentativa(s) restante(s).` : 'IP bloqueado por 15 minutos.'}` 
+        });
+      }
+
+      const isMatch = verifyUserPassword(senha, user.senha_hash);
+      if (!isMatch) {
+        recordFailedAttempt(clientIP);
+        const record = loginAttempts.get(clientIP);
+        const remaining = MAX_LOGIN_ATTEMPTS - (record?.count || 0);
+        return res.status(401).json({ 
+          error: `Login ou senha incorretos. ${remaining > 0 ? `${remaining} tentativa(s) restante(s).` : 'IP bloqueado por 15 minutos.'}` 
+        });
+      }
+
+      clearFailedAttempts(clientIP);
+
+      const secret = getJwtSecret();
+      const token = jwt.sign(
+        { id: user.id, login: user.login, perfil: user.perfil },
+        secret,
+        { expiresIn: '24h' }
+      );
+
+      // Registrar sessão em sessoes_operador para compatibilidade com requireAuth herdado
+      try {
+        db.prepare("DELETE FROM sessoes_operador WHERE expira_em <= datetime('now', 'localtime')").run();
+        let opId = 1;
+        const op = db.prepare('SELECT id FROM operadores WHERE login = ?').get(user.login) as any;
+        if (op) opId = op.id;
+        db.prepare(
+          "INSERT OR REPLACE INTO sessoes_operador (token, operador_id, expira_em) VALUES (?, ?, datetime('now', 'localtime', '+24 hours'))"
+        ).run(token, opId);
+      } catch (sessErr) {
+        console.error('[AUTH] Erro ao gravar sessoes_operador:', sessErr);
+      }
+
+      return res.json({
+        token,
+        perfil: user.perfil,
+        primeiro_acesso: user.primeiro_acesso
+      });
+    } catch (err: any) {
+      console.error('[AUTH] Erro no endpoint /api/login:', err);
+      return res.status(500).json({ error: 'Erro interno no servidor.' });
+    }
+  });
+
+  app.post('/api/logout', (req, res) => {
+    return res.status(200).json({ success: true });
+  });
+
+  app.get('/api/auth/me', (req, res) => {
+    const user = (req as any).user;
+    if (!user) {
+      return res.json({ login: 'local_admin', perfil: 'admin', primeiro_acesso: 0 });
+    }
+    try {
+      const db = getDb();
+      const dbUser = db.prepare('SELECT login, perfil, primeiro_acesso FROM usuarios WHERE id = ?').get(user.id) as any;
+      if (dbUser) {
+        return res.json({
+          login: dbUser.login,
+          perfil: dbUser.perfil,
+          primeiro_acesso: dbUser.primeiro_acesso
+        });
+      }
+    } catch (e) {}
+    return res.json({
+      login: user.login,
+      perfil: user.perfil,
+      primeiro_acesso: 0
+    });
+  });
+
+  app.put('/api/auth/senha', (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(400).json({ error: 'Alteração de senha indisponível para conexões locais sem autenticação.' });
+      }
+
+      const { senha_atual, nova_senha } = req.body;
+      if (!senha_atual || !nova_senha) {
+        return res.status(400).json({ error: 'Campos senha_atual e nova_senha são obrigatórios.' });
+      }
+
+      if (nova_senha.length < 6) {
+        return res.status(400).json({ error: 'A nova senha deve ter no mínimo 6 caracteres.' });
+      }
+
+      const db = getDb();
+      const dbUser = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(user.id) as any;
+      if (!dbUser) {
+        return res.status(404).json({ error: 'Usuário não encontrado.' });
+      }
+
+      const match = bcrypt.compareSync(senha_atual, dbUser.senha_hash);
+      if (!match) {
+        return res.status(400).json({ error: 'Senha atual incorreta.' });
+      }
+
+      const hash = bcrypt.hashSync(nova_senha, 10);
+      db.prepare('UPDATE usuarios SET senha_hash = ?, primeiro_acesso = 0 WHERE id = ?').run(hash, user.id);
+
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error('[AUTH] Erro ao alterar senha:', err);
+      return res.status(500).json({ error: 'Erro interno no servidor.' });
+    }
+  });
+
+  app.get('/api/usuarios', (req, res) => {
+    const user = (req as any).user;
+    if (user && user.perfil !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem acessar a segurança.' });
+    }
+    try {
+      const db = getDb();
+      const usuarios = db.prepare('SELECT id, login, perfil, primeiro_acesso, criado_em FROM usuarios').all();
+      res.json(usuarios);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/usuarios', (req, res) => {
+    const user = (req as any).user;
+    if (user && user.perfil !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem gerenciar usuários.' });
+    }
+    try {
+      const { login, senha, perfil } = req.body;
+      if (!login || !senha) {
+        return res.status(400).json({ error: 'Login e senha são obrigatórios.' });
+      }
+      const db = getDb();
+      const hash = bcrypt.hashSync(senha, 10);
+      db.prepare('INSERT INTO usuarios (login, senha_hash, perfil, primeiro_acesso) VALUES (?, ?, ?, 1)')
+        .run(login.trim(), hash, perfil || 'operador');
+      res.json({ success: true });
+    } catch (err: any) {
+      if (err.message && err.message.includes('UNIQUE')) {
+        return res.status(400).json({ error: 'Este login já está cadastrado.' });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/usuarios/redefinir', (req, res) => {
+    const user = (req as any).user;
+    if (user && user.perfil !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem redefinir senhas.' });
+    }
+    try {
+      const { id } = req.body;
+      if (!id) {
+        return res.status(400).json({ error: 'ID do usuário é obrigatório.' });
+      }
+      const db = getDb();
+      const tempPassword = Math.random().toString(36).substring(2, 10);
+      const hash = bcrypt.hashSync(tempPassword, 10);
+      db.prepare('UPDATE usuarios SET senha_hash = ?, primeiro_acesso = 1 WHERE id = ?').run(hash, id);
+      res.json({ success: true, senha_temporaria: tempPassword });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/usuarios/:id', (req, res) => {
+    const user = (req as any).user;
+    if (user && user.perfil !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem remover usuários.' });
+    }
+    try {
+      const { id } = req.params;
+      if (user && String(user.id) === String(id)) {
+        return res.status(400).json({ error: 'Você não pode remover o próprio usuário logado.' });
+      }
+      const db = getDb();
+      db.prepare('DELETE FROM usuarios WHERE id = ?').run(id);
+      res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -770,7 +1259,7 @@ export function startServer() {
   app.get('/api/operadores', (req, res) => {
     try {
       const db = getDb();
-      const operadores = db.prepare('SELECT id, nome, login, perfil, ativo FROM operadores').all();
+      const operadores = db.prepare('SELECT id, nome, login, perfil, ativo, primeiro_acesso FROM operadores').all();
       res.json(operadores);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -781,9 +1270,35 @@ export function startServer() {
     try {
       const { nome, login, senha, perfil } = req.body;
       const db = getDb();
-      const stmt = db.prepare('INSERT INTO operadores (nome, login, senha_hash, perfil, ativo) VALUES (?, ?, ?, ?, 1)');
-      const result = stmt.run(nome, login, senha, perfil || 'operador');
+      const hashed = hashOperatorPassword(senha);
+      const stmt = db.prepare('INSERT INTO operadores (nome, login, senha_hash, perfil, ativo, primeiro_acesso) VALUES (?, ?, ?, ?, 1, 0)');
+      const result = stmt.run(nome, login, hashed, perfil || 'operador');
       res.status(201).json({ id: result.lastInsertRowid, nome, login, perfil });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put('/api/operadores/:id', requireMaster, (req, res) => {
+    try {
+      const { id } = req.params;
+      const { nome, login, senha, perfil, ativo } = req.body;
+      const db = getDb();
+      
+      let query = 'UPDATE operadores SET nome = ?, login = ?, perfil = ?, ativo = ?';
+      const params = [nome, login, perfil || 'operador', ativo !== undefined ? ativo : 1];
+      
+      if (senha) {
+        const hashed = hashOperatorPassword(senha);
+        query += ', senha_hash = ?, primeiro_acesso = 0';
+        params.push(hashed);
+      }
+      
+      query += ' WHERE id = ?';
+      params.push(id);
+      
+      db.prepare(query).run(...params);
+      res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -849,31 +1364,44 @@ export function startServer() {
       
       console.log(`[Operador Touch - Proximo] guiche=${guiche}`);
 
-      // 1. Busca a próxima senha (preferencial primeiro, depois por ordem de chegada)
-      const proxima = db.prepare(
-        `SELECT s.*, b.nome as balcao_nome, b.prefixo_senha 
-         FROM senhas s 
-         JOIN balcoes b ON s.balcao_id = b.id 
-         WHERE s.status = 'aguardando' 
-         ORDER BY s.preferencial DESC, s.id ASC 
-         LIMIT 1`
-      ).get() as any;
+      const proximoTouchTx = db.transaction((guicheStr: string) => {
+        // 1. Busca a próxima senha (preferencial primeiro, depois por ordem de chegada)
+        const proxima = db.prepare(
+          `SELECT s.*, b.nome as balcao_nome, b.prefixo_senha 
+           FROM senhas s 
+           JOIN balcoes b ON s.balcao_id = b.id 
+           WHERE s.status = 'aguardando' 
+           ORDER BY s.preferencial DESC, s.id ASC 
+           LIMIT 1`
+        ).get() as any;
 
-      if (!proxima) {
+        if (!proxima) return null;
+
+        // 2. Marca como chamada
+        db.prepare("UPDATE senhas SET status = 'chamada', chamada_em = datetime('now') WHERE id = ?").run(proxima.id);
+
+        // 3. Registra a chamada (operador_id = 1 como padrão)
+        db.prepare('INSERT INTO chamadas (senha_id, operador_id, guiche) VALUES (?, 1, ?)').run(proxima.id, `Guichê ${guicheStr}`);
+
+        // 4. Counts for queue-update
+        const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
+        const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
+
+        return {
+          proxima,
+          geral: countGeral.count,
+          preferencial: countPref.count
+        };
+      });
+
+      const txResult = proximoTouchTx(guiche);
+
+      if (!txResult) {
         return res.status(404).json({ error: 'Nenhuma senha aguardando na fila.' });
       }
 
+      const { proxima, geral, preferencial } = txResult;
       const formattedNumero = `${proxima.preferencial ? 'P' : 'A'}-${String(proxima.numero).padStart(3, '0')}`;
-
-      // 2. Marca como chamada
-      db.prepare("UPDATE senhas SET status = 'chamada', chamada_em = datetime('now') WHERE id = ?").run(proxima.id);
-
-      // 3. Registra a chamada (operador_id = 1 como padrão)
-      db.prepare('INSERT INTO chamadas (senha_id, operador_id, guiche) VALUES (?, 1, ?)').run(proxima.id, `Guichê ${guiche}`);
-
-      // 4. Counts for queue-update
-      const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
-      const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
 
       const ticketPayload = {
         id: proxima.id,
@@ -887,14 +1415,14 @@ export function startServer() {
         ...proxima,
         status: 'chamada',
         guiche: `Guichê ${guiche}`,
-        aguardando_count: countGeral.count + countPref.count
+        aguardando_count: geral + preferencial
       };
       
       broadcastEvent('NOVA_SENHA_CHAMADA', standardPayload);
       broadcastEvent('ticket-called', ticketPayload);
       broadcastEvent('queue-update', {
-        geral: countGeral.count,
-        preferencial: countPref.count
+        geral: geral,
+        preferencial: preferencial
       });
 
       // Sincroniza com Supabase
@@ -964,39 +1492,53 @@ export function startServer() {
     }
   });
 
-  app.post('/api/operador/devolver', (req: express.Request, res: express.Response) => {
+  app.post('/api/operador/devolver', requireAuth, (req: express.Request, res: express.Response) => {
     try {
       const { guiche } = req.body;
       const db = getDb();
       
       console.log(`[Operador Touch - Devolver] guiche=${guiche}`);
 
-      // Busca a senha atualmente em atendimento (status 'chamada') neste guichê
-      const ultimaChamada = db.prepare(`
-        SELECT s.* 
-        FROM chamadas c
-        JOIN senhas s ON c.senha_id = s.id
-        WHERE c.guiche = ? AND s.status = 'chamada'
-        ORDER BY c.id DESC
-        LIMIT 1
-      `).get(`Guichê ${guiche}`) as any;
+      const devolverTouchTx = db.transaction((guicheStr: string) => {
+        // Busca a senha atualmente em atendimento (status 'chamada') neste guichê
+        const ultimaChamada = db.prepare(`
+          SELECT s.* 
+          FROM chamadas c
+          JOIN senhas s ON c.senha_id = s.id
+          WHERE c.guiche = ? AND s.status = 'chamada'
+          ORDER BY c.id DESC
+          LIMIT 1
+        `).get(`Guichê ${guicheStr}`) as any;
 
-      if (!ultimaChamada) {
+        if (!ultimaChamada) return null;
+
+        // Atualiza a senha para 'aguardando' e remove a chamada_em
+        db.prepare("UPDATE senhas SET status = 'aguardando', chamada_em = NULL WHERE id = ?").run(ultimaChamada.id);
+
+        const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
+        const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
+
+        return {
+          ultimaChamada,
+          geral: countGeral.count,
+          preferencial: countPref.count
+        };
+      });
+
+      const txResult = devolverTouchTx(guiche);
+
+      if (!txResult) {
         return res.status(404).json({ error: 'Nenhuma senha em atendimento encontrada para este guichê.' });
       }
 
-      // Atualiza a senha para 'aguardando' e remove a chamada_em
-      db.prepare("UPDATE senhas SET status = 'aguardando', chamada_em = NULL WHERE id = ?").run(ultimaChamada.id);
-
-      const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
-      const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
+      const { ultimaChamada, geral, preferencial } = txResult;
 
       // Notifica o telão sobre o estorno e limpa o ticket-called no guichê
-      broadcastEvent('SENHA_ESTORNADA', { id: ultimaChamada.id, aguardando_count: countGeral.count + countPref.count });
+      broadcastEvent('SENHA_ESTORNADA', { id: ultimaChamada.id, aguardando_count: geral + preferencial });
       broadcastEvent('ticket-called', { numero: null, preferencial: null, guiche: `Guichê ${guiche}` });
       broadcastEvent('queue-update', {
-        geral: countGeral.count,
-        preferencial: countPref.count
+        geral: geral,
+        preferencial: preferencial
       });
 
       // Sincroniza com Supabase
@@ -1009,45 +1551,57 @@ export function startServer() {
     }
   });
 
-  // NOVA ROTA: O servidor decide atomicamente quem é o próximo da fila
-  app.post('/api/chamar-proxima', (req: express.Request, res: express.Response) => {
+  app.post('/api/chamar-proxima', requireAuth, (req: express.Request, res: express.Response) => {
     try {
       const { operador_id, guiche } = req.body;
       const db = getDb();
       
       console.log(`[ChamarProxima] operador=${operador_id} guiche=${guiche}`);
 
-      // 1. Busca a próxima senha DIRETO DO BANCO (preferencial primeiro, depois por ordem de chegada)
-      const proxima = db.prepare(
-        `SELECT s.*, b.nome as balcao_nome 
-         FROM senhas s 
-         JOIN balcoes b ON s.balcao_id = b.id 
-         WHERE s.status = 'aguardando' 
-         ORDER BY s.preferencial DESC, s.id ASC 
-         LIMIT 1`
-      ).get() as any;
+      const chamarProximaTx = db.transaction((operadorIdVal: any, guicheStr: string) => {
+        // 1. Busca a próxima senha DIRETO DO BANCO (preferencial primeiro, depois por ordem de chegada)
+        const proxima = db.prepare(
+          `SELECT s.*, b.nome as balcao_nome 
+           FROM senhas s 
+           JOIN balcoes b ON s.balcao_id = b.id 
+           WHERE s.status = 'aguardando' 
+           ORDER BY s.preferencial DESC, s.id ASC 
+           LIMIT 1`
+        ).get() as any;
 
-      if (!proxima) {
+        if (!proxima) return null;
+
+        // 2. Marca como chamada
+        db.prepare("UPDATE senhas SET status = 'chamada', chamada_em = datetime('now') WHERE id = ?").run(proxima.id);
+
+        // 3. Registra a chamada
+        db.prepare('INSERT INTO chamadas (senha_id, operador_id, guiche) VALUES (?, ?, ?)').run(proxima.id, operadorIdVal, guicheStr);
+
+        // 4. Conta aguardando
+        const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
+        const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
+
+        return {
+          proxima,
+          geral: countGeral.count,
+          preferencial: countPref.count
+        };
+      });
+
+      const txResult = chamarProximaTx(operador_id, guiche);
+
+      if (!txResult) {
         return res.status(404).json({ error: 'Nenhuma senha aguardando na fila.' });
       }
 
-      console.log(`[ChamarProxima] Próxima senha encontrada: id=${proxima.id} numero=${proxima.numero}`);
-
-      // 2. Marca como chamada
-      db.prepare("UPDATE senhas SET status = 'chamada', chamada_em = datetime('now') WHERE id = ?").run(proxima.id);
-
-      // 3. Registra a chamada
-      db.prepare('INSERT INTO chamadas (senha_id, operador_id, guiche) VALUES (?, ?, ?)').run(proxima.id, operador_id, guiche);
-
-      // 4. Conta aguardando
-      const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
-      const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
+      const { proxima, geral, preferencial } = txResult;
+      console.log(`[ChamarProxima] Próxima senha encontrada e reservada: id=${proxima.id} numero=${proxima.numero}`);
 
       const payload = {
         ...proxima,
         status: 'chamada',
         guiche,
-        aguardando_count: countGeral.count + countPref.count
+        aguardando_count: geral + preferencial
       };
 
       broadcastEvent('NOVA_SENHA_CHAMADA', payload);
@@ -1063,8 +1617,8 @@ export function startServer() {
           guiche: guicheNumero
         });
         broadcastEvent('queue-update', {
-          geral: countGeral.count,
-          preferencial: countPref.count
+          geral: geral,
+          preferencial: preferencial
         });
       } catch (errBroad) {
         console.error('Erro ao enviar ticket-called/queue-update secundário:', errBroad);
@@ -1082,38 +1636,45 @@ export function startServer() {
   });
 
   // Rota existente mantida para REPETIR chamada (quando já se sabe o ID da senha)
-  app.post('/api/chamadas', (req: express.Request, res: express.Response) => {
+  app.post('/api/chamadas', requireAuth, (req: express.Request, res: express.Response) => {
     try {
       const { senha_id, operador_id, guiche } = req.body;
       const db = getDb();
       
       console.log(`[Chamada] senha_id=${senha_id} operador=${operador_id} guiche=${guiche}`);
 
-      // 1. Update ticket status
-      const updateSenha = db.prepare("UPDATE senhas SET status = 'chamada', chamada_em = datetime('now') WHERE id = ?");
-      updateSenha.run(senha_id);
+      const repetirChamadaTx = db.transaction((senhaIdVal: any, operadorIdVal: any, guicheStr: string) => {
+        // 1. Update ticket status
+        db.prepare("UPDATE senhas SET status = 'chamada', chamada_em = datetime('now') WHERE id = ?").run(senhaIdVal);
 
-      // 2. Record the call
-      const insertChamada = db.prepare('INSERT INTO chamadas (senha_id, operador_id, guiche) VALUES (?, ?, ?)');
-      insertChamada.run(senha_id, operador_id, guiche);
+        // 2. Record the call
+        db.prepare('INSERT INTO chamadas (senha_id, operador_id, guiche) VALUES (?, ?, ?)').run(senhaIdVal, operadorIdVal, guicheStr);
 
-      // 3. Get the ticket details to broadcast
-      const senhaInfo = db.prepare(`
-        SELECT s.*, b.nome as balcao_nome 
-        FROM senhas s 
-        JOIN balcoes b ON s.balcao_id = b.id 
-        WHERE s.id = ?
-      `).get(senha_id) as any;
+        // 3. Fetch details
+        const proxima = db.prepare(`
+          SELECT s.*, b.nome as balcao_nome 
+          FROM senhas s
+          JOIN balcoes b ON s.balcao_id = b.id
+          WHERE s.id = ?
+        `).get(senhaIdVal) as any;
 
-      console.log('[Chamada] Senha info:', senhaInfo);
+        const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
+        const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
 
-      const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
-      const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
+        return {
+          proxima,
+          geral: countGeral.count,
+          preferencial: countPref.count
+        };
+      });
+
+      const txResult = repetirChamadaTx(senha_id, operador_id, guiche);
+      const { proxima, geral, preferencial } = txResult;
 
       const payload = {
-        ...senhaInfo,
+        ...proxima,
         guiche,
-        aguardando_count: countGeral.count + countPref.count
+        aguardando_count: geral + preferencial
       };
 
       broadcastEvent('NOVA_SENHA_CHAMADA', payload);
@@ -1121,12 +1682,16 @@ export function startServer() {
       // Também transmite para os painéis Operator Touch correspondentes
       try {
         const guicheNumero = guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim();
-        const formattedNumero = `${senhaInfo.preferencial ? 'P' : 'A'}-${String(senhaInfo.numero).padStart(3, '0')}`;
+        const formattedNumero = `${proxima.preferencial ? 'P' : 'A'}-${String(proxima.numero).padStart(3, '0')}`;
         broadcastEvent('ticket-called', {
-          id: senhaInfo.id,
+          id: proxima.id,
           numero: formattedNumero,
-          preferencial: senhaInfo.preferencial,
+          preferencial: proxima.preferencial,
           guiche: guicheNumero
+        });
+        broadcastEvent('queue-update', {
+          geral: geral,
+          preferencial: preferencial
         });
       } catch (errBroad) {
         console.error('Erro ao enviar ticket-called secundário:', errBroad);
@@ -1143,23 +1708,34 @@ export function startServer() {
     }
   });
 
-  app.post('/api/senhas/estornar', (req, res) => {
+  app.post('/api/senhas/estornar', requireAuth, (req, res) => {
     try {
       const { senha_id } = req.body;
       const db = getDb();
-      db.prepare("UPDATE senhas SET status = 'aguardando', chamada_em = NULL WHERE id = ?").run(senha_id);
       
-      const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
-      const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
+      const estornarTx = db.transaction((senhaIdVal: any) => {
+        db.prepare("UPDATE senhas SET status = 'aguardando', chamada_em = NULL WHERE id = ?").run(senhaIdVal);
+        
+        const countGeral = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 0").get() as any;
+        const countPref = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'aguardando' AND preferencial = 1").get() as any;
+
+        return {
+          geral: countGeral.count,
+          preferencial: countPref.count
+        };
+      });
+
+      const txResult = estornarTx(senha_id);
+      const { geral, preferencial } = txResult;
       
       // Notifica todos os painéis
-      broadcastEvent('SENHA_ESTORNADA', { id: senha_id, aguardando_count: countGeral.count + countPref.count });
+      broadcastEvent('SENHA_ESTORNADA', { id: senha_id, aguardando_count: geral + preferencial });
       
       // Também transmite para os painéis Operator Touch correspondentes
       try {
         broadcastEvent('queue-update', {
-          geral: countGeral.count,
-          preferencial: countPref.count
+          geral: geral,
+          preferencial: preferencial
         });
       } catch (errBroad) {
         console.error('Erro ao enviar queue-update secundário:', errBroad);
@@ -1263,16 +1839,6 @@ export function startServer() {
     }
   });
 
-  app.get('/api/fila', (req: express.Request, res: express.Response) => {
-    try {
-      const db = getDb();
-      const fila = db.prepare('SELECT * FROM senhas WHERE status = "aguardando" ORDER BY id ASC').all();
-      res.json(fila);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
   app.get('/api/configuracoes', (req: express.Request, res: express.Response) => {
     try {
       const db = getDb();
@@ -1287,7 +1853,7 @@ export function startServer() {
     }
   });
 
-  app.post('/api/configuracoes', requireMaster, (req: express.Request, res: express.Response) => {
+  app.post('/api/configuracoes', requireMaster, async (req: express.Request, res: express.Response) => {
     try {
       const configuracoes = req.body;
       const db = getDb();
@@ -1299,6 +1865,11 @@ export function startServer() {
         if (configuracoes[key] && !cssSize.test(configuracoes[key])) {
           return res.status(400).json({ error: `Tamanho de fonte inválido para ${key}: ${configuracoes[key]}` });
         }
+      }
+
+      // Validação de cor hexadecimal
+      if (configuracoes.cor_primaria && !/^#[0-9A-Fa-f]{6}$/.test(configuracoes.cor_primaria)) {
+        return res.status(400).json({ error: 'Formato de cor hexadecimal inválido para cor_primaria' });
       }
 
       console.log('Saving configs:', configuracoes);
@@ -1329,7 +1900,27 @@ export function startServer() {
       if (configuracoes.portal_som_prestes_chamar !== undefined) syncConfiguracaoPublica('portal_som_prestes_chamar', configuracoes.portal_som_prestes_chamar);
       if (configuracoes.toledo_encarte_ativo !== undefined) syncConfiguracaoPublica('toledo_encarte_ativo', String(configuracoes.toledo_encarte_ativo));
       if (configuracoes.toledo_ocultar_em_falta !== undefined) syncConfiguracaoPublica('toledo_ocultar_em_falta', String(configuracoes.toledo_ocultar_em_falta));
+      if (configuracoes.telao_ticker_texto !== undefined) syncConfiguracaoPublica('telao_ticker_texto', String(configuracoes.telao_ticker_texto));
       
+      if (configuracoes.cor_primaria !== undefined) {
+        const novaCor = configuracoes.cor_primaria;
+        try {
+          const { error } = await supabase
+            .from('configuracoes_publicas')
+            .upsert({ chave: 'cor_primaria', valor: novaCor, updated_at: new Date().toISOString() });
+          if (error) throw error;
+          
+          db.prepare(
+            `INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('sync_pendente_cor_primaria', '0', datetime('now'))`
+          ).run();
+        } catch (err) {
+          db.prepare(
+            `INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('sync_pendente_cor_primaria', '1', datetime('now'))`
+          ).run();
+          console.warn('[Sync] Supabase offline — cor_primaria marcada como pendente de sincronização.');
+        }
+      }
+
       res.json({ success: true });
     } catch (err: any) {
       console.error('Error saving configs:', err);
@@ -1580,11 +2171,31 @@ export function startServer() {
         AND criado_em BETWEEN ? AND ?
       `).get(dateStart, dateEnd) as any;
 
+      // Senhas por hora (periodo)
+      const porHora = db.prepare(`
+        SELECT strftime('%H', criado_em) as hora, COUNT(*) as quantidade
+        FROM senhas
+        WHERE criado_em BETWEEN ? AND ?
+        GROUP BY strftime('%H', criado_em)
+        ORDER BY hora ASC
+      `).all(dateStart, dateEnd);
+
+      // Senhas por balcão
+      const porBalcao = db.prepare(`
+        SELECT b.nome, COUNT(s.id) as quantidade
+        FROM senhas s
+        JOIN balcoes b ON s.balcao_id = b.id
+        WHERE s.criado_em BETWEEN ? AND ?
+        GROUP BY b.id
+      `).all(dateStart, dateEnd);
+
       res.json({
         total: total.count || 0,
         atendidas: atendidas.count || 0,
         canceladas: canceladas.count || 0,
-        tempoMedioEspera: espera.media || 0
+        tempoMedioEspera: espera.media || 0,
+        porHora,
+        porBalcao
       });
     } catch (err: any) {
       console.error('Relatorio error:', err);
@@ -2206,10 +2817,13 @@ export function startServer() {
 
 
 
-  const server = app.listen(PORT, () => {
+  const server = app.listen(PORT, async () => {
     console.log('========================================');
     console.log(`  Server running on http://localhost:${PORT}`);
     console.log('========================================');
+
+    // Iniciar anúncio por broadcast UDP para auto-descoberta
+    startUdpBroadcast();
 
     // Startup reset check and configs synchronization
     try {
@@ -2258,6 +2872,9 @@ export function startServer() {
       if (cfg['toledo_ocultar_em_falta'] !== undefined) {
         syncConfiguracaoPublica('toledo_ocultar_em_falta', cfg['toledo_ocultar_em_falta']);
       }
+      if (cfg['telao_ticker_texto'] !== undefined) {
+        syncConfiguracaoPublica('telao_ticker_texto', cfg['telao_ticker_texto']);
+      }
 
       // Sincroniza a ordem das categorias no startup
       try {
@@ -2295,6 +2912,29 @@ export function startServer() {
           syncConfiguracaoPublica('logo_cliente_base64', dataUrl);
           console.log('[STARTUP] ✅ Logo do estabelecimento sincronizada em base64 com Supabase');
         }
+      }
+
+      // Sincronização pendente da cor primária no startup
+      try {
+        const pendente = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'sync_pendente_cor_primaria'").get() as any;
+        if (pendente && pendente.valor === '1') {
+          const cor = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'cor_primaria'").get() as any;
+          if (cor && cor.valor) {
+            console.log('[STARTUP] Detectado cor_primaria pendente de sincronização. Tentando sincronizar com o Supabase...');
+            const { error } = await supabase
+              .from('configuracoes_publicas')
+              .upsert({ chave: 'cor_primaria', valor: cor.valor, updated_at: new Date().toISOString() });
+            
+            if (!error) {
+              db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('sync_pendente_cor_primaria', '0', datetime('now'))").run();
+              console.log('[STARTUP] ✅ Cor primária sincronizada com sucesso e flag de pendência limpa.');
+            } else {
+              throw error;
+            }
+          }
+        }
+      } catch (errColor) {
+        console.warn('[STARTUP] Supabase offline — cor_primaria permanece pendente de sincronização.');
       }
 
       // Sincroniza todos os produtos Toledo ativos no startup para garantir que a nuvem esteja atualizada
@@ -2712,6 +3352,85 @@ export function broadcastEvent(event: string, data: any) {
   });
 }
 
+let udpSocket: dgram.Socket | null = null;
+let udpBroadcastInterval: NodeJS.Timeout | null = null;
+
+function getLocalIp(): string {
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]!) {
+      if (net.family === 'IPv4' && !net.internal) {
+        if (net.address.startsWith('192.168.') || net.address.startsWith('10.') || net.address.startsWith('172.')) {
+          return net.address;
+        }
+      }
+    }
+  }
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]!) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return '127.0.0.1';
+}
+
+function startUdpBroadcast() {
+  try {
+    if (udpSocket) {
+      try { udpSocket.close(); } catch(e) {}
+      udpSocket = null;
+    }
+    if (udpBroadcastInterval) {
+      clearInterval(udpBroadcastInterval);
+      udpBroadcastInterval = null;
+    }
+
+    udpSocket = dgram.createSocket('udp4');
+    udpSocket.bind(() => {
+      if (udpSocket) {
+        try {
+          udpSocket.setBroadcast(true);
+          console.log('[UDP] Socket de broadcast habilitado.');
+        } catch (e) {
+          console.error('[UDP] Erro ao habilitar setBroadcast:', e);
+        }
+      }
+    });
+
+    // Envia o primeiro anúncio imediatamente
+    setTimeout(() => {
+      enviarAnuncio();
+    }, 500);
+
+    udpBroadcastInterval = setInterval(enviarAnuncio, 5000);
+  } catch (err) {
+    console.error('[UDP] Falha ao iniciar broadcast:', err);
+  }
+}
+
+function enviarAnuncio() {
+  try {
+    const localIp = getLocalIp();
+    const anuncio = {
+      tipo: 'CHAMAAI_SERVIDOR',
+      ip: localIp,
+      porta: 3000,
+      nome: 'ChamaAi'
+    };
+    const mensagem = Buffer.from(JSON.stringify(anuncio));
+    if (udpSocket) {
+      udpSocket.send(mensagem, 0, mensagem.length, 41234, '255.255.255.255', (err) => {
+        if (err) {
+          console.error('[UDP] Erro no envio do broadcast:', err);
+        }
+      });
+    }
+  } catch (err) {
+    console.error('[UDP] Erro na serialização/envio do broadcast:', err);
+  }
+}
 let serverInstance: any = null;
 const serverSockets = new Set<any>();
 let toledoWatcherCleanup: (() => void) | null | undefined = null;
@@ -2723,6 +3442,21 @@ export function stopServer(): Promise<void> {
     if (heartbeatInterval) {
       clearInterval(heartbeatInterval);
       heartbeatInterval = null;
+    }
+
+    if (udpBroadcastInterval) {
+      clearInterval(udpBroadcastInterval);
+      udpBroadcastInterval = null;
+    }
+
+    if (udpSocket) {
+      try {
+        udpSocket.close();
+        console.log('[UDP] Socket de broadcast UDP encerrado.');
+      } catch (e) {
+        console.error('Erro ao fechar socket UDP:', e);
+      }
+      udpSocket = null;
     }
     
     // Fechar todas as conexões SSE ativas

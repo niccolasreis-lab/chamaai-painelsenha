@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { initDatabase } from './electron/services/database';
 import { startServer } from './server/index';
 

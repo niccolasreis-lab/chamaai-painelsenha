@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import AdminLayout from './AdminLayout';
 import { getApiUrl } from '../shared/apiConfig';
 
@@ -10,6 +12,11 @@ export default function Dashboard() {
     cancelados: 0
   });
   const [appVersion, setAppVersion] = useState('...');
+  const [isNewInstall, setIsNewInstall] = useState(false);
+  
+  const [chartDataHora, setChartDataHora] = useState<any[]>([]);
+  const [chartDataBalcao, setChartDataBalcao] = useState<any[]>([]);
+  const COLORS = ['#2563eb', '#16a34a', '#dc2626', '#ca8a04', '#9333ea', '#db2777'];
 
   const API_URL = getApiUrl();
 
@@ -22,6 +29,13 @@ export default function Dashboard() {
       const atendidos = data.filter((s: any) => s.status === 'atendida').length;
       const cancelados = data.filter((s: any) => s.status === 'cancelada').length;
       setStats({ total, aguardando, atendidos, cancelados });
+
+      const resMetricas = await fetch(`${API_URL}/api/dashboard/metricas`);
+      if (resMetricas.ok) {
+        const metricas = await resMetricas.json();
+        setChartDataHora(metricas.porHora.map((i: any) => ({ hora: i.hora + 'h', quantidade: i.quantidade })));
+        setChartDataBalcao(metricas.porBalcao.map((i: any) => ({ name: i.nome, value: i.quantidade })));
+      }
     } catch (err) {
       console.error('Erro ao buscar estatísticas', err);
     }
@@ -37,6 +51,19 @@ export default function Dashboard() {
         setAppVersion(ver);
       }).catch(console.error);
     }
+
+    const checkStatus = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/admin/status`);
+        if (res.ok) {
+          const data = await res.json();
+          setIsNewInstall(data.isNewInstall || false);
+        }
+      } catch (err) {
+        console.error('Falha ao verificar status de admin no dashboard:', err);
+      }
+    };
+    checkStatus();
     
     return () => clearInterval(interval);
   }, []);
@@ -58,6 +85,18 @@ export default function Dashboard() {
             Atualizar
           </button>
         </div>
+
+        {isNewInstall && (
+          <div className="bg-amber-500/10 border-l-4 border-amber-500 p-6 rounded-r-2xl shadow-sm flex items-start gap-4 animate-pulse">
+            <span className="material-symbols-outlined text-amber-500 text-3xl shrink-0 mt-1">warning</span>
+            <div className="flex-1">
+              <h3 className="text-base font-bold text-amber-800 uppercase tracking-widest leading-none">⚠️ AVISO: Altere suas credenciais padrão</h3>
+              <p className="text-xs text-amber-700 font-semibold mt-2 leading-relaxed">
+                Este sistema está rodando com as credenciais administrativas originais de fábrica (<b>admin</b> / <b>admin</b>). Para garantir a integridade absoluta dos seus relatórios, preços e acessos remotos, por favor, <Link to="/admin/operators" className="underline font-bold text-amber-900 hover:text-black">CLIQUE AQUI</Link> ou vá em <b>Operadores</b> para atualizar a senha do administrador agora mesmo!
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -117,13 +156,66 @@ export default function Dashboard() {
 
         {/* Bottom Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-2 bg-surface rounded-[32px] p-10 border border-outline-variant/50 shadow-sm h-80 flex flex-col items-center justify-center gap-4 group">
-            <div className="w-16 h-16 rounded-full bg-surface-variant flex items-center justify-center text-outline-variant group-hover:scale-110 group-hover:bg-primary/5 group-hover:text-primary transition-all duration-500">
-              <span className="material-symbols-outlined text-4xl">insights</span>
+          <div className="md:col-span-2 bg-surface rounded-[32px] p-8 border border-outline-variant/50 shadow-sm flex flex-col gap-6">
+            <h3 className="font-sans text-xl font-bold text-ink uppercase tracking-widest">Atendimentos por Hora</h3>
+            <div className="flex-1 min-h-[250px] w-full">
+              {chartDataHora.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartDataHora} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorQuant" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="hora" tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false} />
+                    <YAxis tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false} />
+                    <RechartsTooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                      labelStyle={{ fontWeight: 'bold', color: '#0f172a' }}
+                    />
+                    <Area type="monotone" dataKey="quantidade" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorQuant)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-ink-secondary text-sm font-bold uppercase tracking-widest">
+                  Sem dados suficientes
+                </div>
+              )}
             </div>
-            <div className="text-center">
-              <h3 className="font-sans text-xl font-bold text-ink uppercase tracking-widest">Análise de Desempenho</h3>
-              <p className="text-ink-secondary text-sm font-bold uppercase tracking-[0.2em] mt-1">Os gráficos serão gerados após o primeiro dia de operação.</p>
+          </div>
+
+          <div className="bg-surface rounded-[32px] p-8 border border-outline-variant/50 shadow-sm flex flex-col gap-6">
+            <h3 className="font-sans text-xl font-bold text-ink uppercase tracking-widest">Por Balcão</h3>
+            <div className="flex-1 min-h-[250px] w-full relative">
+              {chartDataBalcao.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={chartDataBalcao}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {chartDataBalcao.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                      itemStyle={{ fontWeight: 'bold' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-ink-secondary text-sm font-bold uppercase tracking-widest">
+                  Sem dados
+                </div>
+              )}
             </div>
           </div>
           

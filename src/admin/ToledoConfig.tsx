@@ -68,6 +68,8 @@ export default function ToledoConfig() {
   const [masterLoginError, setMasterLoginError] = useState('');
   const [masterLoginLoading, setMasterLoginLoading] = useState(false);
   const [isMasterRemote, setIsMasterRemote] = useState(false);
+  const [editingPlu, setEditingPlu] = useState<string | null>(null);
+  const [editDesc, setEditDesc] = useState<string>('');
 
   // Dynamic Categories CRUD & Import/Export states
   const [categoriasLista, setCategoriasLista] = useState<any[]>([]);
@@ -115,8 +117,39 @@ export default function ToledoConfig() {
         });
       }
     } catch (err) {}
-    localStorage.removeItem('master_remote_token');
-    window.location.reload();
+  };
+
+  const handleInlineEditSave = async (plu: string) => {
+    if (!editDesc.trim()) {
+      alert('A descrição do produto não pode ser vazia.');
+      return;
+    }
+    
+    const originalProd = produtos.find(p => p.plu === plu);
+    if (!originalProd) return;
+    
+    if (originalProd.descricao === editDesc.trim()) {
+      setEditingPlu(null);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/toledo/produtos/${plu}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ descricao: editDesc.trim() })
+      });
+      if (res.ok) {
+        setProdutos(produtos.map(p => p.plu === plu ? { ...p, descricao: editDesc.trim() } : p));
+      } else {
+        const data = await res.json();
+        alert(`Erro ao salvar descrição: ${data.error || 'Falha ao salvar'}`);
+      }
+    } catch (err: any) {
+      alert(`Erro de rede ao salvar descrição: ${err.message}`);
+    } finally {
+      setEditingPlu(null);
+    }
   };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -991,9 +1024,51 @@ export default function ToledoConfig() {
                           const isOferta = p.descricao.includes('* OFERTA *') || p.descricao.includes('OFERTA') || p.descricao.includes('*');
                           return (
                             <div key={p.plu} className={`px-6 py-3 flex items-center justify-between hover:bg-surface-variant/20 transition-colors ${isOferta ? 'bg-error/5 border-l-4 border-error' : ''}`}>
-                              <div className="flex items-center gap-4 flex-1 mr-4 overflow-hidden">
+                              <div className="flex items-center gap-4 flex-1 mr-4 overflow-hidden group">
                                 <span className="text-xs font-mono text-ink-secondary bg-surface-variant px-2 py-1 rounded-lg shrink-0">{p.plu}</span>
-                                <span className={`font-semibold truncate shrink-0 ${isOferta ? 'text-error' : 'text-ink'}`} style={{ maxWidth: '300px' }}>{p.descricao}</span>
+                                {editingPlu === p.plu ? (
+                                  <input
+                                    type="text"
+                                    value={editDesc}
+                                    onChange={(e) => setEditDesc(e.target.value)}
+                                    onBlur={() => handleInlineEditSave(p.plu)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleInlineEditSave(p.plu);
+                                      if (e.key === 'Escape') setEditingPlu(null);
+                                    }}
+                                    className="px-3 py-1.5 rounded-lg border border-primary bg-surface text-ink font-semibold outline-none focus:ring-2 focus:ring-primary/20 text-sm flex-1 min-w-[200px]"
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <div 
+                                    className="flex items-center gap-2 cursor-pointer max-w-[400px] overflow-hidden"
+                                    onDoubleClick={() => {
+                                      if (isMasterServer) {
+                                        setEditingPlu(p.plu);
+                                        setEditDesc(p.descricao);
+                                      }
+                                    }}
+                                  >
+                                    <span 
+                                      className={`font-semibold truncate shrink-0 ${isOferta ? 'text-error font-bold' : 'text-ink font-medium'}`} 
+                                      title="Dê um duplo clique para editar"
+                                    >
+                                      {p.descricao}
+                                    </span>
+                                    {isMasterServer && (
+                                      <button
+                                        onClick={() => {
+                                          setEditingPlu(p.plu);
+                                          setEditDesc(p.descricao);
+                                        }}
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-ink-secondary hover:text-primary rounded"
+                                        title="Editar descrição"
+                                      >
+                                        <span className="material-symbols-outlined text-[14px]">edit</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
                                 <select 
                                   value={p.categoria}
                                   onChange={(e) => handleChangeCategoria(p, e.target.value)}

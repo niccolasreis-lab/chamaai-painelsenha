@@ -6,7 +6,42 @@ import EncarteGranel from './EncarteGranel';
 import TelaoEspera from './TelaoEspera';
 import { useSSE } from '../shared/useSSE';
 import { getApiUrl } from '../shared/apiConfig';
-import { playNotificationSound } from '../shared/sounds';
+import { useAudioPlayer } from '../hooks/useAudioPlayer';
+
+async function falarSenha(texto: string): Promise<boolean> {
+  if (!('speechSynthesis' in window)) {
+    console.warn('[TTS] speechSynthesis não suportado neste dispositivo.');
+    return false;
+  }
+
+  // Aguarda vozes carregarem (necessário em Android/Chrome)
+  const vozes = await new Promise<SpeechSynthesisVoice[]>((resolve) => {
+    const lista = window.speechSynthesis.getVoices();
+    if (lista.length > 0) return resolve(lista);
+    window.speechSynthesis.onvoiceschanged = () => resolve(window.speechSynthesis.getVoices());
+    setTimeout(() => resolve([]), 2000); // fallback: 2s timeout
+  });
+
+  if (vozes.length === 0) {
+    console.warn('[TTS] Nenhuma voz disponível neste dispositivo. TTS ignorado.');
+    return false; // fallback silencioso — não quebra o fluxo
+  }
+
+  window.speechSynthesis.cancel(); // limpa fila acumulada
+  const utterance = new SpeechSynthesisUtterance(texto);
+
+  // Preferir voz em pt-BR se disponível
+  const vozPtBR = vozes.find(v => v.lang.toLowerCase().replace('_', '-') === 'pt-br') 
+    ?? vozes.find(v => v.lang.toLowerCase().startsWith('pt')) 
+    ?? vozes[0];
+  utterance.voice = vozPtBR;
+  utterance.lang = 'pt-BR';
+  utterance.rate = 0.95;
+  utterance.pitch = 1;
+
+  window.speechSynthesis.speak(utterance);
+  return true;
+}
 
 export default function MediaIndoor() {
   // Session / Pairing state
@@ -32,6 +67,49 @@ export default function MediaIndoor() {
   const videoRef = useRef<HTMLVideoElement>(null);
   
   const API_URL = getApiUrl();
+
+  const { initAudioContext, preloadAudio, preloadSystemSound, playAudio, isInitialized } = useAudioPlayer();
+
+  // Preload configured audio (campainha)
+  useEffect(() => {
+    if (config.tipo_som) {
+      if (config.tipo_som === 'custom' && config.som_personalizado) {
+        preloadAudio('campainha', `${API_URL}${config.som_personalizado}`);
+      } else {
+        preloadSystemSound('campainha', config.tipo_som);
+      }
+    } else {
+      preloadSystemSound('campainha', 'bell');
+    }
+  }, [config.tipo_som, config.som_personalizado, API_URL]);
+
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Handle user interaction to unlock AudioContext
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      initAudioContext();
+    };
+
+    // Auto-inicializa o áudio se estiver rodando no APK Kiosk
+    if ((window as any).AndroidKiosk) {
+      console.log('[TELAO] Kiosk Android detectado. Inicializando AudioContext automaticamente.');
+      initAudioContext();
+    }
+
+    document.addEventListener('click', handleUserInteraction, { once: true });
+    document.addEventListener('touchstart', handleUserInteraction, { once: true });
+    return () => {
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, [initAudioContext]);
 
   // Initialize display session
   const initTelaoSession = async () => {
@@ -156,17 +234,15 @@ export default function MediaIndoor() {
 
   // Connect only to paired screen SSE channel (which receives all pairing + queue events)
   const sseUrl = telaoCode ? `${API_URL}/api/telao/sse/${telaoCode}` : null;
-  const { data: telaoSseEvent } = useSSE(sseUrl);
+  const { data: telaoSseEvent, connected: sseConnected } = useSSE(sseUrl);
 
-  const playBell = () => {
-    try {
-      const soundType = config.tipo_som || 'bell';
-      const customUrl = config.som_personalizado ? `${API_URL}${config.som_personalizado}` : undefined;
-      playNotificationSound(soundType, config.volume_audio || 80, customUrl);
-    } catch (err) {
-      console.error('Erro ao tocar som', err);
+  // Buscar perfil atualizado sempre que o telão se reconectar
+  useEffect(() => {
+    if (sseConnected && telaoCode) {
+      console.log('[TELAO] SSE reconectado. Sincronizando perfil...');
+      fetchPerfil(telaoCode);
     }
-  };
+  }, [sseConnected, telaoCode]);
 
   // Watch unified SSE events (pairing events + queue/calling events)
   useEffect(() => {
@@ -174,18 +250,37 @@ export default function MediaIndoor() {
 
     if (telaoSseEvent.event === 'NOVA_SENHA_CHAMADA') {
       const payload = telaoSseEvent.data;
-      setUltimaSenha(payload);
       
+      // PASSO 1: Atualizar o estado React imediatamente (agenda o re-render)
+      setUltimaSenha(payload);
       setHistorico(prev => {
         const filtered = prev.filter(s => s.id !== payload.id);
         return [payload, ...filtered].slice(0, 5);
       });
-      
-      playBell();
-      fetchAguardando();
-      
-      // Focus called ticket in full screen
       setShowMedia(false);
+      // PASSO 2: Aguardar o próximo frame de pintura para disparar o áudio
+      // Garante que o DOM já foi atualizado antes do som tocar
+      requestAnimationFrame(() => {
+        if (!isMountedRef.current) return;
+        const temSomPersonalizado = (config.tipo_som === 'custom' && !!config.som_personalizado) || !!config.portal_som_sua_vez;
+        const ttsAtivo = config.telao_tts_ativo === '1';
+
+        if (ttsAtivo && !temSomPersonalizado) {
+          const textToSpeak = payload.nome_cliente
+            ? `Senha ${payload.numero}, ${payload.nome_cliente}, dirija-se ao ${payload.guiche || 'Balcão'}`
+            : `Senha ${payload.numero}, dirija-se ao ${payload.guiche || 'Balcão'}`;
+          
+          falarSenha(textToSpeak).then((sucesso) => {
+            if (!sucesso && isMountedRef.current) {
+              playAudio('campainha', (config.volume_audio || 80) / 100);
+            }
+          });
+        } else {
+          playAudio('campainha', (config.volume_audio || 80) / 100);
+        }
+      });
+
+      fetchAguardando();
       
       const existingTimer = (window as any)._mediaTimer;
       if (existingTimer) clearTimeout(existingTimer);
@@ -319,9 +414,15 @@ export default function MediaIndoor() {
     : [];
 
   const activeMidia = midias[activeMidiaIndex];
-
-  // Resolve Toledo Config style overrides based on paired profile status
   const showingPriceEncarte = activeModules.includes('encarte') && showingEncarte;
+
+  // Resolvendo layout com suporte a query params (?template=)
+  const query = new URLSearchParams(window.location.search);
+  const templateParam = query.get('template') || query.get('layout');
+  const validTemplates = ['classic', 'sidebar', 'l-shape'];
+  const layout = (templateParam && validTemplates.includes(templateParam))
+    ? templateParam
+    : (perfil?.template_layout || 'classic');
 
   return (
     <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-sans text-ink">
@@ -369,147 +470,302 @@ export default function MediaIndoor() {
 
       {/* Main Body Area */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Media / Call Focus Area (78%) */}
-        <div className="flex-[78] relative bg-[#041a14] overflow-hidden border-r border-outline-variant/20">
-          <div className="h-full w-full">
-            {showingPriceEncarte ? (
-              config.toledo_encarte_estilo === 'granel' ? (
-                <EncarteGranel
-                  key={`encarte-granel-${encarteRefreshKey}`}
-                  duracao={parseInt(config.toledo_encarte_duracao || '15', 10)}
-                  itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
-                  onComplete={onEncarteComplete}
-                  config={config}
-                  categoriasFiltro={parsedCategories}
-                />
-              ) : (
-                <EncartePrecos
-                  key={`encarte-${encarteRefreshKey}`}
-                  duracao={parseInt(config.toledo_encarte_duracao || '15', 10)}
-                  itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
-                  onComplete={onEncarteComplete}
-                  config={config}
-                  categoriasFiltro={parsedCategories}
-                />
-              )
-            ) : activeModules.includes('midia') && activeMidia ? (
-              <div className="h-full w-full animate-fade-in relative">
-                {activeMidia.tipo === 'video' ? (
-                  <video 
-                    ref={videoRef}
-                    src={`${API_URL}${activeMidia.caminho}`} 
-                    className="w-full h-full object-contain"
-                    autoPlay
-                    muted
-                    loop={midias.length === 1 && !activeModules.includes('encarte')}
-                    onEnded={nextMedia}
-                    onPause={(e) => {
-                      // Se o vídeo for pausado pelo SO durante o toque da campainha e ainda não acabou
-                      const video = e.target as HTMLVideoElement;
-                      if (!video.ended && showMedia) {
-                        console.warn('[MEDIA] Vídeo pausado inesperadamente (provavelmente ducking de áudio). Forçando play...');
-                        video.play().catch(() => {});
-                      }
-                    }}
-                    onError={(e) => {
-                      console.error('[MEDIA ERROR] Erro na reprodução do vídeo. Pulando...', e);
-                      nextMedia();
-                    }}
-                    playsInline
-                    preload="auto"
-                  />
-                ) : (
-                  <img 
-                    key={activeMidia.id}
-                    src={`${API_URL}${activeMidia.caminho}`} 
-                    alt={activeMidia.nome}
-                    className="w-full h-full object-contain"
-                    onError={(e) => {
-                      console.error('[MEDIA ERROR] Erro ao carregar imagem. Pulando...', e);
-                      nextMedia();
-                    }}
-                  />
-                )}
-              </div>
-            ) : (
-              /* Branding default screen if no other visual module is selected */
-              <div className="h-full w-full flex flex-col items-center justify-center p-20">
-                <div className="text-center">
-                  {config.logo_cliente ? (
-                    <img src={`${API_URL}${config.logo_cliente}`} className="h-40 object-contain mb-8 drop-shadow-2xl" alt="Logo" />
+        {layout === 'l-shape' ? (
+          <div className="flex-1 flex flex-col overflow-hidden bg-[#041a14]">
+            <div className="flex-1 flex overflow-hidden">
+              {/* Media Area (Centralizada) */}
+              <div className="flex-[72] relative bg-[#041a14] overflow-hidden flex items-center justify-center border-r border-outline-variant/10">
+                <div className="h-full w-full">
+                  {showingPriceEncarte ? (
+                    config.toledo_encarte_estilo === 'granel' ? (
+                      <EncarteGranel
+                        key={`encarte-granel-${encarteRefreshKey}`}
+                        duracao={parseInt(config.toledo_encarte_duracao || '15', 10)}
+                        itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
+                        onComplete={onEncarteComplete}
+                        config={config}
+                        categoriasFiltro={parsedCategories}
+                      />
+                    ) : (
+                      <EncartePrecos
+                        key={`encarte-${encarteRefreshKey}`}
+                        duracao={parseInt(config.toledo_encarte_duracao || '15', 10)}
+                        itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
+                        onComplete={onEncarteComplete}
+                        config={config}
+                        categoriasFiltro={parsedCategories}
+                      />
+                    )
+                  ) : activeModules.includes('midia') && activeMidia ? (
+                    <div className="h-full w-full animate-fade-in relative">
+                      {activeMidia.tipo === 'video' ? (
+                        <video 
+                          ref={videoRef}
+                          src={`${API_URL}${activeMidia.caminho}`} 
+                          className="w-full h-full object-contain"
+                          autoPlay
+                          muted
+                          loop={midias.length === 1 && !activeModules.includes('encarte')}
+                          onEnded={nextMedia}
+                          onPause={(e) => {
+                            const video = e.target as HTMLVideoElement;
+                            if (!video.ended && showMedia) {
+                              video.play().catch(() => {});
+                            }
+                          }}
+                          onError={(e) => {
+                            console.error('[MEDIA ERROR] Erro na reprodução do vídeo. Pulando...', e);
+                            nextMedia();
+                          }}
+                          playsInline
+                          preload="auto"
+                        />
+                      ) : (
+                        <img 
+                          key={activeMidia.id}
+                          src={`${API_URL}${activeMidia.caminho}`} 
+                          alt={activeMidia.nome}
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            console.error('[MEDIA ERROR] Erro ao carregar imagem. Pulando...', e);
+                            nextMedia();
+                          }}
+                        />
+                      )}
+                    </div>
                   ) : (
-                    <h2 className="font-sans text-6xl font-bold text-white mb-6 uppercase tracking-widest drop-shadow-lg">
-                      {config.nome_estabelecimento || 'ChamaAí'}
-                    </h2>
+                    <div className="h-full w-full flex flex-col items-center justify-center p-20">
+                      <div className="text-center">
+                        {config.logo_cliente ? (
+                          <img src={`${API_URL}${config.logo_cliente}`} className="h-40 object-contain mb-8 drop-shadow-2xl" alt="Logo" />
+                        ) : (
+                          <h2 className="font-sans text-6xl font-bold text-white mb-6 uppercase tracking-widest drop-shadow-lg">
+                            {config.nome_estabelecimento || 'ChamaAí'}
+                          </h2>
+                        )}
+                        <p className="font-sans text-3xl font-medium text-white/70 uppercase tracking-widest">
+                          {config.logo_cliente ? (config.nome_estabelecimento || 'ChamaAí') : 'Sua Fila Digital'}
+                        </p>
+                      </div>
+                    </div>
                   )}
-                  <p className="font-sans text-3xl font-medium text-white/70 uppercase tracking-widest">
-                    {config.logo_cliente ? (config.nome_estabelecimento || 'ChamaAí') : 'Sua Fila Digital'}
-                  </p>
+                </div>
+              </div>
+
+              {/* Chamada no Canto (Last Called Ticket Card + Recent History) */}
+              <div className="flex-[28] flex flex-col bg-surface shadow-[-10px_0_30px_rgba(0,0,0,0.05)] border-l border-outline-variant/30 p-6 overflow-hidden">
+                <div className="bg-primary/5 border-2 border-primary/20 rounded-[2rem] p-6 text-center shadow-sm mb-6">
+                  <span className="text-xs font-bold text-primary uppercase tracking-[0.2em] block mb-2">Última Chamada</span>
+                  {ultimaSenha ? (
+                    <div>
+                      <span className="font-sans text-[4.5rem] font-black tracking-tighter text-primary leading-none block">
+                        {String(ultimaSenha.numero).padStart(3, '0')}
+                      </span>
+                      {ultimaSenha.nome_cliente && (
+                        <span className="font-sans text-lg font-medium text-ink-secondary/70 block mt-1 select-none">
+                          {ultimaSenha.nome_cliente.trim()}
+                        </span>
+                      )}
+                      <span className="font-sans text-2xl font-bold text-ink block mt-3 uppercase leading-none">
+                        {ultimaSenha.guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
+                      </span>
+                      <span className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mt-2">
+                        {ultimaSenha.balcao_nome || 'Balcão'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="py-8 text-ink-secondary/30 font-bold uppercase tracking-widest text-sm">
+                      Nenhuma Senha
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  <div className="flex items-center gap-2 mb-4 border-b border-outline-variant/30 pb-2">
+                    <span className="material-symbols-outlined text-primary text-xl font-bold">history</span>
+                    <h3 className="font-sans text-sm font-bold text-ink uppercase tracking-widest">Histórico</h3>
+                  </div>
+                  
+                  <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+                    {historico.slice(1, 5).map(senha => (
+                      <div key={senha.id} className="flex items-center justify-between px-4 py-3 bg-white rounded-2xl border border-outline-variant/50 shadow-sm opacity-80">
+                        <span className="font-sans text-2xl font-black text-ink">
+                          {String(senha.numero).padStart(3, '0')}
+                        </span>
+                        <span className="font-sans text-sm font-bold text-ink-secondary uppercase">
+                          {senha.guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
+                        </span>
+                      </div>
+                    ))}
+                    {historico.length <= 1 && (
+                      <div className="py-8 text-center text-xs font-bold text-ink-secondary/20 uppercase tracking-widest">
+                        Aguardando Chamada
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Ticker do L-Shape */}
+            {config.telao_ticker_texto && (
+              <div className="h-14 bg-ink text-white flex items-center justify-between shrink-0 relative overflow-hidden border-t border-white/10 z-10">
+                <div className="flex-1 overflow-hidden relative h-full flex items-center">
+                  <div 
+                    className="whitespace-nowrap inline-block font-sans text-lg font-bold uppercase tracking-[0.1em] text-white/90"
+                    style={{ animation: 'marquee 25s linear infinite' }}
+                  >
+                    <span className="text-primary mx-6">⚡</span>
+                    {config.telao_ticker_texto}
+                    <span className="text-primary mx-6">⚡</span>
+                    {config.telao_ticker_texto}
+                  </div>
                 </div>
               </div>
             )}
           </div>
-        </div>
-
-        {/* Sidebar History Area (28%) - Displayed only if painel module is active */}
-        {activeModules.includes('painel') && (
-          <div className="flex-[28] flex flex-col bg-surface shadow-[-10px_0_30px_rgba(0,0,0,0.05)] border-l border-outline-variant/30">
-            {/* Recent Calls Section */}
-            <div className="p-8 flex-1 overflow-hidden">
-              <div className="flex items-center gap-3 mb-8 border-b border-outline-variant/30 pb-4">
-                <span className="material-symbols-outlined text-primary text-3xl font-bold">history</span>
-                <h2 className="font-sans text-2xl font-bold text-ink uppercase tracking-widest">Histórico</h2>
-              </div>
-              
-              <div className="space-y-5">
-                {historico.length > 0 ? (
-                  historico.slice(0, 5).map((senha, idx) => (
-                    <div key={senha.id} className={`flex items-center gap-6 px-8 py-5 bg-white rounded-[2rem] border shadow-sm transition-all ${idx === 0 ? 'border-primary ring-4 ring-primary/10 bg-primary/5 scale-[1.03] mb-6' : 'border-outline-variant/50 opacity-60'}`}>
-                      {/* Número da senha */}
-                      <span className={`font-sans text-[5.5rem] font-black leading-none tracking-tighter ${idx === 0 ? 'text-primary' : 'text-ink'}`}>
-                        {String(senha.numero).padStart(3, '0')}
-                      </span>
-                      
-                      {/* Separador */}
-                      <div className="w-[4px] h-16 bg-primary/20 rounded-full shrink-0"></div>
-
-                      {/* Nome do setor */}
-                      <div className="flex flex-col leading-tight">
-                        <span className="font-sans text-[1.3rem] font-bold text-ink-secondary uppercase tracking-widest">
-                          {senha.balcao_nome || config.rotulo_local || 'Balcão'}
-                        </span>
-                        <span className="font-sans text-[2.5rem] font-bold text-ink uppercase leading-none">
-                          {senha.guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
-                        </span>
-                      </div>
-                    </div>
-                  ))
+        ) : (
+          <>
+            {/* Media / Call Focus Area */}
+            <div className={`${layout === 'classic' ? 'flex-1' : 'flex-[78]'} relative bg-[#041a14] overflow-hidden border-r border-outline-variant/20`}>
+              <div className="h-full w-full">
+                {showingPriceEncarte ? (
+                  config.toledo_encarte_estilo === 'granel' ? (
+                    <EncarteGranel
+                      key={`encarte-granel-${encarteRefreshKey}`}
+                      duracao={parseInt(config.toledo_encarte_duracao || '15', 10)}
+                      itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
+                      onComplete={onEncarteComplete}
+                      config={config}
+                      categoriasFiltro={parsedCategories}
+                    />
+                  ) : (
+                    <EncartePrecos
+                      key={`encarte-${encarteRefreshKey}`}
+                      duracao={parseInt(config.toledo_encarte_duracao || '15', 10)}
+                      itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
+                      onComplete={onEncarteComplete}
+                      config={config}
+                      categoriasFiltro={parsedCategories}
+                    />
+                  )
+                ) : activeModules.includes('midia') && activeMidia ? (
+                  <div className="h-full w-full animate-fade-in relative">
+                    {activeMidia.tipo === 'video' ? (
+                      <video 
+                        ref={videoRef}
+                        src={`${API_URL}${activeMidia.caminho}`} 
+                        className="w-full h-full object-contain"
+                        autoPlay
+                        muted
+                        loop={midias.length === 1 && !activeModules.includes('encarte')}
+                        onEnded={nextMedia}
+                        onPause={(e) => {
+                          const video = e.target as HTMLVideoElement;
+                          if (!video.ended && showMedia) {
+                            video.play().catch(() => {});
+                          }
+                        }}
+                        onError={(e) => {
+                          console.error('[MEDIA ERROR] Erro na reprodução do vídeo. Pulando...', e);
+                          nextMedia();
+                        }}
+                        playsInline
+                        preload="auto"
+                      />
+                    ) : (
+                      <img 
+                        key={activeMidia.id}
+                        src={`${API_URL}${activeMidia.caminho}`} 
+                        alt={activeMidia.nome}
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          console.error('[MEDIA ERROR] Erro ao carregar imagem. Pulando...', e);
+                          nextMedia();
+                        }}
+                      />
+                    )}
+                  </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-20 opacity-20">
-                    <span className="material-symbols-outlined text-[6rem]">pending_actions</span>
-                    <p className="text-sm font-bold uppercase tracking-[0.3em] mt-4">Aguardando Chamada</p>
+                  <div className="h-full w-full flex flex-col items-center justify-center p-20">
+                    <div className="text-center">
+                      {config.logo_cliente ? (
+                        <img src={`${API_URL}${config.logo_cliente}`} className="h-40 object-contain mb-8 drop-shadow-2xl" alt="Logo" />
+                      ) : (
+                        <h2 className="font-sans text-6xl font-bold text-white mb-6 uppercase tracking-widest drop-shadow-lg">
+                          {config.nome_estabelecimento || 'ChamaAí'}
+                        </h2>
+                      )}
+                      <p className="font-sans text-3xl font-medium text-white/70 uppercase tracking-widest">
+                        {config.logo_cliente ? (config.nome_estabelecimento || 'ChamaAí') : 'Sua Fila Digital'}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Footer Sidebar (Status) */}
-            <div className="mt-auto p-10 flex flex-col items-center text-center gap-6 border-t border-outline-variant/20">
-               <div className={`p-6 rounded-full ${!showMedia ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-ink-secondary/30'}`}>
-                  <span className="material-symbols-outlined text-[4rem]">
-                     {showMedia ? 'confirmation_number' : 'campaign'}
-                  </span>
-               </div>
-               <p className={`font-sans text-2xl font-bold uppercase tracking-widest ${showMedia ? 'text-ink-secondary/40' : 'text-primary animate-pulse'}`}>
-                  {showMedia ? 'Aguardando chamada...' : 'Senha Chamada!'}
-               </p>
-            </div>
-          </div>
+            {/* Sidebar History Area */}
+            {layout === 'sidebar' && activeModules.includes('painel') && (
+              <div className="flex-[28] flex flex-col bg-surface shadow-[-10px_0_30px_rgba(0,0,0,0.05)] border-l border-outline-variant/30">
+                <div className="p-8 flex-1 overflow-hidden">
+                  <div className="flex items-center gap-3 mb-8 border-b border-outline-variant/30 pb-4">
+                    <span className="material-symbols-outlined text-primary text-3xl font-bold">history</span>
+                    <h2 className="font-sans text-2xl font-bold text-ink uppercase tracking-widest">Histórico</h2>
+                  </div>
+                  
+                  <div className="space-y-5">
+                    {historico.length > 0 ? (
+                      historico.slice(0, 5).map((senha, idx) => (
+                        <div key={senha.id} className={`flex items-center gap-6 px-8 py-5 bg-white rounded-[2rem] border shadow-sm transition-all ${idx === 0 ? 'border-primary ring-4 ring-primary/10 bg-primary/5 scale-[1.03] mb-6' : 'border-outline-variant/50 opacity-60'}`}>
+                          <span className={`font-sans text-[5.5rem] font-black leading-none tracking-tighter ${idx === 0 ? 'text-primary' : 'text-ink'}`}>
+                            {String(senha.numero).padStart(3, '0')}
+                          </span>
+                          
+                          <div className="w-[4px] h-16 bg-primary/20 rounded-full shrink-0"></div>
+
+                          <div className="flex flex-col leading-tight">
+                            {senha.nome_cliente && (
+                              <span className="font-sans text-lg font-medium text-ink-secondary/70 mb-1 select-none">
+                                {senha.nome_cliente.trim()}
+                              </span>
+                            )}
+                            <span className="font-sans text-[1.3rem] font-bold text-ink-secondary uppercase tracking-widest">
+                              {senha.balcao_nome || config.rotulo_local || 'Balcão'}
+                            </span>
+                            <span className="font-sans text-[2.5rem] font-bold text-ink uppercase leading-none">
+                              {senha.guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-20 opacity-20">
+                        <span className="material-symbols-outlined text-[6rem]">pending_actions</span>
+                        <p className="text-sm font-bold uppercase tracking-[0.3em] mt-4">Aguardando Chamada</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-auto p-10 flex flex-col items-center text-center gap-6 border-t border-outline-variant/20">
+                   <div className={`p-6 rounded-full ${!showMedia ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-ink-secondary/30'}`}>
+                      <span className="material-symbols-outlined text-[4rem]">
+                         {showMedia ? 'confirmation_number' : 'campaign'}
+                      </span>
+                   </div>
+                   <p className={`font-sans text-2xl font-bold uppercase tracking-widest ${showMedia ? 'text-ink-secondary/40' : 'text-primary animate-pulse'}`}>
+                      {showMedia ? 'Aguardando chamada...' : 'Senha Chamada!'}
+                   </p>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Bottom Footer Area (Letreiro Digital) */}
-      {config.mostrar_rodape !== '0' && (
+      {layout !== 'l-shape' && config.mostrar_rodape !== '0' && (
         <footer className="h-14 bg-ink text-white flex items-center justify-between shrink-0 relative overflow-hidden">
           <div className="flex-1 overflow-hidden relative h-full flex items-center">
             <div 
@@ -538,7 +794,23 @@ export default function MediaIndoor() {
       {/* Fullscreen Call Overlay (Only if ticket calling is enabled in profile modules) */}
       {!showMedia && ultimaSenha && activeModules.includes('painel') && (
         <div className="absolute inset-0 z-50">
-          <SenhaChamada ultimaSenha={ultimaSenha} config={config} />
+          <SenhaChamada key={`call-${ultimaSenha.id}`} ultimaSenha={ultimaSenha} config={config} />
+        </div>
+      )}
+
+      {/* Activation Overlay */}
+      {!isInitialized && (
+        <div 
+          onClick={initAudioContext}
+          className="fixed bottom-6 right-6 z-[9999] bg-primary hover:bg-primary-hover text-white font-bold py-4 px-8 rounded-3xl shadow-2xl border border-white/20 flex items-center gap-3 cursor-pointer select-none transition-all active:scale-95"
+          style={{
+            willChange: 'transform, opacity',
+            transform: 'translateZ(0)',
+            animation: 'totemGlow 2s infinite'
+          }}
+        >
+          <span className="material-symbols-outlined text-2xl">volume_up</span>
+          <span className="font-sans text-sm uppercase tracking-widest leading-none">Clique para ativar áudio</span>
         </div>
       )}
     </div>

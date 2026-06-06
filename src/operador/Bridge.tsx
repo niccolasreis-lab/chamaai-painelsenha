@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { setServerIp } from '../shared/apiConfig';
+import packageJson from '../../package.json';
 
 export default function Bridge() {
   const [ip, setIp] = useState(localStorage.getItem('server_ip_override') || '');
@@ -191,7 +192,7 @@ export default function Bridge() {
         {/* Footer Info */}
         <div className="mt-12 text-center opacity-40">
           <p className="text-[9px] font-bold uppercase tracking-[0.3em]">
-            CHAMAAÍ V1.0.29 • MOBILE BRIDGE
+            CHAMAAÍ V{packageJson.version} • MOBILE BRIDGE
           </p>
         </div>
       </div>

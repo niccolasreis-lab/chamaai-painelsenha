@@ -1,4 +1,3 @@
-import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer';
 import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from 'child_process';
@@ -16,6 +15,7 @@ export interface TicketData {
   preferencial: boolean;
   logo?: string;
   mostraEncarte?: boolean;
+  nome_cliente?: string;
 }
 
 export interface PrinterConfig {
@@ -104,20 +104,6 @@ export class PrinterService {
     }
     // Fallback: usa a rota local (funciona via Wi-Fi da loja)
     return 'http://localhost:3000/#/cliente';
-  }
-
-  private isEncarteAtivo(): boolean {
-    try {
-      const { getDb } = require('./database');
-      const db = getDb();
-      const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'toledo_encarte_ativo'").get() as any;
-      if (row && row.valor) {
-        return row.valor === '1';
-      }
-    } catch (err) {
-      console.error('[PrinterService] Erro ao ler toledo_encarte_ativo:', err);
-    }
-    return false; // Default to not showing if not explicitly enabled
   }
 
   async printTicket(data: TicketData): Promise<{ success: boolean; error?: string }> {
@@ -313,6 +299,7 @@ export class PrinterService {
             <div id="ticket-content">
               ${logoHtml}
               ${mostrarEscrita ? `<div class="balcao">${tituloEstabelecimento}</div>` : ''}
+              ${data.nome_cliente ? `<div style="font-size: 16px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase;">Cliente: ${data.nome_cliente}</div>` : ''}
               <div class="numero">${data.numero}</div>
               <div class="tipo ${data.preferencial ? 'preferencial' : ''}">${data.preferencial ? 'ATENDIMENTO PREFERENCIAL' : 'ATENDIMENTO NORMAL'}</div>
               <div class="data">${data.data}</div>
