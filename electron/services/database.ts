@@ -89,6 +89,10 @@ export function initDatabase() {
       INSERT OR IGNORE INTO configuracoes VALUES ('totem_screensaver_modo', 'ambos', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('telao_agendamento_ativo', '0', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('telao_agendamento_regras', '[]', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_template', 'Senha {senha}, dirija-se ao {guiche}.', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_template_nome', 'Senha {senha}, {nome}, dirija-se ao {guiche}.', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_velocidade', '0.95', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_tom', '1.0', datetime('now'));
     `);
 
     db.exec(`

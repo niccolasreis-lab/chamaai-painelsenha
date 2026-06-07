@@ -229,6 +229,52 @@ export default function ControleTouch() {
     }
   };
 
+  const handleConcluir = async () => {
+    if (isActionPending || !senhaAtual) return;
+    setIsActionPending(true);
+    triggerVibration(50);
+
+    try {
+      const res = await fetch(`http://${ip}:3000/api/senhas/concluir`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha_id: senhaAtual.id, guiche: `Guichê ${guiche}` }),
+      });
+      if (res.ok) {
+        setSenhaAtual(null);
+      } else {
+        alert('Erro ao concluir atendimento.');
+      }
+    } catch (err) {
+      alert('Sem comunicação com o servidor.');
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
+  const handleCancelar = async () => {
+    if (isActionPending || !senhaAtual) return;
+    setIsActionPending(true);
+    triggerVibration(50);
+
+    try {
+      const res = await fetch(`http://${ip}:3000/api/senhas/cancelar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha_id: senhaAtual.id, guiche: `Guichê ${guiche}` }),
+      });
+      if (res.ok) {
+        setSenhaAtual(null);
+      } else {
+        alert('Erro ao cancelar atendimento.');
+      }
+    } catch (err) {
+      alert('Sem comunicação com o servidor.');
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
   // --- SCREEN 1: Setup & Connection ---
   if (!isSetup) {
     return (
@@ -406,36 +452,69 @@ export default function ControleTouch() {
 
       {/* RIGHT COLUMN (~60% width) */}
       <div className="w-[60%] flex flex-col gap-4 pl-3 h-full justify-between">
-        
-        {/* PRÓXIMO BUTTON (~45% height) */}
-        <button
-          onClick={handleProximo}
-          disabled={isActionPending}
-          className="h-[44%] w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-xl shadow-[#16A34A]/10 border-none outline-none disabled:opacity-50 select-none"
-        >
-          <span className="material-symbols-outlined text-5xl md:text-6xl">campaign</span>
-          <span className="text-3xl md:text-4xl lg:text-5xl font-black">PRÓXIMO</span>
-        </button>
+        {senhaAtual ? (
+          <>
+            {/* Row 1: Concluir & Não Compareceu */}
+            <div className="h-[32%] w-full flex gap-4 animate-fade-in">
+              <button
+                onClick={handleConcluir}
+                disabled={isActionPending}
+                className="flex-1 bg-[#16A34A] hover:bg-[#15803D] text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-all shadow-lg shadow-[#16A34A]/10 border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-2xl md:text-3xl">check_circle</span>
+                <span className="text-base md:text-lg lg:text-xl font-black">CONCLUIR</span>
+              </button>
+              <button
+                onClick={handleCancelar}
+                disabled={isActionPending}
+                className="flex-1 bg-[#EF4444] hover:bg-[#DC2626] text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-all shadow-lg shadow-[#EF4444]/10 border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-2xl md:text-3xl">cancel</span>
+                <span className="text-base md:text-lg lg:text-xl font-black">NÃO COMP.</span>
+              </button>
+            </div>
 
-        {/* REPETIR BUTTON (~30% height) */}
-        <button
-          onClick={handleRepetir}
-          disabled={isActionPending || !senhaAtual}
-          className="h-[29%] w-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-extrabold uppercase tracking-widest rounded-3xl flex items-center justify-center gap-4 active:scale-[0.98] transition-all shadow-lg shadow-[#2563EB]/10 border-none outline-none disabled:opacity-30 select-none"
-        >
-          <span className="material-symbols-outlined text-3xl md:text-4xl">refresh</span>
-          <span className="text-xl md:text-2xl lg:text-3xl font-black">REPETIR</span>
-        </button>
+            {/* Row 2: Chamar Próximo */}
+            <button
+              onClick={handleProximo}
+              disabled={isActionPending}
+              className="h-[32%] w-full bg-slate-800 hover:bg-slate-700 text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-all shadow-md border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-2xl md:text-3xl">campaign</span>
+              <span className="text-lg md:text-xl font-black">CHAMAR PRÓXIMO</span>
+            </button>
 
-        {/* DEVOLVER BUTTON (~25% height) */}
-        <button
-          onClick={() => setShowConfirmDevolver(true)}
-          disabled={isActionPending || !senhaAtual}
-          className="h-[23%] w-full bg-white hover:bg-amber-50/30 text-[#D97706] border-2 border-[#D97706] font-extrabold uppercase tracking-widest rounded-3xl flex items-center justify-center gap-3 active:scale-[0.98] transition-all shadow-sm outline-none disabled:opacity-30 select-none"
-        >
-          <span className="material-symbols-outlined text-2xl md:text-3xl">undo</span>
-          <span className="text-lg md:text-xl font-black">DEVOLVER À FILA</span>
-        </button>
+            {/* Row 3: Repetir & Devolver */}
+            <div className="h-[28%] w-full flex gap-4">
+              <button
+                onClick={handleRepetir}
+                disabled={isActionPending}
+                className="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-extrabold uppercase tracking-widest rounded-3xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-md border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl md:text-2xl">refresh</span>
+                <span className="text-sm md:text-base font-black">REPETIR</span>
+              </button>
+              <button
+                onClick={() => setShowConfirmDevolver(true)}
+                disabled={isActionPending}
+                className="flex-1 bg-white hover:bg-amber-50/30 text-[#D97706] border-2 border-[#D97706] font-extrabold uppercase tracking-widest rounded-3xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm outline-none disabled:opacity-50 select-none cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl md:text-2xl">undo</span>
+                <span className="text-sm md:text-base font-black">DEVOLVER</span>
+              </button>
+            </div>
+          </>
+        ) : (
+          /* PRÓXIMO BUTTON (Full Height) */
+          <button
+            onClick={handleProximo}
+            disabled={isActionPending}
+            className="h-full w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-extrabold uppercase tracking-widest rounded-[40px] flex flex-col items-center justify-center gap-4 active:scale-[0.98] transition-all shadow-2xl shadow-[#16A34A]/20 border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-7xl md:text-8xl">campaign</span>
+            <span className="text-4xl md:text-5xl lg:text-6xl font-black">CHAMAR PRÓXIMO</span>
+          </button>
+        )}
       </div>
 
       {/* --- CONFIRM MODAL FOR DEVOLVER --- */}

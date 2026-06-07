@@ -16,6 +16,7 @@ interface Stats {
   atendidas: number;
   canceladas: number;
   tempoMedioEspera: number; // em minutos
+  tempoMedioAtendimento: number; // em minutos
   porHora?: { hora: string, quantidade: number }[];
   porBalcao?: { nome: string, quantidade: number }[];
 }
@@ -29,7 +30,8 @@ export default function Relatorios() {
     total: 0,
     atendidas: 0,
     canceladas: 0,
-    tempoMedioEspera: 0
+    tempoMedioEspera: 0,
+    tempoMedioAtendimento: 0
   });
 
   const fetchRelatorio = async () => {
@@ -60,6 +62,7 @@ export default function Relatorios() {
       ["Atendidas", stats.atendidas],
       ["Canceladas/Nao Compareceu", stats.canceladas],
       ["Tempo Medio de Espera (min)", stats.tempoMedioEspera.toFixed(1)],
+      ["Tempo Medio de Atendimento (min)", stats.tempoMedioAtendimento.toFixed(1)],
     ];
 
     const csvContent = "data:text/csv;charset=utf-8," 
@@ -131,7 +134,7 @@ export default function Relatorios() {
         </div>
 
         {/* Cards de Métricas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <div className="bg-surface p-8 rounded-[24px] shadow-sm border border-outline-variant/50">
             <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-6">
               <FileText size={24} />
@@ -162,6 +165,14 @@ export default function Relatorios() {
             </div>
             <p className="text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2">Espera Média</p>
             <h3 className="text-4xl font-black text-ink font-sans">{stats.tempoMedioEspera.toFixed(1)} <span className="text-sm">min</span></h3>
+          </div>
+
+          <div className="bg-surface p-8 rounded-[24px] shadow-sm border border-primary/20 border-b-8 border-b-primary">
+            <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-6">
+              <Clock size={24} />
+            </div>
+            <p className="text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2">Atendimento Médio</p>
+            <h3 className="text-4xl font-black text-ink font-sans">{stats.tempoMedioAtendimento.toFixed(1)} <span className="text-sm">min</span></h3>
           </div>
         </div>
 

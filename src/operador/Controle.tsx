@@ -136,6 +136,32 @@ export default function Controle() {
     } catch (err) {}
   };
 
+  const concluirAtendimento = async () => {
+    if (!senhaAtual) return;
+    try {
+      await fetch(`${API_URL}/api/senhas/concluir`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha_id: senhaAtual.id, guiche })
+      });
+      setSenhaAtual(null);
+      refreshData();
+    } catch (err) {}
+  };
+
+  const naoCompareceu = async () => {
+    if (!senhaAtual) return;
+    try {
+      await fetch(`${API_URL}/api/senhas/cancelar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha_id: senhaAtual.id, guiche })
+      });
+      setSenhaAtual(null);
+      refreshData();
+    } catch (err) {}
+  };
+
   const normalCount = fila.filter(s => s.preferencial === 0).length;
   const priorityCount = fila.filter(s => s.preferencial === 1).length;
 
@@ -239,27 +265,41 @@ export default function Controle() {
         {/* Botões de Ação */}
         <div className="flex flex-col gap-3 pb-4">
           {senhaAtual && (
-            <button 
-              onClick={repetirChamada}
-              className="py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-3xl font-bold text-lg shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3">
-              <span className="material-symbols-outlined">refresh</span> REPETIR
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={concluirAtendimento}
+                className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-3xl font-bold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-base">check_circle</span> Concluir
+              </button>
+              <button 
+                onClick={naoCompareceu}
+                className="py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-3xl font-bold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-base">cancel</span> Não Compareceu
+              </button>
+            </div>
+          )}
+
+          {senhaAtual && (
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={repetirChamada}
+                className="py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-3xl font-bold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-base">refresh</span> Repetir
+              </button>
+              <button 
+                onClick={estornar}
+                className={`py-3 rounded-3xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.95] border-2 uppercase tracking-wider
+                  ${theme === 'dark' ? 'bg-amber-600/20 border-amber-500/50 text-amber-500' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
+                <span className="material-symbols-outlined text-base">undo</span> Devolver
+              </button>
+            </div>
           )}
           
           <button 
             onClick={chamarProxima}
-            className="py-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[32px] font-black text-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-4">
-            <span className="material-symbols-outlined text-4xl">campaign</span> PRÓXIMO
+            className="py-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[32px] font-black text-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-4 uppercase tracking-widest">
+            <span className="material-symbols-outlined text-4xl">campaign</span> Próximo
           </button>
-
-          {senhaAtual && (
-            <button 
-              onClick={estornar}
-              className={`w-full py-4 rounded-3xl font-bold text-base flex items-center justify-center gap-3 transition-all active:scale-[0.95] border-2
-                ${theme === 'dark' ? 'bg-amber-600/20 border-amber-500/50 text-amber-500' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
-              <span className="material-symbols-outlined">undo</span> DEVOLVER À FILA
-            </button>
-          )}
         </div>
 
       </div>

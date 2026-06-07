@@ -8,7 +8,7 @@ import { useSSE } from '../shared/useSSE';
 import { getApiUrl } from '../shared/apiConfig';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 
-async function falarSenha(texto: string): Promise<boolean> {
+async function falarSenha(texto: string, rate: number, pitch: number, vozGenero: string): Promise<boolean> {
   if (!('speechSynthesis' in window)) {
     console.warn('[TTS] speechSynthesis não suportado neste dispositivo.');
     return false;
@@ -30,14 +30,24 @@ async function falarSenha(texto: string): Promise<boolean> {
   window.speechSynthesis.cancel(); // limpa fila acumulada
   const utterance = new SpeechSynthesisUtterance(texto);
 
-  // Preferir voz em pt-BR se disponível
-  const vozPtBR = vozes.find(v => v.lang.toLowerCase().replace('_', '-') === 'pt-br') 
-    ?? vozes.find(v => v.lang.toLowerCase().startsWith('pt')) 
-    ?? vozes[0];
-  utterance.voice = vozPtBR;
+  // Selecionar voz em pt-BR
+  const ptVoices = vozes.filter(v => v.lang.toLowerCase().startsWith('pt'));
+  let selectedVoice = null;
+  if (vozGenero === 'Masculina') {
+    selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('masculino') || v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('daniel') || v.name.toLowerCase().includes('google de'));
+  } else {
+    selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('feminina') || v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('maria') || v.name.toLowerCase().includes('luciana'));
+  }
+  if (!selectedVoice && ptVoices.length > 0) {
+    selectedVoice = ptVoices[0];
+  }
+  if (selectedVoice) {
+    utterance.voice = selectedVoice;
+  }
+  
   utterance.lang = 'pt-BR';
-  utterance.rate = 0.95;
-  utterance.pitch = 1;
+  utterance.rate = rate;
+  utterance.pitch = pitch;
 
   window.speechSynthesis.speak(utterance);
   return true;
@@ -266,11 +276,26 @@ export default function MediaIndoor() {
         const ttsAtivo = config.telao_tts_ativo === '1';
 
         if (ttsAtivo && !temSomPersonalizado) {
-          const textToSpeak = payload.nome_cliente
-            ? `Senha ${payload.numero}, ${payload.nome_cliente}, dirija-se ao ${payload.guiche || 'Balcão'}`
-            : `Senha ${payload.numero}, dirija-se ao ${payload.guiche || 'Balcão'}`;
+          const template = (payload.nome_cliente && config.telao_tts_template_nome)
+            ? config.telao_tts_template_nome
+            : (config.telao_tts_template || 'Senha {senha}, dirija-se ao {guiche}.');
+            
+          const pref = payload.preferencial === 1 ? 'P' : 'A';
+          const prefixo = payload.prefixo_senha || pref;
+          const formattedNum = `${prefixo}-${String(payload.numero).padStart(3, '0')}`;
           
-          falarSenha(textToSpeak).then((sucesso) => {
+          const textToSpeak = template
+            .replace(/\{senha\}/gi, formattedNum)
+            .replace(/\{nome\}/gi, payload.nome_cliente || '')
+            .replace(/\{guiche\}/gi, payload.guiche || '')
+            .replace(/\{balcao\}/gi, payload.balcao_nome || '')
+            .replace(/\{local\}/gi, config.rotulo_local || 'Guichê');
+          
+          const rate = parseFloat(config.telao_tts_velocidade || '0.95');
+          const pitch = parseFloat(config.telao_tts_tom || '1.0');
+          const vozGenero = config.telao_tts_voz || 'Feminina';
+
+          falarSenha(textToSpeak, rate, pitch, vozGenero).then((sucesso) => {
             if (!sucesso && isMountedRef.current) {
               playAudio('campainha', (config.volume_audio || 80) / 100);
             }

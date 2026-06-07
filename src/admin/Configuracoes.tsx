@@ -67,6 +67,12 @@ export default function Configuracoes() {
     totem_solicita_nome: '0',
     telao_agendamento_ativo: '0',
     telao_agendamento_regras: '[]',
+    telao_tts_ativo: '0',
+    telao_tts_voz: 'Feminina',
+    telao_tts_template: 'Senha {senha}, dirija-se ao {guiche}.',
+    telao_tts_template_nome: 'Senha {senha}, {nome}, dirija-se ao {guiche}.',
+    telao_tts_velocidade: '0.95',
+    telao_tts_tom: '1.0',
   });
 
   const [agendamentoRegras, setAgendamentoRegras] = useState<{ hora: string; layout: string }[]>([]);
@@ -340,6 +346,48 @@ export default function Configuracoes() {
   const handleTestSound = () => {
     const customUrl = config.som_personalizado ? `${API_URL}${config.som_personalizado}` : undefined;
     playNotificationSound(config.tipo_som as any || 'bell', parseInt(config.volume_audio || '80'), customUrl);
+  };
+
+  const handleTestTts = () => {
+    if (!window.speechSynthesis) {
+      alert('Sintetizador de voz não suportado pelo seu navegador.');
+      return;
+    }
+    window.speechSynthesis.cancel();
+
+    const template = config.totem_solicita_nome === '1'
+      ? config.telao_tts_template_nome 
+      : config.telao_tts_template;
+      
+    const formatMock = template
+      .replace('{senha}', 'A-001')
+      .replace('{nome}', 'Niccolas')
+      .replace('{guiche}', 'Guichê 3')
+      .replace('{balcao}', 'Balcão Geral')
+      .replace('{local}', config.rotulo_local || 'Guichê');
+
+    const utterance = new SpeechSynthesisUtterance(formatMock);
+    
+    utterance.rate = parseFloat(config.telao_tts_velocidade || '0.95');
+    utterance.pitch = parseFloat(config.telao_tts_tom || '1.0');
+
+    const voices = window.speechSynthesis.getVoices();
+    let selectedVoice = null;
+    
+    const ptVoices = voices.filter(v => v.lang.startsWith('pt'));
+    if (config.telao_tts_voz === 'Masculina') {
+      selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('masculino') || v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('daniel') || v.name.toLowerCase().includes('google de'));
+    } else {
+      selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('feminina') || v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('maria') || v.name.toLowerCase().includes('luciana'));
+    }
+    if (!selectedVoice && ptVoices.length > 0) {
+      selectedVoice = ptVoices[0];
+    }
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
+    
+    window.speechSynthesis.speak(utterance);
   };
 
   const handleBackup = async () => {
@@ -656,6 +704,104 @@ export default function Configuracoes() {
                       <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
                     </label>
                   </div>
+                </div>
+
+                {/* Seção TTS de Chamada */}
+                <div className="col-span-2 border-t border-outline-variant/30 pt-6 mt-2 space-y-6 animate-fade-in">
+                  <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-ink text-sm uppercase">Chamada por Voz por TTS (Sintetizador)</span>
+                      <span className="text-[10px] text-ink-secondary/60 font-medium mt-1">Falará a senha e o local nos telões no momento da chamada.</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" name="telao_tts_ativo" checked={config.telao_tts_ativo === '1'} onChange={handleChange} className="sr-only peer" />
+                      <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                    </label>
+                  </div>
+
+                  {config.telao_tts_ativo === '1' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-surface-variant/30 border border-outline-variant/30 rounded-2xl animate-fade-in">
+                      <div>
+                        <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">Gênero da Voz</label>
+                        <select
+                          name="telao_tts_voz"
+                          value={config.telao_tts_voz || 'Feminina'}
+                          onChange={handleChange}
+                          className="w-full bg-white border border-outline-variant/50 rounded-xl px-4 py-3 text-ink font-bold focus:border-primary"
+                        >
+                          <option value="Feminina">Feminina</option>
+                          <option value="Masculina">Masculina</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">Velocidade ({config.telao_tts_velocidade || '0.95'}x)</label>
+                          <input
+                            type="range"
+                            name="telao_tts_velocidade"
+                            min="0.5"
+                            max="2.0"
+                            step="0.05"
+                            value={config.telao_tts_velocidade || '0.95'}
+                            onChange={handleChange}
+                            className="w-full h-2 bg-outline-variant rounded-lg appearance-none cursor-pointer accent-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">Tom ({config.telao_tts_tom || '1.0'})</label>
+                          <input
+                            type="range"
+                            name="telao_tts_tom"
+                            min="0.5"
+                            max="2.0"
+                            step="0.05"
+                            value={config.telao_tts_tom || '1.0'}
+                            onChange={handleChange}
+                            className="w-full h-2 bg-outline-variant rounded-lg appearance-none cursor-pointer accent-primary"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="col-span-2">
+                        <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">Template de Chamada (Sem nome)</label>
+                        <input
+                          name="telao_tts_template"
+                          value={config.telao_tts_template || ''}
+                          onChange={handleChange}
+                          placeholder="Senha {senha}, dirija-se ao {guiche}."
+                          className="w-full bg-white border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold"
+                          type="text"
+                        />
+                      </div>
+
+                      <div className="col-span-2">
+                        <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">Template de Chamada (Com nome do cliente)</label>
+                        <input
+                          name="telao_tts_template_nome"
+                          value={config.telao_tts_template_nome || ''}
+                          onChange={handleChange}
+                          placeholder="Senha {senha}, {nome}, dirija-se ao {guiche}."
+                          className="w-full bg-white border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold"
+                          type="text"
+                        />
+                        <p className="text-[10px] text-ink-secondary/60 mt-2 font-medium">
+                          Placeholders aceitos: <code className="bg-primary/10 px-1 py-0.5 rounded text-primary font-mono font-bold">{'{senha}'}</code>, <code className="bg-primary/10 px-1 py-0.5 rounded text-primary font-mono font-bold">{'{nome}'}</code>, <code className="bg-primary/10 px-1 py-0.5 rounded text-primary font-mono font-bold">{'{guiche}'}</code>, <code className="bg-primary/10 px-1 py-0.5 rounded text-primary font-mono font-bold">{'{balcao}'}</code>, <code className="bg-primary/10 px-1 py-0.5 rounded text-primary font-mono font-bold">{'{local}'}</code>
+                        </p>
+                      </div>
+
+                      <div className="col-span-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleTestTts}
+                          className="px-6 py-3 bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-white rounded-xl font-bold uppercase tracking-widest text-xs flex items-center gap-2 transition-all active:scale-95"
+                        >
+                          <span className="material-symbols-outlined text-sm">volume_up</span>
+                          Testar Voz e Template
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="col-span-2 border-t border-outline-variant/30 pt-6 mt-2">

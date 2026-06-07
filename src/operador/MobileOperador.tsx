@@ -110,6 +110,38 @@ export default function MobileOperador() {
     } catch (err) {}
   };
 
+  const concluirAtendimento = async () => {
+    if (!senhaAtual) return;
+    try {
+      const res = await fetch(`${API_URL}/api/senhas/concluir`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha_id: senhaAtual.id, guiche: `Balcão ${guiche}` })
+      });
+      if (res.ok) {
+        setSenhaAtual(null);
+        fetchFila();
+        if (navigator.vibrate) navigator.vibrate(50);
+      }
+    } catch (err) {}
+  };
+
+  const naoCompareceu = async () => {
+    if (!senhaAtual) return;
+    try {
+      const res = await fetch(`${API_URL}/api/senhas/cancelar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha_id: senhaAtual.id, guiche: `Balcão ${guiche}` })
+      });
+      if (res.ok) {
+        setSenhaAtual(null);
+        fetchFila();
+        if (navigator.vibrate) navigator.vibrate(50);
+      }
+    } catch (err) {}
+  };
+
   const handleInstallClick = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -247,6 +279,26 @@ export default function MobileOperador() {
 
       {/* Floating Action Buttons */}
       <div className="p-8 pb-12 md:p-12 md:pb-16 flex flex-col gap-6 md:gap-8 shrink-0 bg-gradient-to-t from-slate-950 to-transparent">
+        {senhaAtual && (
+          <div className="flex gap-4 md:gap-8 max-w-4xl mx-auto w-full animate-fade-in">
+            <button 
+              onClick={concluirAtendimento}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all text-white font-sans text-xl md:text-4xl font-bold uppercase tracking-wider cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-2xl md:text-5xl">check_circle</span>
+              <span>Concluir</span>
+            </button>
+            
+            <button 
+              onClick={naoCompareceu}
+              className="flex-1 bg-rose-600 hover:bg-rose-500 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all text-white font-sans text-xl md:text-4xl font-bold uppercase tracking-wider cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-2xl md:text-5xl">cancel</span>
+              <span>Não Comp.</span>
+            </button>
+          </div>
+        )}
+
         <button 
           onClick={chamarProxima}
           disabled={aguardandoCount === 0}

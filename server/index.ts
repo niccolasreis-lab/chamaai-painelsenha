@@ -1365,6 +1365,19 @@ export function startServer() {
       console.log(`[Operador Touch - Proximo] guiche=${guiche}`);
 
       const proximoTouchTx = db.transaction((guicheStr: string) => {
+        // 0. Auto-finalize previous called ticket of this guichê
+        const activeCalled = db.prepare(`
+          SELECT s.id 
+          FROM chamadas c
+          JOIN senhas s ON c.senha_id = s.id
+          WHERE c.guiche = ? AND s.status = 'chamada'
+          ORDER BY c.id DESC LIMIT 1
+        `).get(`Guichê ${guicheStr}`) as any;
+
+        if (activeCalled) {
+          db.prepare("UPDATE senhas SET status = 'atendida', atendida_em = datetime('now') WHERE id = ?").run(activeCalled.id);
+        }
+
         // 1. Busca a próxima senha (preferencial primeiro, depois por ordem de chegada)
         const proxima = db.prepare(
           `SELECT s.*, b.nome as balcao_nome, b.prefixo_senha 
@@ -1375,7 +1388,14 @@ export function startServer() {
            LIMIT 1`
         ).get() as any;
 
-        if (!proxima) return null;
+        if (!proxima) {
+          return {
+            proxima: null,
+            geral: 0,
+            preferencial: 0,
+            autoAttendedId: activeCalled?.id
+          };
+        }
 
         // 2. Marca como chamada
         db.prepare("UPDATE senhas SET status = 'chamada', chamada_em = datetime('now') WHERE id = ?").run(proxima.id);
@@ -1390,13 +1410,19 @@ export function startServer() {
         return {
           proxima,
           geral: countGeral.count,
-          preferencial: countPref.count
+          preferencial: countPref.count,
+          autoAttendedId: activeCalled?.id
         };
       });
 
       const txResult = proximoTouchTx(guiche);
 
-      if (!txResult) {
+      if (txResult.autoAttendedId) {
+        syncStatusSenha(txResult.autoAttendedId, 'atendida');
+        broadcastEvent('SENHA_ATENDIDA', { id: txResult.autoAttendedId });
+      }
+
+      if (!txResult.proxima) {
         return res.status(404).json({ error: 'Nenhuma senha aguardando na fila.' });
       }
 
@@ -1559,6 +1585,19 @@ export function startServer() {
       console.log(`[ChamarProxima] operador=${operador_id} guiche=${guiche}`);
 
       const chamarProximaTx = db.transaction((operadorIdVal: any, guicheStr: string) => {
+        // 0. Auto-finalize previous called ticket of this guichê
+        const activeCalled = db.prepare(`
+          SELECT s.id 
+          FROM chamadas c
+          JOIN senhas s ON c.senha_id = s.id
+          WHERE c.guiche = ? AND s.status = 'chamada'
+          ORDER BY c.id DESC LIMIT 1
+        `).get(guicheStr) as any;
+
+        if (activeCalled) {
+          db.prepare("UPDATE senhas SET status = 'atendida', atendida_em = datetime('now') WHERE id = ?").run(activeCalled.id);
+        }
+
         // 1. Busca a próxima senha DIRETO DO BANCO (preferencial primeiro, depois por ordem de chegada)
         const proxima = db.prepare(
           `SELECT s.*, b.nome as balcao_nome 
@@ -1569,7 +1608,12 @@ export function startServer() {
            LIMIT 1`
         ).get() as any;
 
-        if (!proxima) return null;
+        if (!proxima) return {
+          proxima: null,
+          geral: 0,
+          preferencial: 0,
+          autoAttendedId: activeCalled?.id
+        };
 
         // 2. Marca como chamada
         db.prepare("UPDATE senhas SET status = 'chamada', chamada_em = datetime('now') WHERE id = ?").run(proxima.id);
@@ -1584,7 +1628,8 @@ export function startServer() {
         return {
           proxima,
           geral: countGeral.count,
-          preferencial: countPref.count
+          preferencial: countPref.count,
+          autoAttendedId: activeCalled?.id
         };
       });
 
@@ -1594,7 +1639,17 @@ export function startServer() {
         return res.status(404).json({ error: 'Nenhuma senha aguardando na fila.' });
       }
 
-      const { proxima, geral, preferencial } = txResult;
+      const { proxima, geral, preferencial, autoAttendedId } = txResult;
+
+      if (autoAttendedId) {
+        syncStatusSenha(autoAttendedId, 'atendida');
+        broadcastEvent('SENHA_ATENDIDA', { id: autoAttendedId });
+      }
+
+      if (!proxima) {
+        return res.status(404).json({ error: 'Nenhuma senha aguardando na fila.' });
+      }
+
       console.log(`[ChamarProxima] Próxima senha encontrada e reservada: id=${proxima.id} numero=${proxima.numero}`);
 
       const payload = {
@@ -1744,6 +1799,50 @@ export function startServer() {
       // Sync: volta status na nuvem
       syncStatusSenha(senha_id, 'aguardando');
 
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/senhas/concluir', (req, res) => {
+    try {
+      const { senha_id, guiche } = req.body;
+      const db = getDb();
+      
+      db.prepare("UPDATE senhas SET status = 'atendida', atendida_em = datetime('now') WHERE id = ?").run(senha_id);
+      
+      // Notifica todos os painéis
+      broadcastEvent('SENHA_ATENDIDA', { id: senha_id });
+      
+      // Sincroniza estado para operadores touch
+      if (guiche) {
+        broadcastEvent('ticket-called', { id: null, numero: null, preferencial: null, guiche });
+      }
+      
+      syncStatusSenha(senha_id, 'atendida');
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/senhas/cancelar', (req, res) => {
+    try {
+      const { senha_id, guiche } = req.body;
+      const db = getDb();
+      
+      db.prepare("UPDATE senhas SET status = 'cancelada', atendida_em = datetime('now') WHERE id = ?").run(senha_id);
+      
+      // Notifica todos os painéis
+      broadcastEvent('SENHA_CANCELADA', { id: senha_id });
+      
+      // Sincroniza estado para operadores touch
+      if (guiche) {
+        broadcastEvent('ticket-called', { id: null, numero: null, preferencial: null, guiche });
+      }
+      
+      syncStatusSenha(senha_id, 'cancelada');
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -2159,15 +2258,25 @@ export function startServer() {
 
       const total = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE criado_em BETWEEN ? AND ?").get(dateStart, dateEnd) as any;
       const atendidas = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'atendida' AND criado_em BETWEEN ? AND ?").get(dateStart, dateEnd) as any;
-      const canceladas = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status = 'nao_compareceu' AND criado_em BETWEEN ? AND ?").get(dateStart, dateEnd) as any;
+      const canceladas = db.prepare("SELECT COUNT(*) as count FROM senhas WHERE status IN ('cancelada', 'nao_compareceu') AND criado_em BETWEEN ? AND ?").get(dateStart, dateEnd) as any;
 
       // Cálculo de tempo médio de espera em minutos
       // julianday retorna a fração de dias. Multiplicamos por 1440 para converter em minutos (24*60)
       const espera = db.prepare(`
         SELECT AVG((julianday(chamada_em) - julianday(criado_em)) * 1440) as media 
         FROM senhas 
-        WHERE status IN ('chamada', 'atendida', 'nao_compareceu') 
+        WHERE status IN ('chamada', 'atendida', 'cancelada', 'nao_compareceu') 
         AND chamada_em IS NOT NULL
+        AND criado_em BETWEEN ? AND ?
+      `).get(dateStart, dateEnd) as any;
+
+      // Cálculo de tempo médio de atendimento (TMA) em minutos
+      const atendimento = db.prepare(`
+        SELECT AVG((julianday(atendida_em) - julianday(chamada_em)) * 1440) as media 
+        FROM senhas 
+        WHERE status = 'atendida'
+        AND chamada_em IS NOT NULL
+        AND atendida_em IS NOT NULL
         AND criado_em BETWEEN ? AND ?
       `).get(dateStart, dateEnd) as any;
 
@@ -2194,6 +2303,7 @@ export function startServer() {
         atendidas: atendidas.count || 0,
         canceladas: canceladas.count || 0,
         tempoMedioEspera: espera.media || 0,
+        tempoMedioAtendimento: atendimento.media || 0,
         porHora,
         porBalcao
       });
