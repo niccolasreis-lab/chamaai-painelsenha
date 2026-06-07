@@ -687,6 +687,12 @@ app.on('before-quit', async (event) => {
     isQuitting = true;
     console.log('[SYSTEM] Iniciando Graceful Shutdown...');
     
+    // Safety fallback: if shutdown takes more than 1.5s, force quit to avoid zombie process
+    setTimeout(() => {
+      console.warn('[SYSTEM] Shutdown demorou muito. Forçando encerramento imediato.');
+      app.exit(0);
+    }, 1500);
+
     globalShortcut.unregisterAll();
     
     // Só chama stopServer se ainda não foi chamado pelo install-update
