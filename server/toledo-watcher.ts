@@ -153,6 +153,7 @@ interface ToledoItem {
   preco: number;       // price in cents → will be stored as integer (e.g. 5880 = R$ 58.80)
   descricao: string;
   categoria: string;
+  unidade?: string;
 }
 
 // `parseToledoFile` is now handled by `parseFileContent` from `./file-parsers`
@@ -186,8 +187,8 @@ function processToledoItems(items: ToledoItem[]): number {
   let updatedCount = 0;
 
   const insertOrUpdate = db.prepare(`
-    INSERT INTO toledo_produtos (plu, descricao, preco, categoria, atualizado_em)
-    VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
+    INSERT INTO toledo_produtos (plu, descricao, preco, categoria, unidade, atualizado_em)
+    VALUES (?, ?, ?, ?, 'kg', datetime('now', 'localtime'))
     ON CONFLICT(plu) DO UPDATE SET
       preco = excluded.preco,
       categoria = excluded.categoria,
@@ -197,12 +198,12 @@ function processToledoItems(items: ToledoItem[]): number {
 
   // For new products, we need a separate insert to also set the descricao
   const insertNew = db.prepare(`
-    INSERT OR IGNORE INTO toledo_produtos (plu, descricao, preco, categoria, atualizado_em)
-    VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
+    INSERT OR IGNORE INTO toledo_produtos (plu, descricao, preco, categoria, unidade, atualizado_em)
+    VALUES (?, ?, ?, ?, 'kg', datetime('now', 'localtime'))
   `);
 
   // Check which products are new vs existing
-  const existingCheck = db.prepare('SELECT plu, descricao, preco, categoria FROM toledo_produtos WHERE plu = ?');
+  const existingCheck = db.prepare('SELECT plu, descricao, preco, categoria, unidade FROM toledo_produtos WHERE plu = ?');
 
   const transaction = db.transaction((toledoItems: ToledoItem[]) => {
     const importedPlus = new Set<string>();
@@ -252,7 +253,7 @@ let lastMtime: number = 0;
 let debounceTimer: NodeJS.Timeout | null = null;
 let isProcessing = false;
 let watcherActive = false;
-
+ 
 async function processFile(filePath: string) {
   if (isProcessing) {
     console.log('[TOLEDO] Processamento já em andamento, ignorando...');
@@ -317,8 +318,8 @@ async function processFile(filePath: string) {
       // Sync: envia todos os produtos atualizados para a nuvem (Portal do Cliente)
       const db = getDb();
       const produtosCloud = db.prepare(
-        'SELECT plu, descricao, preco, categoria FROM toledo_produtos'
-      ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string }>;
+        'SELECT plu, descricao, preco, categoria, unidade FROM toledo_produtos'
+      ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string; unidade?: string }>;
       syncProdutos(produtosCloud);
     }
   } catch (err: any) {

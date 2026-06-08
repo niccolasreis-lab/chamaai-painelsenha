@@ -326,7 +326,7 @@ export default function EncartePrecos({ duracao, itensPorSlide, onComplete, conf
                             }}>
                               {formatPreco(produto.preco)}
                             </span>
-                            <span className={`${group.isOferta ? 'text-red-400' : accentClass} opacity-60 font-bold uppercase`} style={{ fontSize: 'clamp(0.7rem, calc(var(--price-font) * 0.3), 3rem)' }}>/kg</span>
+                            <span className={`${group.isOferta ? 'text-red-400' : accentClass} opacity-60 font-bold uppercase`} style={{ fontSize: 'clamp(0.7rem, calc(var(--price-font) * 0.3), 3rem)' }}>/{produto.unidade || 'kg'}</span>
                           </>
                         )}
                       </div>

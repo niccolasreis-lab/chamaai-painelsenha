@@ -152,7 +152,7 @@ export default function Devices() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
           <div>
             <h1 className="font-sans text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Dispositivos</h1>
-            <p className="text-ink-secondary mt-2 text-lg font-semibold uppercase tracking-wider">Gerencie os telões vinculados a esta loja.</p>
+            <p className="text-ink-secondary mt-2 text-lg font-semibold tracking-wider">Gerencie os telões vinculados a esta loja.</p>
           </div>
           <button 
             onClick={openVincular}
@@ -177,7 +177,7 @@ export default function Devices() {
           </div>
         )}
 
-        <h2 className="text-xl font-bold text-ink mb-4 uppercase tracking-widest border-b border-outline-variant/30 pb-2">Telões Vinculados</h2>
+        <h2 className="text-xl font-bold text-ink mb-4 tracking-widest border-b border-outline-variant/30 pb-2">Telões vinculados</h2>
         {loading ? (
           <div className="text-ink-secondary uppercase tracking-widest">Carregando dispositivos...</div>
         ) : vinculados.length === 0 ? (
@@ -202,9 +202,9 @@ export default function Devices() {
 
                 <div className="space-y-2 border-t border-outline-variant/30 pt-4 flex-1">
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {device.modulo_painel ? <span className="bg-ink/5 text-ink px-2 py-1 rounded text-[10px] font-bold uppercase">Painel</span> : null}
-                    {device.modulo_encarte ? <span className="bg-ink/5 text-ink px-2 py-1 rounded text-[10px] font-bold uppercase">Encarte</span> : null}
-                    {device.modulo_midia ? <span className="bg-ink/5 text-ink px-2 py-1 rounded text-[10px] font-bold uppercase">Mídia</span> : null}
+                    {device.modulo_painel ? <span className="bg-ink/5 text-ink px-2 py-1 rounded text-[10px] font-bold">Painel</span> : null}
+                    {device.modulo_encarte ? <span className="bg-ink/5 text-ink px-2 py-1 rounded text-[10px] font-bold">Encarte</span> : null}
+                    {device.modulo_midia ? <span className="bg-ink/5 text-ink px-2 py-1 rounded text-[10px] font-bold">Mídia</span> : null}
                   </div>
                   <div className="text-[10px] text-ink-secondary/70 font-bold uppercase tracking-wider mt-2">
                     Layout: {device.template_layout === 'sidebar' ? 'Mídia + Fila' : device.template_layout === 'l-shape' ? 'Modo L' : 'Clássico'}
@@ -250,7 +250,7 @@ export default function Devices() {
             <form onSubmit={saveTelao} className="space-y-6">
               {!editingCode && (
                 <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-2">Código Exibido no Telão</label>
+                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-2">Código exibido no telão</label>
                   <input 
                     type="text" 
                     required 
@@ -263,7 +263,7 @@ export default function Devices() {
                 </div>
               )}
               <div>
-                <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-2">Nome de Identificação (Ex: TV Refeitório)</label>
+                <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-2">Nome de identificação (ex: tv refeitório)</label>
                 <input 
                   type="text" 
                   required 
@@ -274,7 +274,7 @@ export default function Devices() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-2">Layout do Telão</label>
+                <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-2">Layout do telão</label>
                 <select
                   value={formData.template_layout || 'classic'}
                   onChange={e => setFormData({...formData, template_layout: e.target.value})}
@@ -287,7 +287,7 @@ export default function Devices() {
               </div>
 
               <div className="space-y-3 pt-4 border-t border-outline-variant/30">
-                <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest">Módulos Ativos</label>
+                <label className="block text-xs font-bold text-ink-secondary tracking-widest">Módulos ativos</label>
                 
                 <label className="flex items-center gap-3 p-3 bg-surface-variant rounded-xl cursor-pointer hover:border-primary border border-transparent transition-all">
                   <input type="checkbox" checked={formData.modulo_painel} onChange={e => setFormData({...formData, modulo_painel: e.target.checked})} className="w-5 h-5 rounded text-primary" />
@@ -296,19 +296,19 @@ export default function Devices() {
                 
                 <label className="flex items-center gap-3 p-3 bg-surface-variant rounded-xl cursor-pointer hover:border-primary border border-transparent transition-all">
                   <input type="checkbox" checked={formData.modulo_encarte} onChange={e => setFormData({...formData, modulo_encarte: e.target.checked})} className="w-5 h-5 rounded text-primary" />
-                  <span className="font-bold text-ink uppercase tracking-wide text-sm">Encarte Digital (Preços)</span>
+                  <span className="font-bold text-ink tracking-wide text-sm">Encarte digital (preços)</span>
                 </label>
                 
                 <label className="flex items-center gap-3 p-3 bg-surface-variant rounded-xl cursor-pointer hover:border-primary border border-transparent transition-all">
                   <input type="checkbox" checked={formData.modulo_midia} onChange={e => setFormData({...formData, modulo_midia: e.target.checked})} className="w-5 h-5 rounded text-primary" />
-                  <span className="font-bold text-ink uppercase tracking-wide text-sm">Mídia Indoor (Vídeos)</span>
+                  <span className="font-bold text-ink tracking-wide text-sm">Mídia indoor (vídeos)</span>
                 </label>
               </div>
 
               {formData.modulo_encarte && (
                 <div className="pt-4 border-t border-outline-variant/30 space-y-3">
                   <div className="flex justify-between items-center">
-                    <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest">Selecionar Categorias a Exibir</label>
+                    <label className="block text-xs font-bold text-ink-secondary tracking-widest">Selecionar categorias a exibir</label>
                     <div className="flex gap-2">
                       <button 
                         type="button"
@@ -329,7 +329,7 @@ export default function Devices() {
                   </div>
                   
                   {availableCategories.length === 0 ? (
-                    <p className="text-xs text-ink-secondary/60 italic uppercase tracking-wider">Nenhuma categoria encontrada no sistema.</p>
+                    <p className="text-xs text-ink-secondary/60 italic tracking-wider">Nenhuma categoria encontrada no sistema.</p>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-surface-variant/50 border border-outline-variant/30 rounded-xl">
                       {availableCategories.map((cat) => {
@@ -371,9 +371,7 @@ export default function Devices() {
                       })}
                     </div>
                   )}
-                  <p className="text-[10px] text-ink-secondary/70 font-semibold uppercase tracking-wider leading-relaxed">
-                    * Caso nenhuma categoria esteja selecionada, o telão exibirá todas as categorias do sistema automaticamente.
-                  </p>
+                  <p className="text-[10px] text-ink-secondary/70 font-semibold tracking-wider leading-relaxed">* caso nenhuma categoria esteja selecionada, o telão exibirá todas as categorias do sistema automaticamente.</p>
                 </div>
               )}
 

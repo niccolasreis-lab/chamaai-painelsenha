@@ -83,7 +83,7 @@ export default function Relatorios() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
           <div>
             <h1 className="font-sans text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Relatórios & Histórico</h1>
-            <p className="text-ink-secondary mt-2 text-lg font-semibold text-primary uppercase tracking-widest">Analise o desempenho por período</p>
+            <p className="text-ink-secondary mt-2 text-lg font-semibold text-primary tracking-widest">Analise o desempenho por período</p>
           </div>
           
           <button 
@@ -98,7 +98,7 @@ export default function Relatorios() {
         {/* Filtros */}
         <div className="bg-surface p-8 rounded-[32px] shadow-sm border border-outline-variant/50 flex flex-wrap gap-6 items-end">
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-3 ml-1">Data Início</label>
+            <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-3 ml-1">Data início</label>
             <div className="relative">
               <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-primary" size={18} />
               <input 
@@ -111,7 +111,7 @@ export default function Relatorios() {
           </div>
 
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-3 ml-1">Data Fim</label>
+            <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-3 ml-1">Data fim</label>
             <div className="relative">
               <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-primary" size={18} />
               <input 
@@ -139,7 +139,7 @@ export default function Relatorios() {
             <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-6">
               <FileText size={24} />
             </div>
-            <p className="text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2">Total de Senhas</p>
+            <p className="text-ink-secondary text-xs font-bold tracking-widest mb-2">Total de senhas</p>
             <h3 className="text-4xl font-black text-ink font-sans">{stats.total}</h3>
           </div>
 
@@ -147,7 +147,7 @@ export default function Relatorios() {
             <div className="w-12 h-12 bg-success/10 text-success rounded-2xl flex items-center justify-center mb-6">
               <Users size={24} />
             </div>
-            <p className="text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2">Atendidas</p>
+            <p className="text-ink-secondary text-xs font-bold tracking-widest mb-2">Atendidas</p>
             <h3 className="text-4xl font-black text-ink font-sans">{stats.atendidas}</h3>
           </div>
 
@@ -155,7 +155,7 @@ export default function Relatorios() {
             <div className="w-12 h-12 bg-error/10 text-error rounded-2xl flex items-center justify-center mb-6">
               <Users size={24} />
             </div>
-            <p className="text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2">Canceladas</p>
+            <p className="text-ink-secondary text-xs font-bold tracking-widest mb-2">Canceladas</p>
             <h3 className="text-4xl font-black text-ink font-sans">{stats.canceladas}</h3>
           </div>
 
@@ -163,7 +163,7 @@ export default function Relatorios() {
             <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-6">
               <Clock size={24} />
             </div>
-            <p className="text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2">Espera Média</p>
+            <p className="text-ink-secondary text-xs font-bold tracking-widest mb-2">Espera média</p>
             <h3 className="text-4xl font-black text-ink font-sans">{stats.tempoMedioEspera.toFixed(1)} <span className="text-sm">min</span></h3>
           </div>
 
@@ -171,7 +171,7 @@ export default function Relatorios() {
             <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-6">
               <Clock size={24} />
             </div>
-            <p className="text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2">Atendimento Médio</p>
+            <p className="text-ink-secondary text-xs font-bold tracking-widest mb-2">Atendimento médio</p>
             <h3 className="text-4xl font-black text-ink font-sans">{stats.tempoMedioAtendimento.toFixed(1)} <span className="text-sm">min</span></h3>
           </div>
         </div>
@@ -183,7 +183,7 @@ export default function Relatorios() {
               <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
                 <TrendingUp size={20} />
               </div>
-              <h3 className="font-sans text-xl font-bold text-ink uppercase tracking-widest">Horários de Pico</h3>
+              <h3 className="font-sans text-xl font-bold text-ink tracking-widest">Horários de pico</h3>
             </div>
             <div className="h-48 flex items-end justify-between gap-2 mt-4">
               {(stats.porHora || []).map((item, i) => {
@@ -216,7 +216,7 @@ export default function Relatorios() {
               <div className="w-10 h-10 bg-success/10 text-success rounded-xl flex items-center justify-center">
                 <Users size={20} />
               </div>
-              <h3 className="font-sans text-xl font-bold text-ink uppercase tracking-widest">Fluxo por Setor</h3>
+              <h3 className="font-sans text-xl font-bold text-ink tracking-widest">Fluxo por setor</h3>
             </div>
             
             <div className="space-y-6">

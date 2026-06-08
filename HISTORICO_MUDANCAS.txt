@@ -131,6 +131,37 @@ As modificações foram validadas e testadas via compilação completa com suces
     sistema detecte o uso da senha de fábrica 'admin/admin', incentivando a troca
     imediata para garantir a conformidade de segurança.
 
+-------------------------------------------------------------------------------
+11. INDICADOR VISUAL DE SEGUNDA CHAMADA NO TELÃO
+-------------------------------------------------------------------------------
+* Arquivos modificados:
+  - server/index.ts
+  - src/index.css
+  - src/telao/SenhaChamada.tsx
+  - src/telao/MediaIndoor.tsx
+* Alterações:
+  - Inclusão do campo boolean `repeticao` no payload SSE do evento `NOVA_SENHA_CHAMADA`.
+  - Configuração do campo como `true` nas rotas de repetição (`/api/operador/repetir` e `/api/chamadas`) e `false` nas de primeira chamada.
+  - Implementação da classe CSS `.animate-pulse-orange` (pulse rápido de 0.55s) e do badge `.badge-segunda-chamada` em laranja urgente.
+  - Criação do estado `isRepeticao` com temporizador e auto-reset automático de 8 segundos no componente `SenhaChamada` e no controlador `MediaIndoor`.
+  - Adição do badge `⚠ 2ª CHAMADA` e cor laranja condicional no número chamado no destaque central da TV.
+  - Exibição de indicador discreto `"↩ repetida"` ao lado do número em atendimento nas barras laterais dos templates `l-shape` e `sidebar` sem aplicar animação de pulso.
+  - Utilização da propriedade `repeticao` na key do componente `<SenhaChamada>` para forçar o remount limpo ao re-chamar a mesma senha.
+
+-------------------------------------------------------------------------------
+12. INICIALIZAÇÃO SEGURA DO SUPABASE E PROTEÇÃO CONTRA CRASH
+-------------------------------------------------------------------------------
+* Arquivos modificados:
+  - server/supabase-sync.ts
+  - server/index.ts
+* Alterações:
+  - Correção de exceção fatal (Uncaught Exception: supabaseUrl is required) que ocorria no processo principal do Electron quando o sistema era iniciado sem as credenciais do Supabase no ambiente (.env). Esta exceção abortava a inicialização antes do `app.whenReady()`, impedindo que o Electron executasse o script de cleanup de processos órfãos (`cleanZombieProcesses`). Como consequência, processos zumbis (`ChamaAi.exe`) ficavam travados em segundo plano, bloqueando o lançamento de novas instâncias do aplicativo por causa do bloqueio de instância única (`SingleInstanceLock`).
+  - Criação do verificador `isSupabaseConfigured` para identificar a presença de chaves públicas na nuvem.
+  - Substituição da inicialização global vazia por valores placeholder válidos (`https://placeholder-chamaai.supabase.co` e `placeholder-key`), evitando falhas no construtor de classes do módulo do Supabase.
+  - Bloqueio e encerramento antecipado das tarefas de fila local, workers e escuta de comandos WebSocket (`startSyncWorker`, `startSupabaseCommandListener` e `enqueueSyncOp`) se as chaves não estiverem configuradas.
+  - Modificação nas chamadas de startup e endpoints de configuração no servidor para checar a flag `isSupabaseConfigured`, poupando processamento e eliminando erros no console do Electron em instalações locais padrão offline.
+
 ===============================================================================
                     FIM DO RELATÓRIO - COMPILAÇÃO CONCLUÍDA
 ===============================================================================
+

@@ -214,7 +214,7 @@ export default function Seguranca() {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h2 className="font-sans text-3xl font-black text-ink uppercase tracking-wider mb-2">Segurança e Acesso</h2>
+            <h2 className="font-sans text-3xl font-black text-ink tracking-wider mb-2">Segurança e acesso</h2>
             <p className="text-sm font-sans text-ink-secondary font-medium">Gerencie usuários remotos e políticas de controle de acesso.</p>
           </div>
           <button
@@ -267,12 +267,12 @@ export default function Seguranca() {
         <div className="bg-surface border border-outline-variant/30 rounded-[32px] p-8 shadow-sm flex flex-col gap-6">
           <div className="flex items-center gap-3 border-b border-outline-variant/30 pb-4">
             <span className="material-symbols-outlined text-primary text-3xl font-bold">policy</span>
-            <h3 className="font-sans text-lg font-bold text-ink uppercase tracking-widest">Políticas de Segurança</h3>
+            <h3 className="font-sans text-lg font-bold text-ink tracking-widest">Políticas de segurança</h3>
           </div>
 
           <div className="flex items-center justify-between p-4 bg-surface-variant rounded-2xl border border-outline-variant/50">
             <div className="flex flex-col gap-1 max-w-xl">
-              <span className="font-sans text-sm font-bold text-ink uppercase tracking-wide">Exigir autenticação mesmo em acesso local</span>
+              <span className="font-sans text-sm font-bold text-ink tracking-wide">Exigir autenticação mesmo em acesso local</span>
               <span className="text-xs text-ink-secondary leading-relaxed font-medium">
                 Por padrão, o acesso rodando localmente (127.0.0.1 ou mesma máquina) não exige login. Ative esta opção para forçar autenticação mesmo localmente.
               </span>
@@ -297,7 +297,7 @@ export default function Seguranca() {
         <div className="bg-surface border border-outline-variant/30 rounded-[32px] p-8 shadow-sm">
           <div className="flex items-center gap-3 border-b border-outline-variant/30 pb-4 mb-6">
             <span className="material-symbols-outlined text-primary text-3xl font-bold">supervisor_account</span>
-            <h3 className="font-sans text-lg font-bold text-ink uppercase tracking-widest">Usuários Remotos Cadastrados</h3>
+            <h3 className="font-sans text-lg font-bold text-ink tracking-widest">Usuários remotos cadastrados</h3>
           </div>
 
           <div className="overflow-x-auto">
@@ -389,7 +389,7 @@ export default function Seguranca() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-outline-variant/30 rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col gap-6 relative z-50">
             <div>
-              <h3 className="font-sans text-2xl font-bold text-ink uppercase mb-2">Criar Operador</h3>
+              <h3 className="font-sans text-2xl font-bold text-ink mb-2">Criar operador</h3>
               <p className="text-sm font-sans text-ink-secondary font-medium">Cadastre um login e perfil para acesso remoto do painel de chamadas.</p>
             </div>
 
@@ -401,7 +401,7 @@ export default function Seguranca() {
               )}
 
               <div>
-                <label className="block text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2 ml-1">Login</label>
+                <label className="block text-ink-secondary text-xs font-bold tracking-widest mb-2 ml-1">Login</label>
                 <input 
                   type="text" 
                   value={newLogin}
@@ -414,7 +414,7 @@ export default function Seguranca() {
               </div>
 
               <div>
-                <label className="block text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2 ml-1">Senha Inicial</label>
+                <label className="block text-ink-secondary text-xs font-bold tracking-widest mb-2 ml-1">Senha inicial</label>
                 <input 
                   type="password" 
                   value={newSenha}
@@ -426,7 +426,7 @@ export default function Seguranca() {
               </div>
 
               <div>
-                <label className="block text-ink-secondary text-xs font-bold uppercase tracking-widest mb-2 ml-1">Perfil</label>
+                <label className="block text-ink-secondary text-xs font-bold tracking-widest mb-2 ml-1">Perfil</label>
                 <select
                   value={newPerfil}
                   onChange={(e) => setNewPerfil(e.target.value)}

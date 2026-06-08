@@ -1,9 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getApiUrl } from '../shared/apiConfig';
 
-export default function SenhaChamada({ ultimaSenha = null, config: propConfig }: { ultimaSenha?: any; config?: any }) {
+interface SenhaChamadaProps {
+  ultimaSenha?: {
+    id: number;
+    numero: string | number;
+    guiche?: string;
+    balcao_nome?: string;
+    nome_cliente?: string;
+    repeticao?: boolean;
+  } | null;
+  config?: any;
+}
+
+export default function SenhaChamada({ ultimaSenha = null, config: propConfig }: SenhaChamadaProps) {
   const [pulse, setPulse] = useState(false);
   const [config, setConfig] = useState<any>(propConfig || {});
+  const [isRepeticao, setIsRepeticao] = useState(false);
+  const repeticaoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const API_URL = getApiUrl();
 
   useEffect(() => {
@@ -27,6 +41,42 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
       const timer = setTimeout(() => setPulse(false), 3000);
       return () => clearTimeout(timer);
     }
+  }, [ultimaSenha]);
+
+  useEffect(() => {
+    if (!ultimaSenha) {
+      setIsRepeticao(false);
+      if (repeticaoTimerRef.current) {
+        clearTimeout(repeticaoTimerRef.current);
+      }
+      return;
+    }
+
+    if (ultimaSenha.repeticao) {
+      setIsRepeticao(true);
+
+      // Limpar timer anterior se existir
+      if (repeticaoTimerRef.current) {
+        clearTimeout(repeticaoTimerRef.current);
+      }
+
+      // Auto-reset após 8 segundos
+      repeticaoTimerRef.current = setTimeout(() => {
+        setIsRepeticao(false);
+      }, 8000);
+    } else {
+      // Nova senha normal — resetar imediatamente
+      setIsRepeticao(false);
+      if (repeticaoTimerRef.current) {
+        clearTimeout(repeticaoTimerRef.current);
+      }
+    }
+
+    return () => {
+      if (repeticaoTimerRef.current) {
+        clearTimeout(repeticaoTimerRef.current);
+      }
+    };
   }, [ultimaSenha]);
 
   if (!ultimaSenha) {
@@ -60,16 +110,35 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
       </div>
 
       <div className="text-center z-10">
+        {isRepeticao && (
+          <div className="badge-segunda-chamada flex items-center justify-center gap-2 mb-4">
+            <span className="
+              font-sans text-2xl font-black tracking-widest uppercase
+              text-orange-500 border-2 border-orange-500
+              px-6 py-1 rounded-full
+            ">
+              ⚠ 2ª CHAMADA
+            </span>
+          </div>
+        )}
+
         <h2 className="font-sans text-[3rem] font-semibold text-white/50 tracking-[0.3em] uppercase mb-4">
           Senha Atual
         </h2>
 
         <div 
-          className={`font-sans text-[25rem] font-black leading-none tracking-tight text-white ${pulse ? 'animate-pulse-call' : ''}`}
+          key={`call-${ultimaSenha.id}-${isRepeticao}`}
+          className={`font-sans text-[25rem] font-black leading-none tracking-tight ${
+            isRepeticao
+              ? 'text-orange-500 animate-pulse-orange'
+              : `text-white ${pulse ? 'animate-pulse-call' : ''}`
+          }`}
           style={{
-            willChange: 'transform, opacity',
+            willChange: 'opacity, transform',
             transform: 'translateZ(0)',
-            textShadow: '0 0 30px rgba(255, 255, 255, 0.2)'
+            textShadow: isRepeticao 
+              ? '0 0 40px rgba(249, 115, 22, 0.9)' 
+              : '0 0 30px rgba(255, 255, 255, 0.2)'
           }}
         >
           {senhaFormatada}
@@ -91,7 +160,7 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
               )}
               <span className="font-sans text-[5rem] font-bold text-ink uppercase leading-none tracking-tighter text-center">
                 {config.rotulo_local ? `${config.rotulo_local} ` : 'Guichê '}
-                {ultimaSenha.guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
+                {(ultimaSenha.guiche || '').replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
               </span>
             </div>
           </div>

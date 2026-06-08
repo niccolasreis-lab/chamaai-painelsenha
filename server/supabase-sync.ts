@@ -23,7 +23,13 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.VITE_SUPABASE_KEY || '';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+export const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_KEY);
+
+// Inicializa o cliente com placeholders válidos se não estiver configurado para evitar crash no createClient
+const urlToUse = isSupabaseConfigured ? SUPABASE_URL : 'https://placeholder-chamaai.supabase.co';
+const keyToUse = isSupabaseConfigured ? SUPABASE_KEY : 'placeholder-key';
+
+export const supabase = createClient(urlToUse, keyToUse);
 
 // ── Fila Local de Sincronização (Outbox Pattern) ────────────────────────────────
 
@@ -32,6 +38,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
  * Execução síncrona (<1ms) — nunca bloqueia o fluxo principal.
  */
 function enqueueSyncOp(tabela: string, acao: string, payload: any) {
+  if (!isSupabaseConfigured) return;
   try {
     const { getDb } = require('../electron/services/database');
     const db = getDb();
@@ -236,6 +243,7 @@ async function processSyncQueue() {
 }
 
 export function startSyncWorker() {
+  if (!isSupabaseConfigured) return;
   console.log('[SYNC WORKER] 🚀 Worker de sincronização iniciado (intervalo: 5s)');
   if (syncWorkerTimer) clearInterval(syncWorkerTimer);
   
@@ -332,6 +340,7 @@ async function fallbackPollComandos() {
  * Com fallback de polling a cada 30 segundos.
  */
 export function startSupabaseCommandListener() {
+  if (!isSupabaseConfigured) return;
   console.log('[SUPABASE CMD] 🎧 Iniciando listener Realtime de comandos...');
 
   // Limpa listeners anteriores

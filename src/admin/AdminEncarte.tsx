@@ -189,14 +189,14 @@ export default function AdminEncarte() {
         {loading ? (
           <div className="text-center py-20">
             <span className="material-symbols-outlined text-6xl text-outline-variant animate-spin">sync</span>
-            <p className="text-ink-secondary mt-4 font-bold uppercase tracking-widest">Carregando...</p>
+            <p className="text-ink-secondary mt-4 font-bold tracking-widest">Carregando...</p>
           </div>
         ) : (
           <>
             {activeTab === 'filtros' && (
               <div className="space-y-6 animate-fade-in">
                 <div className="bg-surface rounded-2xl p-6 border border-outline-variant/50 shadow-sm">
-                  <h3 className="font-bold text-sm text-ink uppercase tracking-widest mb-4">Novo Filtro (Palavra Bloqueada)</h3>
+                  <h3 className="font-bold text-sm text-ink tracking-widest mb-4">Novo filtro (palavra bloqueada)</h3>
                   <div className="flex gap-4">
                     <input
                       type="text"
@@ -230,7 +230,7 @@ export default function AdminEncarte() {
             {activeTab === 'nomes' && (
               <div className="space-y-6 animate-fade-in">
                 <div className="bg-surface rounded-2xl p-6 border border-outline-variant/50 shadow-sm">
-                  <h3 className="font-bold text-sm text-ink uppercase tracking-widest mb-4">Adicionar Nome Customizado</h3>
+                  <h3 className="font-bold text-sm text-ink tracking-widest mb-4">Adicionar nome customizado</h3>
                   <div className="flex gap-4">
                     <input
                       type="text"
@@ -286,10 +286,10 @@ export default function AdminEncarte() {
               <div className="space-y-6 animate-fade-in">
                 <div className="bg-surface rounded-2xl p-6 border border-outline-variant/50 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="col-span-full">
-                    <h3 className="font-bold text-sm text-ink uppercase tracking-widest mb-4">Adicionar Tema Temático</h3>
+                    <h3 className="font-bold text-sm text-ink tracking-widest mb-4">Adicionar tema temático</h3>
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Nome do Tema</label>
+                    <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Nome do tema</label>
                     <input
                       type="text"
                       value={temaNome}
@@ -299,7 +299,7 @@ export default function AdminEncarte() {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Caminho/URL da Imagem</label>
+                    <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Caminho/url da imagem</label>
                     <input
                       type="text"
                       value={temaImagem}
@@ -309,7 +309,7 @@ export default function AdminEncarte() {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Data de Início</label>
+                    <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Data de início</label>
                     <input
                       type="date"
                       value={temaDataInicio}
@@ -318,7 +318,7 @@ export default function AdminEncarte() {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Data de Fim</label>
+                    <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Data de fim</label>
                     <input
                       type="date"
                       value={temaDataFim}
@@ -349,7 +349,7 @@ export default function AdminEncarte() {
                         )}
                         {!t.ativo && (
                           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                            <span className="text-white font-bold tracking-widest uppercase bg-error px-3 py-1 rounded-full text-xs">Inativo</span>
+                            <span className="text-white font-bold tracking-widest bg-error px-3 py-1 rounded-full text-xs">Inativo</span>
                           </div>
                         )}
                       </div>
@@ -527,7 +527,7 @@ export default function AdminEncarte() {
                             {formattedPreco}
                           </span>
                           <span className={`text-[10px] font-bold uppercase tracking-wider ${simulatedStyle === 'kg' ? 'text-white/40' : 'text-zinc-500'}`}>
-                            / kg
+                            / {p.unidade || 'kg'}
                           </span>
                         </div>
                       </div>

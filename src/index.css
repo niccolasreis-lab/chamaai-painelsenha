@@ -342,4 +342,27 @@
   100% { transform: scale(1); }
 }
 
+/* Pulse rápido para segunda chamada — laranja urgente */
+@keyframes pulseOrange {
+  0%   { opacity: 1; text-shadow: 0 0 40px rgba(249, 115, 22, 0.9); }
+  40%  { opacity: 0.35; text-shadow: 0 0 10px rgba(249, 115, 22, 0.2); }
+  100% { opacity: 1; text-shadow: 0 0 40px rgba(249, 115, 22, 0.9); }
+}
+
+.animate-pulse-orange {
+  animation: pulseOrange 0.55s ease-in-out infinite;
+  will-change: opacity;
+}
+
+/* Badge de "2ª CHAMADA" que aparece acima do número */
+@keyframes slideDownFade {
+  0%   { opacity: 0; transform: translateY(-12px) translateZ(0); }
+  100% { opacity: 1; transform: translateY(0) translateZ(0); }
+}
+
+.badge-segunda-chamada {
+  animation: slideDownFade 0.3s ease-out forwards;
+}
+
+
 

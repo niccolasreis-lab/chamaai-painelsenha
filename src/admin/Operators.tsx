@@ -71,7 +71,7 @@ export default function Operators() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <h1 className="font-sans text-[48px] font-bold text-ink leading-tight uppercase tracking-widest">Operadores</h1>
-            <p className="text-ink-secondary mt-2 text-lg font-semibold uppercase tracking-wider">Gestão de acesso e perfis do sistema</p>
+            <p className="text-ink-secondary mt-2 text-lg font-semibold tracking-wider">Gestão de acesso e perfis do sistema</p>
           </div>
           <button 
             onClick={() => setShowModal(true)}
@@ -119,24 +119,24 @@ export default function Operators() {
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-surface w-full max-w-md rounded-[32px] p-8 shadow-2xl border border-outline-variant/50 animate-fade-in">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="font-sans text-2xl font-bold text-ink uppercase tracking-wider">Novo Operador</h2>
+                <h2 className="font-sans text-2xl font-bold text-ink tracking-wider">Novo operador</h2>
                 <button onClick={() => setShowModal(false)} className="text-ink-secondary hover:text-ink"><span className="material-symbols-outlined">close</span></button>
               </div>
               <form onSubmit={handleAdd} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1">Nome Completo</label>
+                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1">Nome completo</label>
                   <input required value={newOp.nome} onChange={e => setNewOp({...newOp, nome: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="text" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1">Login (Usuário)</label>
+                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1">Login (usuário)</label>
                   <input required value={newOp.login} onChange={e => setNewOp({...newOp, login: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="text" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1">Senha de Acesso</label>
+                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1">Senha de acesso</label>
                   <input required value={newOp.senha} onChange={e => setNewOp({...newOp, senha: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="password" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1">Perfil</label>
+                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1">Perfil</label>
                   <select value={newOp.perfil} onChange={e => setNewOp({...newOp, perfil: e.target.value as any})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold uppercase">
                     <option value="operador">Operador (Balcão)</option>
                     <option value="admin">Administrador</option>

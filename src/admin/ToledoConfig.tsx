@@ -37,6 +37,7 @@ interface ToledoProduto {
   descricao: string;
   preco: number;
   categoria: string;
+  unidade?: string;
   atualizado_em: string;
 }
 
@@ -149,6 +150,24 @@ export default function ToledoConfig() {
       alert(`Erro de rede ao salvar descrição: ${err.message}`);
     } finally {
       setEditingPlu(null);
+    }
+  };
+
+  const handleUnidadeChange = async (plu: string, novaUnidade: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/toledo/produtos/${plu}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unidade: novaUnidade })
+      });
+      if (res.ok) {
+        setProdutos(produtos.map(p => p.plu === plu ? { ...p, unidade: novaUnidade } : p));
+      } else {
+        const data = await res.json();
+        alert(`Erro ao salvar unidade: ${data.error || 'Falha ao salvar'}`);
+      }
+    } catch (err: any) {
+      alert(`Erro de rede ao salvar unidade: ${err.message}`);
     }
   };
 
@@ -568,7 +587,7 @@ export default function ToledoConfig() {
                 <AlertTriangle className="h-6 w-6 text-red-500" />
               </div>
               <div className="ml-3 flex-1">
-                <h3 className="text-lg font-bold text-red-800 uppercase tracking-wider">Acesso Restrito: Modo Leitura</h3>
+                <h3 className="text-lg font-bold text-red-800 tracking-wider">Acesso restrito: modo leitura</h3>
                 <div className="mt-1 text-sm text-red-700">
                   <p>Você está acessando a partir de um dispositivo cliente. Alterações administrativas só podem ser realizadas no <b>Servidor Master</b> da loja.</p>
                 </div>
@@ -620,7 +639,7 @@ export default function ToledoConfig() {
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-emerald-600">verified_user</span>
                 <div>
-                  <h3 className="text-sm font-bold text-emerald-800 uppercase tracking-wider">Sessão Master Remota Ativa</h3>
+                  <h3 className="text-sm font-bold text-emerald-800 tracking-wider">Sessão master remota ativa</h3>
                   <p className="text-xs text-emerald-600">Você tem permissão de administrador via acesso remoto.</p>
                 </div>
               </div>
@@ -640,9 +659,7 @@ export default function ToledoConfig() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Encarte Ativo Toggle */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
-              Encarte no Telão
-            </label>
+            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Encarte no telão</label>
             <button
               onClick={() => handleSaveConfig('toledo_encarte_ativo', encarteAtivo ? '0' : '1')}
               className={`w-full py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-all ${
@@ -657,9 +674,7 @@ export default function ToledoConfig() {
 
           {/* Ocultar em Falta Toggle */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
-              Produtos em Falta
-            </label>
+            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Produtos em falta</label>
             <button
               onClick={() => handleSaveConfig('toledo_ocultar_em_falta', config.toledo_ocultar_em_falta === '1' ? '0' : '1')}
               className={`w-full py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-all ${
@@ -674,9 +689,7 @@ export default function ToledoConfig() {
 
           {/* Duração */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
-              Duração por Slide (seg)
-            </label>
+            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Duração por slide (seg)</label>
             <input
               type="number"
               min="5"
@@ -689,9 +702,7 @@ export default function ToledoConfig() {
 
           {/* Posição na rotação */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
-              Posição na Rotação
-            </label>
+            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Posição na rotação</label>
             <input
               type="number"
               min="0"
@@ -704,9 +715,7 @@ export default function ToledoConfig() {
 
           {/* Itens por slide */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
-              Itens por Slide
-            </label>
+            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Itens por slide</label>
             <input
               type="number"
               min="4"
@@ -720,9 +729,7 @@ export default function ToledoConfig() {
           
           {/* Caminho da Pasta Toledo */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm md:col-span-2 lg:col-span-3">
-            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
-              Caminho da Pasta Toledo (Rede/Local)
-            </label>
+            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Caminho da pasta toledo (rede/local)</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -740,9 +747,7 @@ export default function ToledoConfig() {
 
           {/* Formato do Arquivo */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm md:col-span-2 lg:col-span-2">
-            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
-              Formato de Integração
-            </label>
+            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Formato de integração</label>
             <select
               value={config.toledo_formato_arquivo || 'toledo_mgv6'}
               onChange={(e) => {
@@ -776,9 +781,7 @@ export default function ToledoConfig() {
 
           {/* Colunas */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
-              Qtd. Colunas
-            </label>
+            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Qtd. colunas</label>
             <select
               value={config.toledo_encarte_colunas || '3'}
               onChange={(e) => handleSaveConfig('toledo_encarte_colunas', e.target.value)}
@@ -793,9 +796,7 @@ export default function ToledoConfig() {
 
           {/* Tamanho da Fonte — Descrição */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
-              Fonte Descrição
-            </label>
+            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Fonte descrição</label>
             <select
               value={config.toledo_fonte_descricao || '1.25rem'}
               onChange={(e) => handleSaveConfig('toledo_fonte_descricao', e.target.value)}
@@ -835,9 +836,7 @@ export default function ToledoConfig() {
 
           {/* Tamanho da Fonte — Preço */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
-              Fonte Preço
-            </label>
+            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Fonte preço</label>
             <select
               value={config.toledo_fonte_preco || '1.75rem'}
               onChange={(e) => handleSaveConfig('toledo_fonte_preco', e.target.value)}
@@ -885,9 +884,7 @@ export default function ToledoConfig() {
 
           {/* Ocultar Guichê no Telão */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
-              Guichê no Telão
-            </label>
+            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Guichê no telão</label>
             <button
               onClick={() => handleSaveConfig('telao_ocultar_guiche', config.telao_ocultar_guiche === '1' ? '0' : '1')}
               className={`w-full py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-all ${
@@ -903,9 +900,7 @@ export default function ToledoConfig() {
 
           {/* Estilo do Encarte */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm md:col-span-2 lg:col-span-5">
-            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
-              Estilo do Encarte
-            </label>
+            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Estilo do encarte</label>
             <div className="grid grid-cols-2 gap-3">
               {[
                 { id: 'kg', label: '🌙 Preços por KG (Escuro)', desc: 'Layout dark com colunas, ideal para carnes e frios' },
@@ -929,9 +924,7 @@ export default function ToledoConfig() {
 
           {/* Tema Visual */}
           <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm md:col-span-2 lg:col-span-5">
-            <label className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mb-3">
-              Tema Visual do Encarte
-            </label>
+            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Tema visual do encarte</label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { id: 'padrao', label: 'Verde (Padrão)', color: 'bg-emerald-500' },
@@ -980,7 +973,7 @@ export default function ToledoConfig() {
         {loading ? (
           <div className="text-center py-20">
             <span className="material-symbols-outlined text-6xl text-outline-variant animate-spin">sync</span>
-            <p className="text-ink-secondary mt-4 font-bold uppercase tracking-widest">Carregando...</p>
+            <p className="text-ink-secondary mt-4 font-bold tracking-widest">Carregando...</p>
           </div>
         ) : (
           <>
@@ -1003,7 +996,7 @@ export default function ToledoConfig() {
                 {filteredProdutos.length === 0 ? (
                   <div className="text-center py-20 bg-surface rounded-3xl border border-dashed border-outline-variant">
                     <span className="material-symbols-outlined text-6xl text-outline-variant mb-4">scale</span>
-                    <p className="text-xl font-bold text-ink-secondary uppercase tracking-widest">Nenhum produto Toledo encontrado</p>
+                    <p className="text-xl font-bold text-ink-secondary tracking-widest">Nenhum produto toledo encontrado</p>
                     <p className="text-ink-secondary/60 mt-2">Nenhum produto corresponde à sua pesquisa ou a balança ainda não enviou arquivos.</p>
                   </div>
                 ) : (
@@ -1104,10 +1097,34 @@ export default function ToledoConfig() {
                                 })()}
                               </div>
                               <div className="flex items-center gap-6">
-                                <div className="text-right">
-                                  <span className={`font-black text-lg block ${p.preco === 0 ? 'text-error' : 'text-emerald-600'}`}>
-                                    {p.preco === 0 ? 'PRODUTO EM FALTA 🥲' : `${formatPreco(p.preco)}/kg`}
-                                  </span>
+                                <div className="text-right flex flex-col items-end gap-1">
+                                  {p.preco === 0 ? (
+                                    <span className="font-black text-lg text-error block">
+                                      PRODUTO EM FALTA 🥲
+                                    </span>
+                                  ) : (
+                                    <div className="flex items-center gap-1">
+                                      <span className="font-black text-lg text-emerald-600">
+                                        {formatPreco(p.preco)}
+                                      </span>
+                                      <span className="text-ink-secondary text-sm font-medium">/</span>
+                                      <select
+                                        value={p.unidade || 'kg'}
+                                        onChange={(e) => handleUnidadeChange(p.plu, e.target.value)}
+                                        disabled={!isMasterServer}
+                                        className="text-xs font-bold bg-surface border border-outline-variant/60 rounded-lg px-1.5 py-1 outline-none focus:border-primary disabled:opacity-50 cursor-pointer text-ink font-semibold"
+                                      >
+                                        <option value="kg">kg</option>
+                                        <option value="UN">UN</option>
+                                        <option value="PT">PT</option>
+                                        <option value="CX">CX</option>
+                                        <option value="PC">PC</option>
+                                        <option value="FD">FD</option>
+                                        <option value="LT">LT</option>
+                                        <option value="GF">GF</option>
+                                      </select>
+                                    </div>
+                                  )}
                                   <span className="text-[10px] text-ink-secondary/50 font-bold block">{formatDate(p.atualizado_em)}</span>
                                 </div>
                                 <button 
@@ -1149,7 +1166,7 @@ export default function ToledoConfig() {
                       
                       <div className="space-y-4">
                         <div>
-                          <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Nome da Categoria</label>
+                          <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Nome da categoria</label>
                           <input
                             type="text"
                             value={catNome}
@@ -1160,7 +1177,7 @@ export default function ToledoConfig() {
                         </div>
                         
                         <div>
-                          <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Emoji / Ícone</label>
+                          <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Emoji / ícone</label>
                           <input
                             type="text"
                             value={catEmoji}
@@ -1172,7 +1189,7 @@ export default function ToledoConfig() {
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Descrição Personalizada</label>
+                          <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Descrição personalizada</label>
                           <textarea
                             value={catDescricao}
                             onChange={(e) => setCatDescricao(e.target.value)}
@@ -1183,7 +1200,7 @@ export default function ToledoConfig() {
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Setor / Departamento</label>
+                          <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Setor / departamento</label>
                           <select
                             value={catSetor}
                             onChange={(e) => setCatSetor(e.target.value)}
@@ -1199,7 +1216,7 @@ export default function ToledoConfig() {
 
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-1">Ordem</label>
+                            <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Ordem</label>
                             <input
                               type="number"
                               value={catOrdem}
@@ -1209,7 +1226,7 @@ export default function ToledoConfig() {
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-2">Ativo</label>
+                            <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-2">Ativo</label>
                             <button
                               type="button"
                               onClick={() => setCatAtivo(!catAtivo)}
@@ -1295,7 +1312,7 @@ export default function ToledoConfig() {
                                     <span className="text-[9px] font-bold text-ink-secondary bg-surface-variant px-1.5 py-0.5 rounded-md">Posição: {c.ordem}</span>
                                     <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider">{c.setor || 'Mercearia'}</span>
                                     {!c.ativo && (
-                                      <span className="text-[9px] font-bold text-error bg-error/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider">Inativo</span>
+                                      <span className="text-[9px] font-bold text-error bg-error/10 px-1.5 py-0.5 rounded-md tracking-wider">Inativo</span>
                                     )}
                                   </div>
                                   {c.descricao && (
@@ -1334,10 +1351,10 @@ export default function ToledoConfig() {
                   {/* Adicionar Mapeamento */}
                   <div className="bg-surface rounded-2xl p-6 border border-outline-variant/50 shadow-sm flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-sm text-ink uppercase tracking-widest mb-4">Adicionar Mapeamento PLU</h3>
+                      <h3 className="font-bold text-sm text-ink tracking-widest mb-4">Adicionar mapeamento PLU</h3>
                       <div className="space-y-4">
                         <div>
-                          <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-2">Código PLU</label>
+                          <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-2">Código PLU</label>
                           <input
                             type="text"
                             value={novoPlu}
@@ -1348,7 +1365,7 @@ export default function ToledoConfig() {
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block mb-2">Categoria Visual</label>
+                          <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-2">Categoria visual</label>
                           <select
                             value={novaCategoria}
                             onChange={(e) => setNovaCategoria(e.target.value)}
@@ -1617,7 +1634,7 @@ export default function ToledoConfig() {
             {activeTab === 'logs' && (
               <div className="bg-surface rounded-2xl border border-outline-variant/50 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 bg-surface-variant/30 border-b border-outline-variant/30">
-                  <h3 className="font-bold text-sm text-ink uppercase tracking-widest">Histórico de Processamento</h3>
+                  <h3 className="font-bold text-sm text-ink tracking-widest">Histórico de processamento</h3>
                 </div>
                 {logs.length === 0 ? (
                   <div className="p-8 text-center text-ink-secondary">

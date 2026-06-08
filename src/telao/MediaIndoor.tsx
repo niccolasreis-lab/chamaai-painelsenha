@@ -75,6 +75,8 @@ export default function MediaIndoor() {
   const [pessoasAguardando, setPessoasAguardando] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [isRepeticao, setIsRepeticao] = useState(false);
+  const repeticaoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const API_URL = getApiUrl();
 
@@ -98,6 +100,9 @@ export default function MediaIndoor() {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      if (repeticaoTimerRef.current) {
+        clearTimeout(repeticaoTimerRef.current);
+      }
     };
   }, []);
 
@@ -268,6 +273,22 @@ export default function MediaIndoor() {
         return [payload, ...filtered].slice(0, 5);
       });
       setShowMedia(false);
+
+      // Lógica de repetição
+      if (payload.repeticao) {
+        setIsRepeticao(true);
+        if (repeticaoTimerRef.current) {
+          clearTimeout(repeticaoTimerRef.current);
+        }
+        repeticaoTimerRef.current = setTimeout(() => {
+          setIsRepeticao(false);
+        }, 8000);
+      } else {
+        setIsRepeticao(false);
+        if (repeticaoTimerRef.current) {
+          clearTimeout(repeticaoTimerRef.current);
+        }
+      }
       // PASSO 2: Aguardar o próximo frame de pintura para disparar o áudio
       // Garante que o DOM já foi atualizado antes do som tocar
       requestAnimationFrame(() => {
@@ -318,6 +339,12 @@ export default function MediaIndoor() {
       fetchAguardando();
       if (telaoSseEvent.event === 'SENHA_ESTORNADA') {
         setHistorico(prev => prev.filter(s => s.id !== telaoSseEvent.data?.id));
+        if (ultimaSenha && telaoSseEvent.data && ultimaSenha.id === telaoSseEvent.data.id) {
+          setIsRepeticao(false);
+          if (repeticaoTimerRef.current) {
+            clearTimeout(repeticaoTimerRef.current);
+          }
+        }
       }
     } else if (telaoSseEvent.event === 'queue-update') {
       const { geral, preferencial } = telaoSseEvent.data || {};
@@ -332,6 +359,10 @@ export default function MediaIndoor() {
       setUltimaSenha(null);
       setHistorico([]);
       setShowMedia(true);
+      setIsRepeticao(false);
+      if (repeticaoTimerRef.current) {
+        clearTimeout(repeticaoTimerRef.current);
+      }
       fetchAguardando();
     } else if (telaoSseEvent.event === 'TELAO_VINCULADO' || telaoSseEvent.event === 'TELAO_ATUALIZADO') {
       const data = telaoSseEvent.data;
@@ -585,6 +616,9 @@ export default function MediaIndoor() {
                     <div>
                       <span className="font-sans text-[4.5rem] font-black tracking-tighter text-primary leading-none block">
                         {String(ultimaSenha.numero).padStart(3, '0')}
+                        {isRepeticao && (
+                          <span className="text-xs text-orange-400 font-medium ml-2">↩ repetida</span>
+                        )}
                       </span>
                       {ultimaSenha.nome_cliente && (
                         <span className="font-sans text-lg font-medium text-ink-secondary/70 block mt-1 select-none">
@@ -745,6 +779,9 @@ export default function MediaIndoor() {
                         <div key={senha.id} className={`flex items-center gap-6 px-8 py-5 bg-white rounded-[2rem] border shadow-sm transition-all ${idx === 0 ? 'border-primary ring-4 ring-primary/10 bg-primary/5 scale-[1.03] mb-6' : 'border-outline-variant/50 opacity-60'}`}>
                           <span className={`font-sans text-[5.5rem] font-black leading-none tracking-tighter ${idx === 0 ? 'text-primary' : 'text-ink'}`}>
                             {String(senha.numero).padStart(3, '0')}
+                            {idx === 0 && isRepeticao && (
+                              <span className="text-xs text-orange-400 font-medium ml-2">↩ repetida</span>
+                            )}
                           </span>
                           
                           <div className="w-[4px] h-16 bg-primary/20 rounded-full shrink-0"></div>
@@ -819,7 +856,7 @@ export default function MediaIndoor() {
       {/* Fullscreen Call Overlay (Only if ticket calling is enabled in profile modules) */}
       {!showMedia && ultimaSenha && activeModules.includes('painel') && (
         <div className="absolute inset-0 z-50">
-          <SenhaChamada key={`call-${ultimaSenha.id}`} ultimaSenha={ultimaSenha} config={config} />
+          <SenhaChamada key={`call-${ultimaSenha.id}-${ultimaSenha.repeticao}`} ultimaSenha={ultimaSenha} config={config} />
         </div>
       )}
 

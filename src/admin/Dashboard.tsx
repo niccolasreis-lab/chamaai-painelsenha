@@ -75,7 +75,7 @@ export default function Dashboard() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
           <div>
             <h1 className="font-sans text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Dashboard</h1>
-            <p className="text-ink-secondary mt-2 text-lg font-semibold text-primary uppercase tracking-widest">Métricas em tempo real da fila</p>
+            <p className="text-ink-secondary mt-2 text-lg font-semibold text-primary tracking-widest">Métricas em tempo real da fila</p>
           </div>
           <button 
             onClick={fetchStats} 
@@ -90,7 +90,7 @@ export default function Dashboard() {
           <div className="bg-amber-500/10 border-l-4 border-amber-500 p-6 rounded-r-2xl shadow-sm flex items-start gap-4 animate-pulse">
             <span className="material-symbols-outlined text-amber-500 text-3xl shrink-0 mt-1">warning</span>
             <div className="flex-1">
-              <h3 className="text-base font-bold text-amber-800 uppercase tracking-widest leading-none">⚠️ AVISO: Altere suas credenciais padrão</h3>
+              <h3 className="text-base font-bold text-amber-800 tracking-widest leading-none">⚠️ aviso: altere suas credenciais padrão</h3>
               <p className="text-xs text-amber-700 font-semibold mt-2 leading-relaxed">
                 Este sistema está rodando com as credenciais administrativas originais de fábrica (<b>admin</b> / <b>admin</b>). Para garantir a integridade absoluta dos seus relatórios, preços e acessos remotos, por favor, <Link to="/admin/operators" className="underline font-bold text-amber-900 hover:text-black">CLIQUE AQUI</Link> ou vá em <b>Operadores</b> para atualizar a senha do administrador agora mesmo!
               </p>
@@ -157,7 +157,7 @@ export default function Dashboard() {
         {/* Bottom Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2 bg-surface rounded-[32px] p-8 border border-outline-variant/50 shadow-sm flex flex-col gap-6">
-            <h3 className="font-sans text-xl font-bold text-ink uppercase tracking-widest">Atendimentos por Hora</h3>
+            <h3 className="font-sans text-xl font-bold text-ink tracking-widest">Atendimentos por hora</h3>
             <div className="flex-1 min-h-[250px] w-full">
               {chartDataHora.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -187,7 +187,7 @@ export default function Dashboard() {
           </div>
 
           <div className="bg-surface rounded-[32px] p-8 border border-outline-variant/50 shadow-sm flex flex-col gap-6">
-            <h3 className="font-sans text-xl font-bold text-ink uppercase tracking-widest">Por Balcão</h3>
+            <h3 className="font-sans text-xl font-bold text-ink tracking-widest">Por balcão</h3>
             <div className="flex-1 min-h-[250px] w-full relative">
               {chartDataBalcao.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -222,7 +222,7 @@ export default function Dashboard() {
           {/* Version Card */}
           <div className="bg-surface rounded-[32px] p-8 border border-outline-variant/50 shadow-sm flex flex-col items-center justify-center text-center group">
             <span className="material-symbols-outlined text-5xl text-primary mb-4">new_releases</span>
-            <h3 className="font-sans text-2xl font-bold text-ink uppercase tracking-widest mb-2">Versão do Sistema</h3>
+            <h3 className="font-sans text-2xl font-bold text-ink tracking-widest mb-2">Versão do sistema</h3>
             <div className="bg-primary/10 text-primary px-6 py-2 rounded-full font-black text-xl tracking-[0.3em] border border-primary/20 mb-6">
               v{appVersion}
             </div>

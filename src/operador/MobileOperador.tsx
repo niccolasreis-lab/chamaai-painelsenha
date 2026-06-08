@@ -10,6 +10,7 @@ export default function MobileOperador() {
   const [tempIp, setTempIp] = useState(localStorage.getItem('server_ip_override') || '');
   const [error, setError] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [config, setConfig] = useState<any>({});
   const API_URL = getApiUrl();
 
   useEffect(() => {
@@ -32,9 +33,20 @@ export default function MobileOperador() {
       setError(true);
     }
   };
+  
+  const fetchConfig = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/configuracoes`);
+      if (res.ok) {
+        const data = await res.json();
+        setConfig(data);
+      }
+    } catch (err) {}
+  };
 
   useEffect(() => {
     fetchFila();
+    fetchConfig();
     const interval = setInterval(fetchFila, 10000);
     return () => clearInterval(interval);
   }, [API_URL]);
@@ -279,23 +291,27 @@ export default function MobileOperador() {
 
       {/* Floating Action Buttons */}
       <div className="p-8 pb-12 md:p-12 md:pb-16 flex flex-col gap-6 md:gap-8 shrink-0 bg-gradient-to-t from-slate-950 to-transparent">
-        {senhaAtual && (
+        {senhaAtual && (config.painel_habilitar_concluir !== '0' || config.painel_habilitar_nao_compareceu !== '0') && (
           <div className="flex gap-4 md:gap-8 max-w-4xl mx-auto w-full animate-fade-in">
-            <button 
-              onClick={concluirAtendimento}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all text-white font-sans text-xl md:text-4xl font-bold uppercase tracking-wider cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-2xl md:text-5xl">check_circle</span>
-              <span>Concluir</span>
-            </button>
+            {config.painel_habilitar_concluir !== '0' && (
+              <button 
+                onClick={concluirAtendimento}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all text-white font-sans text-xl md:text-4xl font-bold uppercase tracking-wider cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-2xl md:text-5xl">check_circle</span>
+                <span>Concluir</span>
+              </button>
+            )}
             
-            <button 
-              onClick={naoCompareceu}
-              className="flex-1 bg-rose-600 hover:bg-rose-500 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all text-white font-sans text-xl md:text-4xl font-bold uppercase tracking-wider cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-2xl md:text-5xl">cancel</span>
-              <span>Não Comp.</span>
-            </button>
+            {config.painel_habilitar_nao_compareceu !== '0' && (
+              <button 
+                onClick={naoCompareceu}
+                className="flex-1 bg-rose-600 hover:bg-rose-500 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all text-white font-sans text-xl md:text-4xl font-bold uppercase tracking-wider cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-2xl md:text-5xl">cancel</span>
+                <span>Não Comp.</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -309,23 +325,27 @@ export default function MobileOperador() {
         </button>
 
         <div className="flex gap-4 md:gap-8 max-w-4xl mx-auto w-full">
-          <button 
-            onClick={repetirChamada}
-            disabled={!senhaAtual}
-            className="flex-1 bg-slate-800 hover:bg-slate-700 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all border border-slate-700 disabled:opacity-20"
-          >
-            <span className="material-symbols-outlined text-2xl md:text-5xl">refresh</span>
-            <span className="font-sans text-xl md:text-4xl font-bold uppercase tracking-wider">Repetir</span>
-          </button>
+          {config.painel_habilitar_repetir !== '0' && (
+            <button 
+              onClick={repetirChamada}
+              disabled={!senhaAtual}
+              className="flex-1 bg-slate-800 hover:bg-slate-700 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all border border-slate-700 disabled:opacity-20"
+            >
+              <span className="material-symbols-outlined text-2xl md:text-5xl">refresh</span>
+              <span className="font-sans text-xl md:text-4xl font-bold uppercase tracking-wider">Repetir</span>
+            </button>
+          )}
           
-          <button 
-            onClick={estornar}
-            disabled={!senhaAtual}
-            className="flex-1 bg-amber-600/20 hover:bg-amber-600/40 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all border-2 border-amber-500/50 text-amber-500 disabled:opacity-20"
-          >
-            <span className="material-symbols-outlined text-2xl md:text-5xl">undo</span>
-            <span className="font-sans text-xl md:text-4xl font-bold uppercase tracking-wider">Devolver</span>
-          </button>
+          {config.painel_habilitar_devolver !== '0' && (
+            <button 
+              onClick={estornar}
+              disabled={!senhaAtual}
+              className="flex-1 bg-amber-600/20 hover:bg-amber-600/40 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all border-2 border-amber-500/50 text-amber-500 disabled:opacity-20"
+            >
+              <span className="material-symbols-outlined text-2xl md:text-5xl">undo</span>
+              <span className="font-sans text-xl md:text-4xl font-bold uppercase tracking-wider">Devolver</span>
+            </button>
+          )}
 
           <button 
             onClick={() => window.location.reload()}

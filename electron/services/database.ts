@@ -93,6 +93,10 @@ export function initDatabase() {
       INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_template_nome', 'Senha {senha}, {nome}, dirija-se ao {guiche}.', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_velocidade', '0.95', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_tom', '1.0', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('painel_habilitar_repetir', '1', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('painel_habilitar_devolver', '1', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('painel_habilitar_nao_compareceu', '1', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('painel_habilitar_concluir', '1', datetime('now'));
     `);
 
     db.exec(`
@@ -187,9 +191,18 @@ export function initDatabase() {
         descricao    TEXT NOT NULL,
         preco        INTEGER NOT NULL DEFAULT 0,
         categoria    TEXT NOT NULL DEFAULT 'Outros',
+        unidade      TEXT NOT NULL DEFAULT 'kg',
         atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
+
+    // Migration: Adicionar coluna unidade em toledo_produtos caso não exista
+    try {
+      db.prepare("ALTER TABLE toledo_produtos ADD COLUMN unidade TEXT DEFAULT 'kg'").run();
+      console.log("[DATABASE] Coluna 'unidade' adicionada à tabela toledo_produtos.");
+    } catch (e) {
+      // Ignorar se a coluna já existe
+    }
 
     // Toledo — Categorias dinâmicas
     db.exec(`

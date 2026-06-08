@@ -59,7 +59,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         <div className="flex-1 px-4 space-y-2">
           {navLinks.map((link) => {
-            const isActive = location.pathname === link.path || (link.path === '/admin' && location.pathname === '/admin/');
+            const isActive = location.pathname === link.path || 
+              (link.path !== '/' && link.path !== '/admin' && location.pathname.startsWith(link.path)) ||
+              (link.path === '/admin' && (location.pathname === '/admin' || location.pathname === '/admin/'));
             return (
               <Link
                 key={link.name}
@@ -80,7 +82,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         <div className="px-6 mt-auto">
           <button className="w-full py-4 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary-hover active:scale-95 transition-all flex items-center justify-center space-x-2 outline-none">
             <span className="material-symbols-outlined text-sm">add</span>
-            <span className="uppercase tracking-widest text-sm">Novo Operador</span>
+            <span className="tracking-widest text-sm">Novo operador</span>
           </button>
         </div>
       </nav>

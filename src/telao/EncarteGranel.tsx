@@ -306,7 +306,7 @@ export default function EncarteGranel({ duracao, itensPorSlide, onComplete, conf
                             color: isOferta ? '#dc2626' : COLORS.amber
                           }}>{formatPreco(p.preco)}</span>
                         </div>
-                        <span style={{ fontSize: 'clamp(8px, calc(var(--price-font) * 0.25), 28px)', fontWeight: 600, letterSpacing: 2, color: COLORS.muted, textTransform: 'uppercase' as const, marginTop: 2 }}>por kg</span>
+                        <span style={{ fontSize: 'clamp(8px, calc(var(--price-font) * 0.25), 28px)', fontWeight: 600, letterSpacing: 2, color: COLORS.muted, textTransform: 'uppercase' as const, marginTop: 2 }}>por {p.unidade || 'kg'}</span>
                       </>
                     )}
                   </div>

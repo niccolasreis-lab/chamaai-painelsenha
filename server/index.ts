@@ -8,7 +8,7 @@ import dgram from 'dgram';
 import cron from 'node-cron';
 import { getDb } from '../electron/services/database';
 import { startToledoWatcher, forceToledoRefresh, reloadCategorias, setBroadcastFn } from './toledo-watcher';
-import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica, startSyncWorker, stopSyncWorker, supabase } from './supabase-sync';
+import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica, startSyncWorker, stopSyncWorker, supabase, isSupabaseConfigured } from './supabase-sync';
 import { migrateDatabaseAndConfigs } from './categorizador';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
@@ -1441,7 +1441,8 @@ export function startServer() {
         ...proxima,
         status: 'chamada',
         guiche: `Guichê ${guiche}`,
-        aguardando_count: geral + preferencial
+        aguardando_count: geral + preferencial,
+        repeticao: false
       };
       
       broadcastEvent('NOVA_SENHA_CHAMADA', standardPayload);
@@ -1502,7 +1503,8 @@ export function startServer() {
         ...ultimaChamada,
         status: 'chamada',
         guiche: `Guichê ${guiche}`,
-        aguardando_count: countGeral.count + countPref.count
+        aguardando_count: countGeral.count + countPref.count,
+        repeticao: true
       };
 
       broadcastEvent('NOVA_SENHA_CHAMADA', standardPayload);
@@ -1656,7 +1658,8 @@ export function startServer() {
         ...proxima,
         status: 'chamada',
         guiche,
-        aguardando_count: geral + preferencial
+        aguardando_count: geral + preferencial,
+        repeticao: false
       };
 
       broadcastEvent('NOVA_SENHA_CHAMADA', payload);
@@ -1729,7 +1732,8 @@ export function startServer() {
       const payload = {
         ...proxima,
         guiche,
-        aguardando_count: geral + preferencial
+        aguardando_count: geral + preferencial,
+        repeticao: true
       };
 
       broadcastEvent('NOVA_SENHA_CHAMADA', payload);
@@ -2001,7 +2005,7 @@ export function startServer() {
       if (configuracoes.toledo_ocultar_em_falta !== undefined) syncConfiguracaoPublica('toledo_ocultar_em_falta', String(configuracoes.toledo_ocultar_em_falta));
       if (configuracoes.telao_ticker_texto !== undefined) syncConfiguracaoPublica('telao_ticker_texto', String(configuracoes.telao_ticker_texto));
       
-      if (configuracoes.cor_primaria !== undefined) {
+      if (configuracoes.cor_primaria !== undefined && isSupabaseConfigured) {
         const novaCor = configuracoes.cor_primaria;
         try {
           const { error } = await supabase
@@ -2429,7 +2433,7 @@ export function startServer() {
 
       // 3. Buscar os produtos
       let produtos = db.prepare(
-        'SELECT plu, descricao, preco, categoria, atualizado_em FROM toledo_produtos ORDER BY categoria ASC, descricao ASC'
+        'SELECT plu, descricao, preco, categoria, unidade, atualizado_em FROM toledo_produtos ORDER BY categoria ASC, descricao ASC'
       ).all() as any[];
 
       // 4. Aplicar filtros e renomeação
@@ -2487,8 +2491,8 @@ export function startServer() {
       try {
         const db = getDb();
         const produtosCloud = db.prepare(
-          'SELECT plu, descricao, preco, categoria FROM toledo_produtos'
-        ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string }>;
+          'SELECT plu, descricao, preco, categoria, unidade FROM toledo_produtos'
+        ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string; unidade?: string }>;
         syncProdutos(produtosCloud);
       } catch (syncErr) {
         console.error('[TOLEDO] Sync cloud falhou (não crítico):', syncErr);
@@ -2549,8 +2553,8 @@ export function startServer() {
 
       // Sync: envia produtos com categorias atualizadas para a nuvem
       const produtosCloud = db.prepare(
-        'SELECT plu, descricao, preco, categoria FROM toledo_produtos'
-      ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string }>;
+        'SELECT plu, descricao, preco, categoria, unidade FROM toledo_produtos'
+      ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string; unidade?: string }>;
       syncProdutos(produtosCloud);
 
       res.json({ success: true });
@@ -2867,11 +2871,21 @@ export function startServer() {
   app.put('/api/toledo/produtos/:plu', (req, res) => {
     try {
       const { plu } = req.params;
-      const { descricao } = req.body;
+      const { descricao, unidade } = req.body;
       const db = getDb();
       
-      db.prepare(`UPDATE toledo_produtos SET descricao = ?, atualizado_em = datetime('now', 'localtime') WHERE plu = ?`)
-        .run(descricao, plu);
+      if (descricao !== undefined && unidade !== undefined) {
+        db.prepare(`UPDATE toledo_produtos SET descricao = ?, unidade = ?, atualizado_em = datetime('now', 'localtime') WHERE plu = ?`)
+          .run(descricao, unidade, plu);
+      } else if (unidade !== undefined) {
+        db.prepare(`UPDATE toledo_produtos SET unidade = ?, atualizado_em = datetime('now', 'localtime') WHERE plu = ?`)
+          .run(unidade, plu);
+      } else if (descricao !== undefined) {
+        db.prepare(`UPDATE toledo_produtos SET descricao = ?, atualizado_em = datetime('now', 'localtime') WHERE plu = ?`)
+          .run(descricao, plu);
+      } else {
+        return res.status(400).json({ error: 'Nenhum campo para atualizar fornecido.' });
+      }
       
       broadcastEvent('TOLEDO_PRECOS_ATUALIZADOS', { action: 'description_update' });
       res.json({ success: true });
@@ -3027,7 +3041,7 @@ export function startServer() {
       // Sincronização pendente da cor primária no startup
       try {
         const pendente = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'sync_pendente_cor_primaria'").get() as any;
-        if (pendente && pendente.valor === '1') {
+        if (pendente && pendente.valor === '1' && isSupabaseConfigured) {
           const cor = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'cor_primaria'").get() as any;
           if (cor && cor.valor) {
             console.log('[STARTUP] Detectado cor_primaria pendente de sincronização. Tentando sincronizar com o Supabase...');
@@ -3050,8 +3064,8 @@ export function startServer() {
       // Sincroniza todos os produtos Toledo ativos no startup para garantir que a nuvem esteja atualizada
       try {
         const produtosCloud = db.prepare(
-          'SELECT plu, descricao, preco, categoria FROM toledo_produtos'
-        ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string }>;
+          'SELECT plu, descricao, preco, categoria, unidade FROM toledo_produtos'
+        ).all() as Array<{ plu: string; descricao: string; preco: number; categoria: string; unidade?: string }>;
         if (produtosCloud.length > 0) {
           syncProdutos(produtosCloud);
           console.log('[STARTUP] ✅ Enfileirada sincronização de', produtosCloud.length, 'produtos Toledo com o Supabase');

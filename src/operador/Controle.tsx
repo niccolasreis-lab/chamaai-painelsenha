@@ -261,37 +261,44 @@ export default function Controle() {
             <div className="text-[10px] font-bold uppercase opacity-50">Total</div>
           </div>
         </div>
-
         {/* Botões de Ação */}
         <div className="flex flex-col gap-3 pb-4">
-          {senhaAtual && (
-            <div className="grid grid-cols-2 gap-3">
-              <button 
-                onClick={concluirAtendimento}
-                className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-3xl font-bold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
-                <span className="material-symbols-outlined text-base">check_circle</span> Concluir
-              </button>
-              <button 
-                onClick={naoCompareceu}
-                className="py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-3xl font-bold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
-                <span className="material-symbols-outlined text-base">cancel</span> Não Compareceu
-              </button>
+          {senhaAtual && (_config.painel_habilitar_concluir !== '0' || _config.painel_habilitar_nao_compareceu !== '0') && (
+            <div className={`grid ${_config.painel_habilitar_concluir !== '0' && _config.painel_habilitar_nao_compareceu !== '0' ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
+              {_config.painel_habilitar_concluir !== '0' && (
+                <button 
+                  onClick={concluirAtendimento}
+                  className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-3xl font-bold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
+                  <span className="material-symbols-outlined text-base">check_circle</span> Concluir
+                </button>
+              )}
+              {_config.painel_habilitar_nao_compareceu !== '0' && (
+                <button 
+                  onClick={naoCompareceu}
+                  className="py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-3xl font-bold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
+                  <span className="material-symbols-outlined text-base">cancel</span> Não Compareceu
+                </button>
+              )}
             </div>
           )}
 
-          {senhaAtual && (
-            <div className="grid grid-cols-2 gap-3">
-              <button 
-                onClick={repetirChamada}
-                className="py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-3xl font-bold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
-                <span className="material-symbols-outlined text-base">refresh</span> Repetir
-              </button>
-              <button 
-                onClick={estornar}
-                className={`py-3 rounded-3xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.95] border-2 uppercase tracking-wider
-                  ${theme === 'dark' ? 'bg-amber-600/20 border-amber-500/50 text-amber-500' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
-                <span className="material-symbols-outlined text-base">undo</span> Devolver
-              </button>
+          {senhaAtual && (_config.painel_habilitar_repetir !== '0' || _config.painel_habilitar_devolver !== '0') && (
+            <div className={`grid ${_config.painel_habilitar_repetir !== '0' && _config.painel_habilitar_devolver !== '0' ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
+              {_config.painel_habilitar_repetir !== '0' && (
+                <button 
+                  onClick={repetirChamada}
+                  className="py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-3xl font-bold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
+                  <span className="material-symbols-outlined text-base">refresh</span> Repetir
+                </button>
+              )}
+              {_config.painel_habilitar_devolver !== '0' && (
+                <button 
+                  onClick={estornar}
+                  className={`py-3 rounded-3xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.95] border-2 uppercase tracking-wider
+                    ${theme === 'dark' ? 'bg-amber-600/20 border-amber-500/50 text-amber-500' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
+                  <span className="material-symbols-outlined text-base">undo</span> Devolver
+                </button>
+              )}
             </div>
           )}
           

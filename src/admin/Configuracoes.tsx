@@ -5,6 +5,7 @@ import { SOUND_OPTIONS, playNotificationSound } from '../shared/sounds';
 import { AlertTriangle } from 'lucide-react';
 
 export default function Configuracoes() {
+  const [activeTab, setActiveTab] = useState<'geral' | 'telao' | 'totem' | 'sistema' | 'seguranca'>('geral');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [printers, setPrinters] = useState<any[]>([]);
@@ -73,6 +74,10 @@ export default function Configuracoes() {
     telao_tts_template_nome: 'Senha {senha}, {nome}, dirija-se ao {guiche}.',
     telao_tts_velocidade: '0.95',
     telao_tts_tom: '1.0',
+    painel_habilitar_repetir: '1',
+    painel_habilitar_devolver: '1',
+    painel_habilitar_nao_compareceu: '1',
+    painel_habilitar_concluir: '1',
   });
 
   const [agendamentoRegras, setAgendamentoRegras] = useState<{ hora: string; layout: string }[]>([]);
@@ -487,7 +492,7 @@ export default function Configuracoes() {
                 <span className="material-symbols-outlined text-2xl">settings_backup_restore</span>
               </div>
               <div>
-                <h3 className="text-sm font-bold text-emerald-800 uppercase tracking-widest leading-none">Backup Restaurado</h3>
+                <h3 className="text-sm font-bold text-emerald-800 tracking-widest leading-none">Backup restaurado</h3>
                 <p className="text-xs text-emerald-600 font-semibold mt-2 leading-relaxed">
                   O backup do arquivo <strong className="font-mono text-emerald-700 bg-emerald-500/10 px-1.5 py-0.5 rounded break-all">{restoredBackupName}</strong> foi restaurado com sucesso!
                 </p>
@@ -510,7 +515,7 @@ export default function Configuracoes() {
                 <AlertTriangle className="h-6 w-6 text-red-500" />
               </div>
               <div className="ml-3 flex-1">
-                <h3 className="text-lg font-bold text-red-800 uppercase tracking-wider">Acesso Restrito: Modo Leitura</h3>
+                <h3 className="text-lg font-bold text-red-800 tracking-wider">Acesso restrito: modo leitura</h3>
                 <div className="mt-1 text-sm text-red-700">
                   <p>Você está acessando as configurações a partir de um dispositivo cliente. Alterações administrativas só podem ser realizadas no <b>Servidor Master</b> da loja para garantir a integridade dos dados e evitar conflitos de sincronização.</p>
                 </div>
@@ -562,7 +567,7 @@ export default function Configuracoes() {
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-emerald-600">verified_user</span>
                 <div>
-                  <h3 className="text-sm font-bold text-emerald-800 uppercase tracking-wider">Sessão Master Remota Ativa</h3>
+                  <h3 className="text-sm font-bold text-emerald-800 tracking-wider">Sessão master remota ativa</h3>
                   <p className="text-xs text-emerald-600">Você tem permissão de administrador via acesso remoto.</p>
                 </div>
               </div>
@@ -584,6 +589,7 @@ export default function Configuracoes() {
               <p className="text-ink-secondary mt-2 text-lg font-semibold uppercase tracking-wider">Gestão do Sistema ChamaAí</p>
             </div>
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving || !isMasterServer}
               className={`px-8 py-4 bg-primary text-on-primary rounded-xl font-bold shadow-xl transition-all outline-none uppercase tracking-widest text-sm ${saving || !isMasterServer ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-hover active:scale-95'}`}
@@ -592,18 +598,77 @@ export default function Configuracoes() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Coluna Esquerda: Estabelecimento */}
-          <div className="lg:col-span-2 space-y-8">
-            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+          {/* Tabs Navigation */}
+          <div className="flex space-x-2 border-b border-outline-variant/30">
+            <button
+              type="button"
+              onClick={() => setActiveTab('geral')}
+              className={`px-6 py-3 font-bold text-sm uppercase tracking-widest rounded-t-xl transition-all ${
+                activeTab === 'geral'
+                  ? 'bg-surface text-primary border border-outline-variant/50 border-b-transparent -mb-[1px]'
+                  : 'text-ink-secondary hover:text-ink hover:bg-surface-variant/50'
+              }`}
+            >
+              Geral
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('telao')}
+              className={`px-6 py-3 font-bold text-sm uppercase tracking-widest rounded-t-xl transition-all ${
+                activeTab === 'telao'
+                  ? 'bg-surface text-primary border border-outline-variant/50 border-b-transparent -mb-[1px]'
+                  : 'text-ink-secondary hover:text-ink hover:bg-surface-variant/50'
+              }`}
+            >
+              Telão & Interface
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('totem')}
+              className={`px-6 py-3 font-bold text-sm uppercase tracking-widest rounded-t-xl transition-all ${
+                activeTab === 'totem'
+                  ? 'bg-surface text-primary border border-outline-variant/50 border-b-transparent -mb-[1px]'
+                  : 'text-ink-secondary hover:text-ink hover:bg-surface-variant/50'
+              }`}
+            >
+              Totem & Impressora
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('sistema')}
+              className={`px-6 py-3 font-bold text-sm uppercase tracking-widest rounded-t-xl transition-all ${
+                activeTab === 'sistema'
+                  ? 'bg-surface text-primary border border-outline-variant/50 border-b-transparent -mb-[1px]'
+                  : 'text-ink-secondary hover:text-ink hover:bg-surface-variant/50'
+              }`}
+            >
+              Sistema
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('seguranca')}
+              className={`px-6 py-3 font-bold text-sm uppercase tracking-widest rounded-t-xl transition-all ${
+                activeTab === 'seguranca'
+                  ? 'bg-surface text-primary border border-outline-variant/50 border-b-transparent -mb-[1px]'
+                  : 'text-ink-secondary hover:text-ink hover:bg-surface-variant/50'
+              }`}
+            >
+              Segurança
+            </button>
+          </div>
+
+          {/* Tab Content: Geral */}
+          {activeTab === 'geral' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+              <div className="space-y-8">
+                <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
               <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">storefront</span>
                 Estabelecimento
               </h2>
               <div className="space-y-6">
                 <div>
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">NOME DO ESTABELECIMENTO</label>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Nome do estabelecimento</label>
                   <input
                     name="nome_estabelecimento"
                     value={config.nome_estabelecimento || ''}
@@ -614,14 +679,14 @@ export default function Configuracoes() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30">
-                    <span className="font-bold text-ink text-sm uppercase">Atendimento Geral</span>
+                    <span className="font-bold text-ink text-sm">Atendimento geral</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" name="fila_normal_ativa" checked={config.fila_normal_ativa === '1'} onChange={handleChange} className="sr-only peer" />
                       <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
                     </label>
                   </div>
                   <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30">
-                    <span className="font-bold text-ink text-sm uppercase">Prioritário</span>
+                    <span className="font-bold text-ink text-sm">Prioritário</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" name="fila_preferencial_ativa" checked={config.fila_preferencial_ativa === '1'} onChange={handleChange} className="sr-only peer" />
                       <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
@@ -630,26 +695,163 @@ export default function Configuracoes() {
                 </div>
               </div>
             </div>
-            {/* Telão & Personalização */}
+                
             <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+              <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-primary">sensors</span>
+                Painel do Operador
+              </h2>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  
+                  <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-ink text-sm">Botão repetir</span>
+                      <span className="text-[10px] text-ink-secondary/60 font-medium mt-1">Exibir botão para repetir chamada da senha atual.</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        name="painel_habilitar_repetir" 
+                        checked={config.painel_habilitar_repetir !== '0'} 
+                        onChange={handleChange} 
+                        className="sr-only peer" 
+                      />
+                      <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-ink text-sm">Botão devolver</span>
+                      <span className="text-[10px] text-ink-secondary/60 font-medium mt-1">Exibir botão para devolver a senha de volta para a fila.</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        name="painel_habilitar_devolver" 
+                        checked={config.painel_habilitar_devolver !== '0'} 
+                        onChange={handleChange} 
+                        className="sr-only peer" 
+                      />
+                      <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-ink text-sm">Botão não compareceu</span>
+                      <span className="text-[10px] text-ink-secondary/60 font-medium mt-1">Exibir botão para cancelar a senha por ausência do cliente.</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        name="painel_habilitar_nao_compareceu" 
+                        checked={config.painel_habilitar_nao_compareceu !== '0'} 
+                        onChange={handleChange} 
+                        className="sr-only peer" 
+                      />
+                      <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-ink text-sm">Botão concluir</span>
+                      <span className="text-[10px] text-ink-secondary/60 font-medium mt-1">Exibir botão para finalizar o atendimento da senha atual.</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        name="painel_habilitar_concluir" 
+                        checked={config.painel_habilitar_concluir !== '0'} 
+                        onChange={handleChange} 
+                        className="sr-only peer" 
+                      />
+                      <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                    </label>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+  
+              </div>
+              <div className="space-y-8">
+                <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+              <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-primary">palette</span>
+                Identidade Visual & Cores
+              </h2>
+              <div className="space-y-6">
+                <div>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Cor primária da marca</label>
+                  <div className="flex gap-4 items-center">
+                    <div className="relative w-16 h-12 rounded-xl overflow-hidden border border-outline-variant/50 cursor-pointer shrink-0">
+                      <input
+                        type="color"
+                        name="cor_primaria"
+                        value={config.cor_primaria || '#2563eb'}
+                        onChange={handleChange}
+                        className="absolute inset-0 w-full h-full scale-150 cursor-pointer border-none p-0"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <input
+                        name="cor_primaria"
+                        value={config.cor_primaria || '#2563eb'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setConfig(prev => ({ ...prev, cor_primaria: val }));
+                        }}
+                        placeholder="#2563eb"
+                        className={`w-full bg-surface-variant border rounded-xl px-4 py-3 focus:outline-none text-ink font-semibold font-mono ${
+                          /^#[0-9A-Fa-f]{6}$/.test(config.cor_primaria || '') 
+                            ? 'border-outline-variant/50 focus:border-primary' 
+                            : 'border-error focus:border-error'
+                        }`}
+                        type="text"
+                        maxLength={7}
+                      />
+                      {!/^#[0-9A-Fa-f]{6}$/.test(config.cor_primaria || '') && (
+                        <p className="text-error text-[10px] font-bold mt-1 tracking-wider">Formato de cor inválido. use o formato hexadecimal (ex: #2563eb).</p>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-ink-secondary/60 mt-2 font-medium">
+                    A cor primária define a identidade visual do Totem, Telão, Operador e Portal do Cliente.
+                  </p>
+                </div>
+              </div>
+            </div>
+                <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+              <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-primary">image</span>
+                Logo
+              </h2>
+              <div className="flex flex-col items-center p-6 border-2 border-dashed border-outline-variant/50 rounded-2xl bg-surface-variant/30">
+                {config.logo_cliente && <img src={`${API_URL}${config.logo_cliente}`} className="h-16 object-contain mb-4" />}
+                <input type="file" id="logo-input" className="hidden" accept="image/*" onChange={handleLogoUpload} />
+                <label htmlFor="logo-input" className="text-primary font-bold text-sm tracking-widest cursor-pointer hover:underline">Trocar logo</label>
+              </div>
+            </div>
+              </div>
+            </div>
+          )}
+
+          {/* Tab Content: Telão & Interface */}
+          {activeTab === 'telao' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+              <div className="lg:col-span-2 space-y-8">
+                <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
               <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">tv</span>
                 Telão & Interface
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="col-span-2">
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">NOME DO ESTABELECIMENTO</label>
-                  <input
-                    name="nome_estabelecimento"
-                    value={config.nome_estabelecimento || ''}
-                    onChange={handleChange}
-                    className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold"
-                    type="text"
-                  />
-                  <p className="text-[10px] text-ink-secondary/60 mt-1 font-medium">Aparece no portal do cliente e no telão.</p>
-                </div>
+
                 <div className="col-span-2 md:col-span-1">
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">TEXTO DO RODAPÉ (TELÃO)</label>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Texto do rodapé (telão)</label>
                   <input
                     name="texto_rodape"
                     value={config.texto_rodape || ''}
@@ -659,7 +861,7 @@ export default function Configuracoes() {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">RÓTULO DO LOCAL (Ex: GUICHÊ, SALA)</label>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Rótulo do local (ex: guichê, sala)</label>
                   <input
                     name="rotulo_local"
                     value={config.rotulo_local || ''}
@@ -670,7 +872,7 @@ export default function Configuracoes() {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">RÓTULO ATEND. GERAL</label>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Rótulo atend. geral</label>
                   <input
                     name="rotulo_atendimento_geral"
                     value={config.rotulo_atendimento_geral || ''}
@@ -680,7 +882,7 @@ export default function Configuracoes() {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">RÓTULO ATEND. PRIORITÁRIO</label>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Rótulo atend. prioritário</label>
                   <input
                     name="rotulo_atendimento_prioritario"
                     value={config.rotulo_atendimento_prioritario || ''}
@@ -691,14 +893,14 @@ export default function Configuracoes() {
                 </div>
                 <div className="col-span-2 flex gap-4">
                   <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30 flex-1">
-                    <span className="font-bold text-ink text-sm uppercase">Mostrar Rodapé no Telão</span>
+                    <span className="font-bold text-ink text-sm">Mostrar rodapé no telão</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" name="mostrar_rodape" checked={config.mostrar_rodape !== '0'} onChange={handleChange} className="sr-only peer" />
                       <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
                     </label>
                   </div>
                   <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30 flex-1">
-                    <span className="font-bold text-ink text-sm uppercase">Ocultar Tipo no Ticket</span>
+                    <span className="font-bold text-ink text-sm">Ocultar tipo no ticket</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" name="ocultar_tipo_senha" checked={config.ocultar_tipo_senha === '1'} onChange={handleChange} className="sr-only peer" />
                       <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
@@ -710,7 +912,7 @@ export default function Configuracoes() {
                 <div className="col-span-2 border-t border-outline-variant/30 pt-6 mt-2 space-y-6 animate-fade-in">
                   <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30">
                     <div className="flex flex-col">
-                      <span className="font-bold text-ink text-sm uppercase">Chamada por Voz por TTS (Sintetizador)</span>
+                      <span className="font-bold text-ink text-sm">Chamada por voz por TTS (sintetizador)</span>
                       <span className="text-[10px] text-ink-secondary/60 font-medium mt-1">Falará a senha e o local nos telões no momento da chamada.</span>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -722,7 +924,7 @@ export default function Configuracoes() {
                   {config.telao_tts_ativo === '1' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-surface-variant/30 border border-outline-variant/30 rounded-2xl animate-fade-in">
                       <div>
-                        <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">Gênero da Voz</label>
+                        <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Gênero da voz</label>
                         <select
                           name="telao_tts_voz"
                           value={config.telao_tts_voz || 'Feminina'}
@@ -764,7 +966,7 @@ export default function Configuracoes() {
                       </div>
 
                       <div className="col-span-2">
-                        <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">Template de Chamada (Sem nome)</label>
+                        <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Template de chamada (sem nome)</label>
                         <input
                           name="telao_tts_template"
                           value={config.telao_tts_template || ''}
@@ -776,7 +978,7 @@ export default function Configuracoes() {
                       </div>
 
                       <div className="col-span-2">
-                        <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">Template de Chamada (Com nome do cliente)</label>
+                        <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Template de chamada (com nome do cliente)</label>
                         <input
                           name="telao_tts_template_nome"
                           value={config.telao_tts_template_nome || ''}
@@ -805,7 +1007,7 @@ export default function Configuracoes() {
                 </div>
 
                 <div className="col-span-2 border-t border-outline-variant/30 pt-6 mt-2">
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">ARTE DE ESPERA DO TELÃO (PRÉ-VÍNCULO)</label>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Arte de espera do telão (pré-vínculo)</label>
                   <div className="flex items-center gap-4">
                     {config.telao_arte_espera && (
                       <div className="w-32 h-20 bg-black rounded-lg overflow-hidden shrink-0 flex items-center justify-center border border-outline-variant/50">
@@ -834,59 +1036,16 @@ export default function Configuracoes() {
                 </div>
               </div>
             </div>
-
-            {/* Identidade Visual & Cores */}
-            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
-              <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
-                <span className="material-symbols-outlined text-primary">palette</span>
-                Identidade Visual & Cores
-              </h2>
-              <div className="space-y-6">
-                <div>
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">COR PRIMÁRIA DA MARCA</label>
-                  <div className="flex gap-4 items-center">
-                    <div className="relative w-16 h-12 rounded-xl overflow-hidden border border-outline-variant/50 cursor-pointer shrink-0">
-                      <input
-                        type="color"
-                        name="cor_primaria"
-                        value={config.cor_primaria || '#2563eb'}
-                        onChange={handleChange}
-                        className="absolute inset-0 w-full h-full scale-150 cursor-pointer border-none p-0"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <input
-                        name="cor_primaria"
-                        value={config.cor_primaria || '#2563eb'}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setConfig(prev => ({ ...prev, cor_primaria: val }));
-                        }}
-                        placeholder="#2563eb"
-                        className={`w-full bg-surface-variant border rounded-xl px-4 py-3 focus:outline-none text-ink font-semibold font-mono ${
-                          /^#[0-9A-Fa-f]{6}$/.test(config.cor_primaria || '') 
-                            ? 'border-outline-variant/50 focus:border-primary' 
-                            : 'border-error focus:border-error'
-                        }`}
-                        type="text"
-                        maxLength={7}
-                      />
-                      {!/^#[0-9A-Fa-f]{6}$/.test(config.cor_primaria || '') && (
-                        <p className="text-error text-[10px] font-bold mt-1 uppercase tracking-wider">
-                          Formato de cor inválido. Use o formato hexadecimal (ex: #2563eb).
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-ink-secondary/60 mt-2 font-medium">
-                    A cor primária define a identidade visual do Totem, Telão, Operador e Portal do Cliente.
-                  </p>
-                </div>
               </div>
-            </div>
 
-            {/* Totem & Autoatendimento */}
-            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+            </div>
+          )}
+
+          {/* Tab Content: Totem & Impressora */}
+          {activeTab === 'totem' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+              <div className="lg:col-span-2 space-y-8">
+                <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
               <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">touch_app</span>
                 Totem & Autoatendimento
@@ -895,7 +1054,7 @@ export default function Configuracoes() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30 col-span-2">
                     <div className="flex flex-col">
-                      <span className="font-bold text-ink text-sm uppercase">Ativar Modo Descanso (Screensaver)</span>
+                      <span className="font-bold text-ink text-sm">Ativar modo descanso (screensaver)</span>
                       <span className="text-[10px] text-ink-secondary/60 font-medium mt-1">Exibe mídia ou relógio quando o totem fica ocioso.</span>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -913,7 +1072,7 @@ export default function Configuracoes() {
                   {config.totem_screensaver_ativo === '1' && (
                     <>
                       <div>
-                        <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">TEMPO DE INATIVIDADE (SEGUNDOS)</label>
+                        <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Tempo de inatividade (segundos)</label>
                         <input
                           name="totem_screensaver_timeout"
                           value={config.totem_screensaver_timeout || '120'}
@@ -924,7 +1083,7 @@ export default function Configuracoes() {
                         />
                       </div>
                       <div>
-                        <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">INTERVALO DAS MÍDIAS (SEGUNDOS)</label>
+                        <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Intervalo das mídias (segundos)</label>
                         <input
                           name="totem_screensaver_intervalo"
                           value={config.totem_screensaver_intervalo || '10'}
@@ -935,7 +1094,7 @@ export default function Configuracoes() {
                         />
                       </div>
                       <div className="col-span-2">
-                        <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">MODO DE EXIBIÇÃO DO SCREENSAVER</label>
+                        <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Modo de exibição do screensaver</label>
                         <select
                           name="totem_screensaver_modo"
                           value={config.totem_screensaver_modo || 'ambos'}
@@ -952,7 +1111,7 @@ export default function Configuracoes() {
                   
                   <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30 col-span-2">
                     <div className="flex flex-col">
-                      <span className="font-bold text-ink text-sm uppercase">Solicitar Nome do Cliente</span>
+                      <span className="font-bold text-ink text-sm">Solicitar nome do cliente</span>
                       <span className="text-[10px] text-ink-secondary/60 font-medium mt-1">Exibe teclado virtual no totem para o cliente digitar o nome.</span>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -970,117 +1129,14 @@ export default function Configuracoes() {
               </div>
             </div>
 
-            {/* Agendamento de Layouts do Telão */}
-            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
-              <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
-                <span className="material-symbols-outlined text-primary">schedule</span>
-                Agendamento de Layouts do Telão
-              </h2>
-              <div className="space-y-6">
-                <div className="flex items-center justify-between p-5 bg-surface-variant rounded-xl border border-outline-variant/30">
-                  <div className="flex flex-col">
-                    <span className="font-bold text-ink text-sm uppercase">Ativar Troca Automática por Horário</span>
-                    <span className="text-[10px] text-ink-secondary/60 font-medium mt-1">Altera o layout padrão dos telões automaticamente ao longo do dia.</span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      name="telao_agendamento_ativo" 
-                      checked={config.telao_agendamento_ativo === '1'} 
-                      onChange={handleChange} 
-                      className="sr-only peer" 
-                    />
-                    <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
-                  </label>
-                </div>
-
-                {config.telao_agendamento_ativo === '1' && (
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="block font-bold tracking-widest text-ink-secondary uppercase text-xs">Regras de Agendamento</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAgendamentoRegras(prev => [...prev, { hora: '08:00', layout: 'classic' }]);
-                        }}
-                        className="px-4 py-2 bg-primary text-on-primary rounded-lg font-bold text-xs uppercase hover:bg-primary-hover flex items-center gap-1.5 transition-all active:scale-95"
-                      >
-                        <span className="material-symbols-outlined text-xs leading-none">add</span>
-                        Nova Regra
-                      </button>
-                    </div>
-
-                    {agendamentoRegras.length === 0 ? (
-                      <div className="p-8 text-center text-xs font-bold text-ink-secondary/35 uppercase border border-dashed border-outline-variant/50 rounded-2xl bg-surface-variant/30">
-                        Nenhuma regra de agendamento definida. Clique em "Nova Regra" para adicionar.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {agendamentoRegras.map((regra, idx) => (
-                          <div key={idx} className="flex gap-4 items-center bg-surface-variant p-4 rounded-xl border border-outline-variant/30">
-                            <div className="flex-1">
-                              <label className="block text-[10px] font-bold text-ink-secondary uppercase mb-1">Horário</label>
-                              <input
-                                type="time"
-                                value={regra.hora}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setAgendamentoRegras(prev => {
-                                    const next = [...prev];
-                                    next[idx].hora = val;
-                                    return next;
-                                  });
-                                }}
-                                className="w-full bg-white border border-outline-variant/50 rounded-lg px-3 py-2 text-ink font-semibold"
-                              />
-                            </div>
-                            <div className="flex-[2]">
-                              <label className="block text-[10px] font-bold text-ink-secondary uppercase mb-1">Layout do Telão</label>
-                              <select
-                                value={regra.layout}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setAgendamentoRegras(prev => {
-                                    const next = [...prev];
-                                    next[idx].layout = val;
-                                    return next;
-                                  });
-                                }}
-                                className="w-full bg-white border border-outline-variant/50 rounded-lg px-3 py-2 text-ink font-bold"
-                              >
-                                <option value="classic">Clássico ( classic )</option>
-                                <option value="sidebar">Mídia + Fila Lateral ( sidebar )</option>
-                                <option value="l-shape">Modo L ( l-shape )</option>
-                              </select>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAgendamentoRegras(prev => prev.filter((_, i) => i !== idx));
-                              }}
-                              className="mt-5 p-2 bg-error/10 text-error hover:bg-error hover:text-white rounded-lg transition-colors flex items-center justify-center"
-                              title="Excluir Regra"
-                            >
-                              <span className="material-symbols-outlined text-sm leading-none">delete</span>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Impressora */}
-            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+                <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
               <h2 className="font-sans text-[24px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">print</span>
                 Impressora Térmica
               </h2>
               <div className="space-y-6">
                 <div>
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">SELECIONAR IMPRESSORA</label>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Selecionar impressora</label>
                   <select
                     name="impressora_interface"
                     value={config.impressora_interface || ''}
@@ -1094,7 +1150,7 @@ export default function Configuracoes() {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">VOZ DE ALERTA DO CELULAR</label>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Voz de alerta do celular</label>
                   <select
                     name="portal_voz_alerta"
                     value={config.portal_voz_alerta || 'Feminina'}
@@ -1111,9 +1167,7 @@ export default function Configuracoes() {
                 {config.portal_voz_alerta === 'AudioGravado' && (
                   <div className="col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 bg-primary/5 p-6 rounded-2xl border border-primary/10">
                     <div className="flex flex-col gap-2">
-                      <label className="block font-bold tracking-widest text-ink-secondary uppercase text-[10px]">
-                        Áudio "Sua Vez Chegou"
-                      </label>
+                      <label className="block font-bold tracking-widest text-ink-secondary text-[10px]">Áudio "sua vez chegou"</label>
                       <div className="flex items-center gap-3">
                         <input
                           type="file"
@@ -1160,9 +1214,7 @@ export default function Configuracoes() {
                     </div>
  
                     <div className="flex flex-col gap-2">
-                      <label className="block font-bold tracking-widest text-ink-secondary uppercase text-[10px]">
-                        Áudio "Senha Próxima"
-                      </label>
+                      <label className="block font-bold tracking-widest text-ink-secondary text-[10px]">Áudio "senha próxima"</label>
                       <div className="flex items-center gap-3">
                         <input
                           type="file"
@@ -1210,7 +1262,7 @@ export default function Configuracoes() {
                   </div>
                 )}
                 <div className="col-span-2">
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">URL DO PORTAL DO CLIENTE (QR CODE)</label>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Url do portal do cliente (QR Code)</label>
                   <input
                     name="portal_cliente_url"
                     value={config.portal_cliente_url || ''}
@@ -1223,24 +1275,24 @@ export default function Configuracoes() {
                 </div>
                 <div className="border-t border-outline-variant/30 pt-6 mt-2 flex flex-col xl:flex-row gap-6">
                   <div className="flex-1">
-                    <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-4 text-xs">LAYOUT DO TICKET IMPRESSO</label>
+                    <label className="block font-bold tracking-widest text-ink-secondary mb-4 text-xs">Layout do ticket impresso</label>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30">
-                        <span className="font-bold text-ink text-sm uppercase">Exibir Logotipo</span>
+                        <span className="font-bold text-ink text-sm">Exibir logotipo</span>
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" name="print_logo" checked={config.print_logo !== '0'} onChange={handleChange} className="sr-only peer" />
                           <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
                         </label>
                       </div>
                       <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30">
-                        <span className="font-bold text-ink text-sm uppercase">Exibir Nome do Estabelecimento</span>
+                        <span className="font-bold text-ink text-sm">Exibir nome do estabelecimento</span>
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" name="print_escrita" checked={config.print_escrita !== '0'} onChange={handleChange} className="sr-only peer" />
                           <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
                         </label>
                       </div>
                       <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30">
-                        <span className="font-bold text-ink text-sm uppercase">Exibir QR Code</span>
+                        <span className="font-bold text-ink text-sm">Exibir QR Code</span>
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" name="print_qrcode" checked={config.print_qrcode !== '0'} onChange={handleChange} className="sr-only peer" />
                           <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
@@ -1251,7 +1303,7 @@ export default function Configuracoes() {
 
                   {/* Preview Visual do Ticket */}
                   <div className="w-full xl:w-[280px] shrink-0 bg-surface-variant/30 border-2 border-dashed border-outline-variant/50 rounded-2xl p-4 flex flex-col items-center overflow-hidden relative">
-                    <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-4 text-xs text-center">PREVIEW (SIMULAÇÃO)</label>
+                    <label className="block font-bold tracking-widest text-ink-secondary mb-4 text-xs text-center">Preview (simulação)</label>
                     
                     {/* Boca da impressora */}
                     <div className="w-[90%] h-4 bg-ink/80 rounded-full mb-0 z-10 shadow-md relative">
@@ -1336,11 +1388,163 @@ export default function Configuracoes() {
                 </button>
               </div>
             </div>
-          </div>
+              </div>
 
-          {/* Coluna Direita: Sistema e Backup */}
-          <div className="space-y-8">
-            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+            </div>
+          )}
+
+          {/* Tab Content: Sistema */}
+          {activeTab === 'sistema' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+              <div className="lg:col-span-2 space-y-8">
+                <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+              <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-primary">cloud_sync</span>
+                Backup & Dados
+              </h2>
+              <div className="space-y-6">
+                {/* Escopo do Backup */}
+                <div>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-3 text-xs">O que incluir no backup</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { key: 'backup_incluir_config', label: 'Configurações', icon: 'settings' },
+                      { key: 'backup_incluir_operadores', label: 'Operadores', icon: 'group' },
+                      { key: 'backup_incluir_balcoes', label: 'Balcões', icon: 'point_of_sale' },
+                      { key: 'backup_incluir_midias', label: 'Mídias e Imagens', icon: 'perm_media' },
+                    ].map(item => (
+                      <label key={item.key} className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                        config[item.key] !== '0'
+                          ? 'bg-primary/5 border-primary/30 text-ink'
+                          : 'bg-surface-variant border-outline-variant/30 text-ink-secondary'
+                      }`}>
+                        <input
+                          type="checkbox"
+                          name={item.key}
+                          checked={config[item.key] !== '0'}
+                          onChange={handleChange}
+                          className="w-4 h-4 rounded accent-primary shrink-0"
+                        />
+                        <span className="material-symbols-outlined text-lg shrink-0">{item.icon}</span>
+                        <span className="font-bold text-[11px] uppercase tracking-wider">{item.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Agendamento */}
+                <div className={`border-t border-outline-variant/30 pt-6 space-y-4 transition-opacity ${
+                  config.backup_incluir_config === '0' && config.backup_incluir_operadores === '0' && config.backup_incluir_balcoes === '0' && config.backup_incluir_midias === '0'
+                    ? 'opacity-40 pointer-events-none' : ''
+                }`}>
+                  <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30">
+                    <div>
+                      <span className="font-bold text-ink text-sm block">Agendamento automático</span>
+                      {config.backup_incluir_config === '0' && config.backup_incluir_operadores === '0' && config.backup_incluir_balcoes === '0' && config.backup_incluir_midias === '0' && (
+                        <span className="text-[10px] text-error font-bold">Selecione ao menos um item acima</span>
+                      )}
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" name="backup_agendado_ativo" checked={config.backup_agendado_ativo === '1'} onChange={handleChange} className="sr-only peer" />
+                      <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Frequência</label>
+                    <select
+                      name="backup_frequencia"
+                      value={config.backup_frequencia || 'diario'}
+                      onChange={handleChange}
+                      className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-bold"
+                    >
+                      <option value="diario">Diário</option>
+                      <option value="semanal">Semanal (Domingos)</option>
+                      <option value="mensal">Mensal (Dia 1º)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Destino dos backups</label>
+                    <input
+                      name="backup_destino"
+                      value={config.backup_destino || ''}
+                      onChange={handleChange}
+                      placeholder="C:\ChamaAi\Backups (padrão)"
+                      className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold font-mono text-sm"
+                      type="text"
+                    />
+                  </div>
+                </div>
+
+                {/* Ações */}
+                <div className="grid grid-cols-1 gap-3 pt-2">
+                  <button
+                    onClick={handleBackup}
+                    className="w-full flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30 hover:border-primary/50 transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="material-symbols-outlined text-primary">download</span>
+                      <span className="font-bold text-ink text-xs tracking-widest">Fazer backup agora</span>
+                    </div>
+                    <span className="material-symbols-outlined text-ink-secondary opacity-20 group-hover:opacity-100 transition-opacity">chevron_right</span>
+                  </button>
+
+                  <div className="relative">
+                    <input type="file" id="restore-input" className="hidden" accept=".json,.zip" onChange={handleRestore} />
+                    <label
+                      htmlFor="restore-input"
+                      className="w-full flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30 hover:border-success/50 transition-all group cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-success">upload</span>
+                        <span className="font-bold text-ink text-xs tracking-widest">Restaurar de arquivo manual</span>
+                      </div>
+                      <span className="material-symbols-outlined text-ink-secondary opacity-20 group-hover:opacity-100 transition-opacity">chevron_right</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Histórico de Backups */}
+                {backups.length > 0 && (
+                  <div className="mt-6 pt-6 border-t border-outline-variant/30">
+                    <h3 className="font-sans text-[14px] font-bold text-ink mb-4 flex items-center gap-2 uppercase tracking-wider">
+                      <span className="material-symbols-outlined text-primary text-[20px]">history</span>
+                      Histórico de Backups
+                    </h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                      {backups.map((bkp, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 bg-surface-variant/50 rounded-xl border border-outline-variant/30 hover:border-primary/30 transition-all group">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-ink text-sm">{bkp.nome}</span>
+                            <span className="text-ink-secondary text-[11px] uppercase tracking-widest">
+                              {new Date(bkp.criado_em).toLocaleString()} • {bkp.tamanhoMB} MB
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleRestoreLocal(bkp.nome)}
+                              title="Restaurar"
+                              className="p-2 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors flex items-center justify-center"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">restore</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBackup(bkp.nome)}
+                              title="Excluir"
+                              className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors flex items-center justify-center"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+              </div>
+              <div className="space-y-8">
+                <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
               <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">settings_applications</span>
                 Sistema
@@ -1348,7 +1552,7 @@ export default function Configuracoes() {
               <div className="space-y-6">
                 <div className="p-5 bg-surface-variant rounded-xl border border-outline-variant/30">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold text-ink text-sm uppercase">Iniciar com Windows</span>
+                    <span className="font-bold text-ink text-sm">Iniciar com Windows</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -1399,7 +1603,7 @@ export default function Configuracoes() {
                 </div>
 
                 <div>
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">TEMPO DE DESTAQUE DA SENHA (SEGUNDOS)</label>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Tempo de destaque da senha (segundos)</label>
                   <input
                     name="tempo_destaque_senha"
                     value={config.tempo_destaque_senha || ''}
@@ -1410,7 +1614,7 @@ export default function Configuracoes() {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">SOM DO CHAMADO</label>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Som do chamado</label>
                   <div className="flex gap-2">
                     <select
                       name="tipo_som"
@@ -1427,16 +1631,14 @@ export default function Configuracoes() {
                 </div>
               </div>
             </div>
-
-            {/* Atualização de Sistema */}
-            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+                <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
               <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">update</span>
                 Atualização do Sistema
               </h2>
               <div className="grid grid-cols-1 gap-4">
                 <div className="mb-2">
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">Pasta de Atualizações Locais (Offline)</label>
+                  <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Pasta de atualizações locais (offline)</label>
                   <input
                     name="update_path"
                     value={config.update_path || ''}
@@ -1463,7 +1665,7 @@ export default function Configuracoes() {
                 >
                   <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-primary">search</span>
-                    <span className="font-bold text-ink text-xs uppercase tracking-widest">Buscar Atualizações</span>
+                    <span className="font-bold text-ink text-xs tracking-widest">Buscar atualizações</span>
                   </div>
                   <span className="material-symbols-outlined text-ink-secondary opacity-20 group-hover:opacity-100 transition-opacity">chevron_right</span>
                 </button>
@@ -1508,7 +1710,7 @@ export default function Configuracoes() {
                   <div className="flex items-center gap-3 text-left">
                     <span className="material-symbols-outlined">install_desktop</span>
                     <div>
-                      <span className="font-bold text-xs uppercase tracking-widest block">Instalar Atualização Agora</span>
+                      <span className="font-bold text-xs tracking-widest block">Instalar atualização agora</span>
                       <span className="text-[10px] opacity-70 block font-normal normal-case mt-0.5">Executa o instalador da nova versão e reinicia o aplicativo automaticamente.</span>
                     </div>
                   </div>
@@ -1516,218 +1718,16 @@ export default function Configuracoes() {
                 </button>
               </div>
             </div>
-
-            {/* Backup & Dados */}
-            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
-              <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
-                <span className="material-symbols-outlined text-primary">cloud_sync</span>
-                Backup & Dados
-              </h2>
-              <div className="space-y-6">
-                {/* Escopo do Backup */}
-                <div>
-                  <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-3 text-xs">O QUE INCLUIR NO BACKUP</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { key: 'backup_incluir_config', label: 'Configurações', icon: 'settings' },
-                      { key: 'backup_incluir_operadores', label: 'Operadores', icon: 'group' },
-                      { key: 'backup_incluir_balcoes', label: 'Balcões', icon: 'point_of_sale' },
-                      { key: 'backup_incluir_midias', label: 'Mídias e Imagens', icon: 'perm_media' },
-                    ].map(item => (
-                      <label key={item.key} className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
-                        config[item.key] !== '0'
-                          ? 'bg-primary/5 border-primary/30 text-ink'
-                          : 'bg-surface-variant border-outline-variant/30 text-ink-secondary'
-                      }`}>
-                        <input
-                          type="checkbox"
-                          name={item.key}
-                          checked={config[item.key] !== '0'}
-                          onChange={handleChange}
-                          className="w-4 h-4 rounded accent-primary shrink-0"
-                        />
-                        <span className="material-symbols-outlined text-lg shrink-0">{item.icon}</span>
-                        <span className="font-bold text-[11px] uppercase tracking-wider">{item.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Agendamento */}
-                <div className={`border-t border-outline-variant/30 pt-6 space-y-4 transition-opacity ${
-                  config.backup_incluir_config === '0' && config.backup_incluir_operadores === '0' && config.backup_incluir_balcoes === '0' && config.backup_incluir_midias === '0'
-                    ? 'opacity-40 pointer-events-none' : ''
-                }`}>
-                  <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30">
-                    <div>
-                      <span className="font-bold text-ink text-sm uppercase block">Agendamento Automático</span>
-                      {config.backup_incluir_config === '0' && config.backup_incluir_operadores === '0' && config.backup_incluir_balcoes === '0' && config.backup_incluir_midias === '0' && (
-                        <span className="text-[10px] text-error font-bold">Selecione ao menos um item acima</span>
-                      )}
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" name="backup_agendado_ativo" checked={config.backup_agendado_ativo === '1'} onChange={handleChange} className="sr-only peer" />
-                      <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
-                    </label>
-                  </div>
-                  <div>
-                    <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">FREQUÊNCIA</label>
-                    <select
-                      name="backup_frequencia"
-                      value={config.backup_frequencia || 'diario'}
-                      onChange={handleChange}
-                      className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-bold"
-                    >
-                      <option value="diario">Diário</option>
-                      <option value="semanal">Semanal (Domingos)</option>
-                      <option value="mensal">Mensal (Dia 1º)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">DESTINO DOS BACKUPS</label>
-                    <input
-                      name="backup_destino"
-                      value={config.backup_destino || ''}
-                      onChange={handleChange}
-                      placeholder="C:\ChamaAi\Backups (padrão)"
-                      className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold font-mono text-sm"
-                      type="text"
-                    />
-                  </div>
-                </div>
-
-                {/* Ações */}
-                <div className="grid grid-cols-1 gap-3 pt-2">
-                  <button
-                    onClick={handleBackup}
-                    className="w-full flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30 hover:border-primary/50 transition-all group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-primary">download</span>
-                      <span className="font-bold text-ink text-xs uppercase tracking-widest">Fazer Backup Agora</span>
-                    </div>
-                    <span className="material-symbols-outlined text-ink-secondary opacity-20 group-hover:opacity-100 transition-opacity">chevron_right</span>
-                  </button>
-
-                  <div className="relative">
-                    <input type="file" id="restore-input" className="hidden" accept=".json,.zip" onChange={handleRestore} />
-                    <label
-                      htmlFor="restore-input"
-                      className="w-full flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30 hover:border-success/50 transition-all group cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-success">upload</span>
-                        <span className="font-bold text-ink text-xs uppercase tracking-widest">Restaurar de Arquivo Manual</span>
-                      </div>
-                      <span className="material-symbols-outlined text-ink-secondary opacity-20 group-hover:opacity-100 transition-opacity">chevron_right</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Histórico de Backups */}
-                {backups.length > 0 && (
-                  <div className="mt-6 pt-6 border-t border-outline-variant/30">
-                    <h3 className="font-sans text-[14px] font-bold text-ink mb-4 flex items-center gap-2 uppercase tracking-wider">
-                      <span className="material-symbols-outlined text-primary text-[20px]">history</span>
-                      Histórico de Backups
-                    </h3>
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                      {backups.map((bkp, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 bg-surface-variant/50 rounded-xl border border-outline-variant/30 hover:border-primary/30 transition-all group">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-ink text-sm">{bkp.nome}</span>
-                            <span className="text-ink-secondary text-[11px] uppercase tracking-widest">
-                              {new Date(bkp.criado_em).toLocaleString()} • {bkp.tamanhoMB} MB
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => handleRestoreLocal(bkp.nome)}
-                              title="Restaurar"
-                              className="p-2 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors flex items-center justify-center"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">restore</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteBackup(bkp.nome)}
-                              title="Excluir"
-                              className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors flex items-center justify-center"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">delete</span>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
+          )}
 
-            {/* Recursos & Segurança */}
-            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
-              <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
-                <span className="material-symbols-outlined text-primary">security</span>
-                Recursos & Segurança
-              </h2>
-              <div className="space-y-6">
-                <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30">
-                  <div>
-                    <span className="font-bold text-ink text-sm uppercase block">Filas Avançadas</span>
-                    <span className="text-[10px] text-ink-secondary/60 mt-1 block leading-relaxed">
-                      Ativa o módulo avançado de controle e métricas de filas.
-                    </span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                    <input 
-                      type="checkbox" 
-                      name="habilitar_filas_avancadas" 
-                      checked={config.habilitar_filas_avancadas === '1'} 
-                      onChange={handleChange} 
-                      className="sr-only peer" 
-                    />
-                    <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl border border-outline-variant/30">
-                  <div>
-                    <span className="font-bold text-ink text-sm uppercase block">Login Local Obrigatório</span>
-                    <span className="text-[10px] text-ink-secondary/60 mt-1 block leading-relaxed">
-                      Exige senha de operador mesmo ao acessar no servidor local (localhost).
-                    </span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                    <input 
-                      type="checkbox" 
-                      name="acesso_local_exige_auth" 
-                      checked={config.acesso_local_exige_auth === '1'} 
-                      onChange={handleChange} 
-                      className="sr-only peer" 
-                    />
-                    <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
-              <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
-                <span className="material-symbols-outlined text-primary">image</span>
-                Logo
-              </h2>
-              <div className="flex flex-col items-center p-6 border-2 border-dashed border-outline-variant/50 rounded-2xl bg-surface-variant/30">
-                {config.logo_cliente && <img src={`${API_URL}${config.logo_cliente}`} className="h-16 object-contain mb-4" />}
-                <input type="file" id="logo-input" className="hidden" accept="image/*" onChange={handleLogoUpload} />
-                <label htmlFor="logo-input" className="text-primary font-bold text-sm uppercase tracking-widest cursor-pointer hover:underline">Trocar Logo</label>
-              </div>
-            </div>
-          </div>
-          </div>
-
-          {/* Acesso Remoto Master — só visível para quem é master */}
-          {isMasterServer && (
-            <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
+          {/* Tab Content: Segurança */}
+          {activeTab === 'seguranca' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+              {isMasterServer && (
+                <div className="space-y-8">
+                  <div className="bg-surface rounded-[32px] p-8 shadow-sm border border-outline-variant/50">
               <h2 className="font-sans text-[22px] font-bold text-ink mb-6 flex items-center gap-3 border-b border-outline-variant/30 pb-4 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary">admin_panel_settings</span>
                 Acesso Remoto Master
@@ -1763,8 +1763,10 @@ export default function Configuracoes() {
                 </div>
               </div>
             </div>
+                </div>
+              )}
+            </div>
           )}
-
         </fieldset>
       </div>
     </AdminLayout>

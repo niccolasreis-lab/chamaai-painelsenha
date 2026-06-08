@@ -176,7 +176,7 @@ export default function GerenciarMidias() {
                     {midia.nome}
                   </h3>
                   <div className="mt-2 space-y-2">
-                    <label className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest block">Data de Expiração</label>
+                    <label className="text-[10px] font-bold text-ink-secondary tracking-widest block">Data de expiração</label>
                     <input
                       type="date"
                       value={midia.data_expiracao || ''}
@@ -221,9 +221,7 @@ export default function GerenciarMidias() {
               <p className="font-bold text-lg text-ink uppercase tracking-wider font-sans">
                 {uploading ? 'Enviando...' : 'Nova Mídia'}
               </p>
-              <p className="text-[10px] font-bold tracking-widest text-ink-secondary mt-1 uppercase text-center px-4">
-                Clique ou arraste arquivos MP4, JPG ou PNG para cá
-              </p>
+              <p className="text-[10px] font-bold tracking-widest text-ink-secondary mt-1 text-center px-4">Clique ou arraste arquivos mp4, jpg ou png para cá</p>
             </div>
           </div>
         </div>
@@ -231,7 +229,7 @@ export default function GerenciarMidias() {
         {midias.length === 0 && !uploading && (
           <div className="text-center py-20 bg-surface rounded-3xl border border-dashed border-outline-variant">
             <span className="material-symbols-outlined text-6xl text-outline-variant mb-4">cloud_off</span>
-            <p className="text-xl font-bold text-ink-secondary uppercase tracking-widest font-sans">Nenhuma mídia cadastrada</p>
+            <p className="text-xl font-bold text-ink-secondary tracking-widest font-sans">Nenhuma mídia cadastrada</p>
             <p className="text-ink-secondary/60 mt-2">As mídias aparecerão no carrossel do Telão quando a fila estiver vazia.</p>
           </div>
         )}

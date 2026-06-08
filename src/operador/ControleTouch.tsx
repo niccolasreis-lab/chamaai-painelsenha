@@ -13,6 +13,7 @@ export default function ControleTouch() {
   const [showConfirmDevolver, setShowConfirmDevolver] = useState(false);
   const [isActionPending, setIsActionPending] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [config, setConfig] = useState<any>({});
 
   // Listen to beforeinstallprompt for PWA install capability
   useEffect(() => {
@@ -111,6 +112,13 @@ export default function ControleTouch() {
             preferencial: active.preferencial,
           });
         }
+      }
+
+      // 3. Fetch configurations
+      const configRes = await fetch(`http://${serverIp}:3000/api/configuracoes`);
+      if (configRes.ok) {
+        const configData = await configRes.json();
+        setConfig(configData);
       }
     } catch (e) {
       console.error('Erro ao buscar dados iniciais:', e);
@@ -455,54 +463,66 @@ export default function ControleTouch() {
         {senhaAtual ? (
           <>
             {/* Row 1: Concluir & Não Compareceu */}
-            <div className="h-[32%] w-full flex gap-4 animate-fade-in">
-              <button
-                onClick={handleConcluir}
-                disabled={isActionPending}
-                className="flex-1 bg-[#16A34A] hover:bg-[#15803D] text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-all shadow-lg shadow-[#16A34A]/10 border-none outline-none disabled:opacity-50 select-none cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-2xl md:text-3xl">check_circle</span>
-                <span className="text-base md:text-lg lg:text-xl font-black">CONCLUIR</span>
-              </button>
-              <button
-                onClick={handleCancelar}
-                disabled={isActionPending}
-                className="flex-1 bg-[#EF4444] hover:bg-[#DC2626] text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-all shadow-lg shadow-[#EF4444]/10 border-none outline-none disabled:opacity-50 select-none cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-2xl md:text-3xl">cancel</span>
-                <span className="text-base md:text-lg lg:text-xl font-black">NÃO COMP.</span>
-              </button>
-            </div>
+            {(config.painel_habilitar_concluir !== '0' || config.painel_habilitar_nao_compareceu !== '0') && (
+              <div className="flex-1 w-full flex gap-4 animate-fade-in">
+                {config.painel_habilitar_concluir !== '0' && (
+                  <button
+                    onClick={handleConcluir}
+                    disabled={isActionPending}
+                    className="flex-1 bg-[#16A34A] hover:bg-[#15803D] text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-all shadow-lg shadow-[#16A34A]/10 border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-2xl md:text-3xl">check_circle</span>
+                    <span className="text-base md:text-lg lg:text-xl font-black">CONCLUIR</span>
+                  </button>
+                )}
+                {config.painel_habilitar_nao_compareceu !== '0' && (
+                  <button
+                    onClick={handleCancelar}
+                    disabled={isActionPending}
+                    className="flex-1 bg-[#EF4444] hover:bg-[#DC2626] text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-all shadow-lg shadow-[#EF4444]/10 border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-2xl md:text-3xl">cancel</span>
+                    <span className="text-base md:text-lg lg:text-xl font-black">NÃO COMP.</span>
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Row 2: Chamar Próximo */}
             <button
               onClick={handleProximo}
               disabled={isActionPending}
-              className="h-[32%] w-full bg-slate-800 hover:bg-slate-700 text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-all shadow-md border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+              className="flex-1 w-full bg-slate-800 hover:bg-slate-700 text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-all shadow-md border-none outline-none disabled:opacity-50 select-none cursor-pointer"
             >
               <span className="material-symbols-outlined text-2xl md:text-3xl">campaign</span>
               <span className="text-lg md:text-xl font-black">CHAMAR PRÓXIMO</span>
             </button>
 
             {/* Row 3: Repetir & Devolver */}
-            <div className="h-[28%] w-full flex gap-4">
-              <button
-                onClick={handleRepetir}
-                disabled={isActionPending}
-                className="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-extrabold uppercase tracking-widest rounded-3xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-md border-none outline-none disabled:opacity-50 select-none cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-xl md:text-2xl">refresh</span>
-                <span className="text-sm md:text-base font-black">REPETIR</span>
-              </button>
-              <button
-                onClick={() => setShowConfirmDevolver(true)}
-                disabled={isActionPending}
-                className="flex-1 bg-white hover:bg-amber-50/30 text-[#D97706] border-2 border-[#D97706] font-extrabold uppercase tracking-widest rounded-3xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm outline-none disabled:opacity-50 select-none cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-xl md:text-2xl">undo</span>
-                <span className="text-sm md:text-base font-black">DEVOLVER</span>
-              </button>
-            </div>
+            {(config.painel_habilitar_repetir !== '0' || config.painel_habilitar_devolver !== '0') && (
+              <div className="flex-1 w-full flex gap-4">
+                {config.painel_habilitar_repetir !== '0' && (
+                  <button
+                    onClick={handleRepetir}
+                    disabled={isActionPending}
+                    className="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-extrabold uppercase tracking-widest rounded-3xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-md border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-xl md:text-2xl">refresh</span>
+                    <span className="text-sm md:text-base font-black">REPETIR</span>
+                  </button>
+                )}
+                {config.painel_habilitar_devolver !== '0' && (
+                  <button
+                    onClick={() => setShowConfirmDevolver(true)}
+                    disabled={isActionPending}
+                    className="flex-1 bg-white hover:bg-amber-50/30 text-[#D97706] border-2 border-[#D97706] font-extrabold uppercase tracking-widest rounded-3xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm outline-none disabled:opacity-50 select-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-xl md:text-2xl">undo</span>
+                    <span className="text-sm md:text-base font-black">DEVOLVER</span>
+                  </button>
+                )}
+              </div>
+            )}
           </>
         ) : (
           /* PRÓXIMO BUTTON (Full Height) */
