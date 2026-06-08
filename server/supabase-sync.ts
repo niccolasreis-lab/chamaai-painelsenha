@@ -263,6 +263,11 @@ export function stopSyncWorker() {
 
 // ── Comandos Remotos (Operador Nuvem via Realtime + Fallback Poll) ──────────────
 
+let loopbackToken = '';
+export function setLoopbackToken(token: string) {
+  loopbackToken = token;
+}
+
 let realtimeChannel: any = null;
 let fallbackTimer: NodeJS.Timeout | null = null;
 
@@ -283,19 +288,28 @@ async function processarComandoRemoto(data: any) {
     if (data.comando === 'CHAMAR_PROXIMA') {
       res = await fetch(`${apiUrl}/api/chamar-proxima`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-loopback-token': loopbackToken
+        },
         body: JSON.stringify(data.payload)
       });
     } else if (data.comando === 'REPETIR') {
       res = await fetch(`${apiUrl}/api/chamadas`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-loopback-token': loopbackToken
+        },
         body: JSON.stringify(data.payload)
       });
     } else if (data.comando === 'ESTORNAR') {
       res = await fetch(`${apiUrl}/api/senhas/estornar`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-loopback-token': loopbackToken
+        },
         body: JSON.stringify(data.payload)
       });
     }

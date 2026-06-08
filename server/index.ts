@@ -8,13 +8,17 @@ import dgram from 'dgram';
 import cron from 'node-cron';
 import { getDb } from '../electron/services/database';
 import { startToledoWatcher, forceToledoRefresh, reloadCategorias, setBroadcastFn } from './toledo-watcher';
-import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica, startSyncWorker, stopSyncWorker, supabase, isSupabaseConfigured } from './supabase-sync';
+import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica, startSyncWorker, stopSyncWorker, supabase, isSupabaseConfigured, setLoopbackToken } from './supabase-sync';
 import { migrateDatabaseAndConfigs } from './categorizador';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
 const app = express();
+app.set('trust proxy', true);
+
+export const loopbackToken = crypto.randomBytes(32).toString('hex');
+setLoopbackToken(loopbackToken);
 
 // --- MASTER REMOTO: Rate Limiting (Anti-Brute Force) ---
 const loginAttempts = new Map<string, { count: number; blockedUntil: number }>();
@@ -209,6 +213,13 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
     return next();
   }
 
+  // Loopback authentication bypass using unique token
+  const loopbackHeader = req.headers['x-loopback-token'] as string;
+  if (loopbackHeader && loopbackHeader === loopbackToken) {
+    (req as any).operador_id = 1; // default to admin id
+    return next();
+  }
+
   // Se for master local e não exigir auth, permite
   if (isRequestLocal(req)) {
     try {
@@ -244,6 +255,7 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
   }
 }
 
+let memoryFallbackSecret: string | null = null;
 function getJwtSecret(): string {
   if (process.env.JWT_SECRET) {
     return process.env.JWT_SECRET;
@@ -260,7 +272,10 @@ function getJwtSecret(): string {
     }
   } catch (err) {
     console.error('[AUTH] Erro ao obter JWT_SECRET do banco:', err);
-    return 'fallback-secret-chamaai-1234';
+    if (!memoryFallbackSecret) {
+      memoryFallbackSecret = crypto.randomBytes(32).toString('hex');
+    }
+    return memoryFallbackSecret;
   }
 }
 
@@ -1166,7 +1181,7 @@ export function startServer() {
         return res.status(404).json({ error: 'Usuário não encontrado.' });
       }
 
-      const match = bcrypt.compareSync(senha_atual, dbUser.senha_hash);
+      const match = verifyUserPassword(senha_atual, dbUser.senha_hash);
       if (!match) {
         return res.status(400).json({ error: 'Senha atual incorreta.' });
       }
@@ -2178,7 +2193,7 @@ export function startServer() {
     try {
       const filename = req.params.filename as string;
       // Validação rígida contra Path Traversal
-      if (!filename || !filename.startsWith('backup_') || !filename.endsWith('.zip') || filename.includes('..') || filename.includes('/')) {
+      if (!filename || !filename.startsWith('backup_') || !filename.endsWith('.zip') || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
         return res.status(400).json({ error: 'Nome de arquivo inválido.' });
       }
       
@@ -2202,7 +2217,7 @@ export function startServer() {
     try {
       const filename = req.params.filename as string;
       // Validação rígida contra Path Traversal
-      if (!filename || !filename.startsWith('backup_') || !filename.endsWith('.zip') || filename.includes('..') || filename.includes('/')) {
+      if (!filename || !filename.startsWith('backup_') || !filename.endsWith('.zip') || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
         return res.status(400).json({ error: 'Nome de arquivo inválido.' });
       }
       

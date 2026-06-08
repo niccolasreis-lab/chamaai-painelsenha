@@ -235,12 +235,19 @@ function processToledoItems(items: ToledoItem[]): number {
     const allExisting = db.prepare('SELECT plu FROM toledo_produtos').all() as any[];
     const toDelete = allExisting.filter(row => !importedPlus.has(row.plu));
     if (toDelete.length > 0) {
-      const deleteStmt = db.prepare('DELETE FROM toledo_produtos WHERE plu = ?');
-      for (const row of toDelete) {
-        deleteStmt.run(row.plu);
-        updatedCount++; // Conta como atualização para forçar o broadcast e sincronização
+      const currentCount = allExisting.length;
+      // Se a carga importada tiver menos de 10% dos produtos do banco e o banco tiver mais de 20 produtos,
+      // recusa a exclusão em massa por segurança (para evitar apagar tudo se for arquivo corrompido/incompleto)
+      if (toledoItems.length < currentCount * 0.1 && currentCount > 20) {
+        console.warn(`[TOLEDO] ⚠️ Importação suspeita: número de itens recebidos (${toledoItems.length}) é muito menor do que o banco possui (${currentCount}). Pulando deleção em massa dos outros produtos.`);
+      } else {
+        const deleteStmt = db.prepare('DELETE FROM toledo_produtos WHERE plu = ?');
+        for (const row of toDelete) {
+          deleteStmt.run(row.plu);
+          updatedCount++; // Conta como atualização para forçar o broadcast e sincronização
+        }
+        console.log(`[TOLEDO] 🗑️ Removidos ${toDelete.length} produtos da base local que não constavam na última carga.`);
       }
-      console.log(`[TOLEDO] 🗑️ Removidos ${toDelete.length} produtos da base local que não constavam na última carga.`);
     }
   });
 
@@ -254,6 +261,24 @@ let debounceTimer: NodeJS.Timeout | null = null;
 let isProcessing = false;
 let watcherActive = false;
  
+async function waitForFileToStabilize(filePath: string): Promise<boolean> {
+  try {
+    let prevSize = -1;
+    for (let i = 0; i < 5; i++) {
+      if (!fs.existsSync(filePath)) return false;
+      const stats = fs.statSync(filePath);
+      if (stats.size > 0 && stats.size === prevSize) {
+        return true;
+      }
+      prevSize = stats.size;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    const finalStats = fs.statSync(filePath);
+    if (finalStats.size === 0) return true;
+  } catch (e) {}
+  return false;
+}
+ 
 async function processFile(filePath: string) {
   if (isProcessing) {
     console.log('[TOLEDO] Processamento já em andamento, ignorando...');
@@ -265,6 +290,12 @@ async function processFile(filePath: string) {
 
   try {
     console.log(`[TOLEDO] ⏳ Iniciando processamento de ${path.basename(filePath)}...`);
+
+    const stabilized = await waitForFileToStabilize(filePath);
+    if (!stabilized) {
+      console.warn('[TOLEDO] ⚠️ Arquivo instável ou sendo gravado muito lentamente. Abortando leitura.');
+      return;
+    }
 
     const content = await readFileWithRetry(filePath);
     if (!content) {

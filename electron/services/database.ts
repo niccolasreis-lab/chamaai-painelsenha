@@ -17,6 +17,7 @@ export function initDatabase() {
 
     const initializeDb = () => {
       db = new Database(dbPath);
+      db.pragma('journal_mode = WAL');
       // Create schema if it doesn't exist
       const schemaPath = path.join(__dirname, '../../server/db/schema.sql');
       if (fs.existsSync(schemaPath)) {
