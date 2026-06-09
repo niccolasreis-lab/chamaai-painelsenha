@@ -8,7 +8,7 @@ export function installFetchInterceptor() {
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const masterToken = localStorage.getItem('master_remote_token');
-    const userToken = sessionStorage.getItem('user_token');
+    const userToken = localStorage.getItem('user_token');
     let userSession = null;
     try {
       const sessionStr = localStorage.getItem('user_session');

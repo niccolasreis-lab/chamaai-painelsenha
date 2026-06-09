@@ -7,6 +7,16 @@ import * as QRCode from 'qrcode';
 
 const execAsync = promisify(exec);
 
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export interface TicketData {
   ticketId?: number;
   numero: string;
@@ -75,7 +85,10 @@ export class PrinterService {
     if (!this.printWindow) {
       this.printWindow = new BrowserWindow({
         show: false,
-        webPreferences: { nodeIntegration: true }
+        webPreferences: { 
+          nodeIntegration: false,
+          contextIsolation: true
+        }
       });
     }
   }
@@ -298,11 +311,11 @@ export class PrinterService {
           <body>
             <div id="ticket-content">
               ${logoHtml}
-              ${mostrarEscrita ? `<div class="balcao">${tituloEstabelecimento}</div>` : ''}
-              ${data.nome_cliente ? `<div style="font-size: 16px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase;">Cliente: ${data.nome_cliente}</div>` : ''}
-              <div class="numero">${data.numero}</div>
+              ${mostrarEscrita ? `<div class="balcao">${escapeHtml(tituloEstabelecimento)}</div>` : ''}
+              ${data.nome_cliente ? `<div style="font-size: 16px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase;">Cliente: ${escapeHtml(data.nome_cliente)}</div>` : ''}
+              <div class="numero">${escapeHtml(data.numero)}</div>
               <div class="tipo ${data.preferencial ? 'preferencial' : ''}">${data.preferencial ? 'ATENDIMENTO PREFERENCIAL' : 'ATENDIMENTO NORMAL'}</div>
-              <div class="data">${data.data}</div>
+              <div class="data">${escapeHtml(data.data)}</div>
 
               ${mostraQRCode ? `
               <div class="qr-container">
@@ -311,7 +324,7 @@ export class PrinterService {
                 <div class="qr-obs">* Preços válidos para hoje.</div>
               </div>
               ` : ''}
-              <div class="footer">${this.config.footer}</div>
+              <div class="footer">${escapeHtml(this.config.footer)}</div>
             </div>
           </body>
           </html>

@@ -33,12 +33,16 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
 
   useEffect(() => {
     const verifyToken = async () => {
-      const token = sessionStorage.getItem('user_token');
+      const token = localStorage.getItem('user_token');
+      if (!token) {
+        setAuthorized(false);
+        setChecking(false);
+        return;
+      }
+
       try {
         const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
+        headers['Authorization'] = `Bearer ${token}`;
         
         const res = await fetch(`${API_URL}/api/auth/me`, { headers });
         if (res.ok) {
@@ -51,12 +55,14 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
             setAuthorized(true);
           }
         } else {
-          sessionStorage.clear();
+          localStorage.removeItem('user_token');
+          localStorage.removeItem('user_perfil');
           setAuthorized(false);
         }
       } catch (err) {
         console.error('Erro de rede ao validar autenticação:', err);
-        setAuthorized(false);
+        // Em erro de rede (PC acordando/Wi-Fi oscilando), mantém autorizado temporariamente
+        setAuthorized(true);
       } finally {
         setChecking(false);
       }

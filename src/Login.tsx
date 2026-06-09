@@ -22,10 +22,10 @@ export default function Login() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [tempIp, setTempIp] = useState(localStorage.getItem('server_ip_override') || '');
 
-  // Se já tiver token válido em sessionStorage, tenta ir direto pro painel
+  // Se já tiver token válido em localStorage, tenta ir direto pro painel
   useEffect(() => {
     const checkLogged = async () => {
-      const token = sessionStorage.getItem('user_token');
+      const token = localStorage.getItem('user_token');
       if (!token) return;
 
       try {
@@ -37,10 +37,14 @@ export default function Login() {
           const data = await res.json();
           redirecionarUsuario(data.perfil);
         } else {
-          sessionStorage.clear();
+          localStorage.removeItem('user_token');
+          localStorage.removeItem('user_perfil');
         }
       } catch (err) {
         console.error('Falha ao validar login existente:', err);
+        // Em caso de erro de rede, assume o perfil salvo e tenta ir para a tela operacional
+        const savedPerfil = localStorage.getItem('user_perfil') || 'operador';
+        redirecionarUsuario(savedPerfil);
       }
     };
     checkLogged();
@@ -96,8 +100,8 @@ export default function Login() {
         setShowChangePassword(true);
       } else {
         // Login direto
-        sessionStorage.setItem('user_token', data.token);
-        sessionStorage.setItem('user_perfil', data.perfil);
+        localStorage.setItem('user_token', data.token);
+        localStorage.setItem('user_perfil', data.perfil);
         localStorage.setItem('user_session', JSON.stringify({ token: data.token }));
         redirecionarUsuario(data.perfil);
       }
@@ -145,8 +149,8 @@ export default function Login() {
       }
 
       // Senha alterada com sucesso! Loga o usuário.
-      sessionStorage.setItem('user_token', tempToken);
-      sessionStorage.setItem('user_perfil', tempPerfil);
+      localStorage.setItem('user_token', tempToken);
+      localStorage.setItem('user_perfil', tempPerfil);
       localStorage.setItem('user_session', JSON.stringify({ token: tempToken }));
       setShowChangePassword(false);
       redirecionarUsuario(tempPerfil);

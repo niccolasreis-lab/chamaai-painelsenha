@@ -192,7 +192,37 @@ export default function MediaIndoor() {
         const midiasAtivas = Array.isArray(data) 
           ? data.filter((m: any) => m.ativo === 1 && m.status === 'ativo')
           : [];
-        setMidias(midiasAtivas);
+        
+        setMidias(prev => {
+          const prevIds = prev.map(m => m.id).join(',');
+          const newIds = midiasAtivas.map((m: any) => m.id).join(',');
+          
+          // Se a lista mudou, resetar o índice para evitar apontar para mídia inexistente
+          if (prevIds !== newIds) {
+            console.log(`[TELAO] Mídias atualizadas: ${prev.length} → ${midiasAtivas.length}`);
+            setActiveMidiaIndex(idx => {
+              if (midiasAtivas.length === 0) return 0;
+              // Clampa o índice ao novo tamanho
+              return idx >= midiasAtivas.length ? 0 : idx;
+            });
+            
+            // Se não há mais mídias e o encarte está ativo, forçar exibição do encarte
+            if (midiasAtivas.length === 0 && activeModules.includes('encarte')) {
+              setShowingEncarte(true);
+            }
+
+            // Parar o vídeo atual para não ficar preso com o src antigo
+            if (videoRef.current) {
+              try {
+                videoRef.current.pause();
+                videoRef.current.removeAttribute('src');
+                videoRef.current.load();
+              } catch (e) { /* ignore */ }
+            }
+          }
+          
+          return midiasAtivas;
+        });
       }
     } catch (err) {
       console.error('Erro ao buscar mídias', err);
@@ -416,6 +446,11 @@ export default function MediaIndoor() {
   useEffect(() => {
     if (midias.length > 0 && showMedia && !showingEncarte && activeModules.includes('midia')) {
       const current = midias[activeMidiaIndex];
+      if (!current) {
+        // Índice inválido após remoção de mídia — resetar
+        setActiveMidiaIndex(0);
+        return;
+      }
       if (current.tipo === 'imagem') {
         const timer = setTimeout(nextMedia, 10000);
         return () => clearTimeout(timer);

@@ -1105,7 +1105,7 @@ export function startServer() {
       const token = jwt.sign(
         { id: user.id, login: user.login, perfil: user.perfil },
         secret,
-        { expiresIn: '24h' }
+        { expiresIn: '3650d' }
       );
 
       // Registrar sessão em sessoes_operador para compatibilidade com requireAuth herdado
@@ -1115,7 +1115,7 @@ export function startServer() {
         const op = db.prepare('SELECT id FROM operadores WHERE login = ?').get(user.login) as any;
         if (op) opId = op.id;
         db.prepare(
-          "INSERT OR REPLACE INTO sessoes_operador (token, operador_id, expira_em) VALUES (?, ?, datetime('now', 'localtime', '+24 hours'))"
+          "INSERT OR REPLACE INTO sessoes_operador (token, operador_id, expira_em) VALUES (?, ?, datetime('now', 'localtime', '+36500 days'))"
         ).run(token, opId);
       } catch (sessErr) {
         console.error('[AUTH] Erro ao gravar sessoes_operador:', sessErr);

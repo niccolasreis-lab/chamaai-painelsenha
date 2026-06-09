@@ -33,7 +33,7 @@ export default function Seguranca() {
   const [tempPasswordUser, setTempPasswordUser] = useState('');
 
   const API_URL = getApiUrl();
-  const token = sessionStorage.getItem('user_token') || '';
+  const token = localStorage.getItem('user_token') || '';
 
   const headers = {
     'Content-Type': 'application/json',
