@@ -69,7 +69,7 @@ export default function Login() {
         navigate('/admin');
       } else {
         const isMobile = window.innerWidth < 1024;
-        navigate(isMobile ? '/balcao' : '/balcao'); // Rota operacional padrão
+        navigate(isMobile ? '/mobile' : '/operador'); // Rota operacional padrão
       }
     }
   };
