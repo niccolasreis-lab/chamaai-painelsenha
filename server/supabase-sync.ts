@@ -45,6 +45,11 @@ function enqueueSyncOp(tabela: string, acao: string, payload: any) {
     db.prepare(
       'INSERT INTO supabase_sync_queue (tabela, acao, payload) VALUES (?, ?, ?)'
     ).run(tabela, acao, JSON.stringify(payload));
+
+    // Executa o sync worker imediatamente em background para latência próxima a zero
+    setTimeout(() => {
+      processSyncQueue().catch(err => console.error('[SYNC QUEUE] ⚠️ Erro no processamento imediato:', err));
+    }, 50);
   } catch (err) {
     console.error('[SYNC QUEUE] ⚠️ Erro ao enfileirar operação (não crítico):', err);
   }

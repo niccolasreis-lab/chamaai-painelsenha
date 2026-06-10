@@ -37,6 +37,25 @@ android {
             resValue "string", "title_activity_main", "ChamaAi Telão"
             buildConfigField "String", "APP_MODE", "\"telao\""
         }
+        desktop {
+            dimension "mode"
+            applicationId "com.chamaai.app.desktop"
+            resValue "string", "app_name", "ChamaAi Desktop"
+            resValue "string", "title_activity_main", "ChamaAi Desktop"
+            buildConfigField "String", "APP_MODE", "\"desktop\""
+        }
+    }
+
+    sourceSets {
+        operador {
+            java.srcDirs = ['src/operador/java', 'src/capacitorCommon/java']
+        }
+        telao {
+            java.srcDirs = ['src/telao/java', 'src/capacitorCommon/java']
+        }
+        desktop {
+            java.srcDirs = ['src/desktop/java']
+        }
     }
 
     buildTypes {

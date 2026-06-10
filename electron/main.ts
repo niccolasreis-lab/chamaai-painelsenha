@@ -29,6 +29,14 @@ function logUpdate(level: 'INFO' | 'WARN' | 'ERROR', message: string) {
 }
 
 
+// Disable hardware acceleration to avoid GPU process crashes (common in VMs, RDP, or old/missing drivers)
+app.disableHardwareAcceleration();
+
+// Disable GPU and sandboxing to allow running correctly from mapped network drives (e.g. Z:\)
+app.commandLine.appendSwitch('no-sandbox');
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+
 // Disable node integration in all webcontents for security
 app.on('web-contents-created', (event, contents) => {
   contents.on('will-attach-webview', (event, webPreferences, params) => {
@@ -197,7 +205,7 @@ function createWindow(customRoute?: string) {
     });
   } else {
     const devUrl = process.env.VITE_DEV_SERVER_URL;
-    const base = devUrl || 'https://localhost:5173';
+    const base = devUrl || 'http://localhost:5175';
     newWindow.loadURL(`${base}#/${route}`).then(() => {
       newWindow.webContents.openDevTools();
     }).catch(err => {
@@ -513,8 +521,8 @@ async function cleanZombieProcesses() {
     
     // Mata qualquer processo ChamaA* ou chamaai* zumbi na máquina (menos o atual)
     const cmd1 = `powershell -NoProfile -Command "Get-Process | Where-Object { (($_.ProcessName -like '*ChamaA*') -or ($_.ProcessName -like '*chamaai*')) -and ($_.Id -ne ${currentPid}) } | Stop-Process -Force -EA 0"`;
-    // Libera a porta 3000 (onde roda o servidor Express) matando o processo zumbi que estiver usando ela (menos o atual)
-    const cmd2 = `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | Where-Object { $_ -ne ${currentPid} } | Get-Process -ErrorAction SilentlyContinue | Stop-Process -Force -EA 0"`;
+    // Libera a porta 3001 (onde roda o servidor Express) matando o processo zumbi que estiver usando ela (menos o atual)
+    const cmd2 = `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 3001 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | Where-Object { $_ -ne ${currentPid} } | Get-Process -ErrorAction SilentlyContinue | Stop-Process -Force -EA 0"`;
     
     try { execSync(cmd1, { windowsHide: true }); } catch (e) {}
     try { execSync(cmd2, { windowsHide: true }); } catch (e) {}

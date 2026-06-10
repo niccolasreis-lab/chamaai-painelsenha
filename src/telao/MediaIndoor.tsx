@@ -4,6 +4,7 @@ import SenhaChamada from './SenhaChamada';
 import EncartePrecos from './EncartePrecos';
 import EncarteGranel from './EncarteGranel';
 import TelaoEspera from './TelaoEspera';
+import SmartMediaLayer from './SmartMediaLayer';
 import { useSSE } from '../shared/useSSE';
 import { getApiUrl } from '../shared/apiConfig';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
@@ -72,6 +73,7 @@ export default function MediaIndoor() {
   const [midias, setMidias] = useState<any[]>([]);
   const [activeMidiaIndex, setActiveMidiaIndex] = useState(0);
   const [config, setConfig] = useState<any>({});
+  const [smartMediaSettings, setSmartMediaSettings] = useState<any>({ midia_indoor_ativa: false, midia_indoor_layout: 'lateral' });
   const [pessoasAguardando, setPessoasAguardando] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -183,6 +185,15 @@ export default function MediaIndoor() {
     }
   };
 
+  const fetchSmartMediaSettings = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/media/settings`);
+      if (res.ok) {
+        setSmartMediaSettings(await res.json());
+      }
+    } catch (err) {}
+  };
+
   const fetchMidias = async () => {
     try {
       const res = await fetch(`${API_URL}/api/midias`);
@@ -256,9 +267,9 @@ export default function MediaIndoor() {
     }
   };
 
-  // Run initializations
   useEffect(() => {
     fetchConfig();
+    fetchSmartMediaSettings();
     fetchMidias();
     fetchAguardando();
     fetchRecentCalls();
@@ -381,6 +392,8 @@ export default function MediaIndoor() {
       setPessoasAguardando((geral || 0) + (preferencial || 0));
     } else if (telaoSseEvent.event === 'CONFIG_ATUALIZADA') {
       fetchConfig();
+    } else if (telaoSseEvent.event === 'MEDIA_SETTINGS_UPDATED') {
+      fetchSmartMediaSettings();
     } else if (telaoSseEvent.event === 'MIDIAS_ATUALIZADAS') {
       fetchMidias();
     } else if (telaoSseEvent.event === 'TOLEDO_PRECOS_ATUALIZADOS') {
@@ -444,6 +457,7 @@ export default function MediaIndoor() {
 
   // Handle transition timers
   useEffect(() => {
+    if (smartMediaSettings.midia_indoor_ativa) return;
     if (midias.length > 0 && showMedia && !showingEncarte && activeModules.includes('midia')) {
       const current = midias[activeMidiaIndex];
       if (!current) {
@@ -470,6 +484,10 @@ export default function MediaIndoor() {
 
   // Ensure video element reloads and plays when src changes or when recovering from senha overlay
   useEffect(() => {
+    if (smartMediaSettings.midia_indoor_ativa) {
+      if (videoRef.current) videoRef.current.pause();
+      return;
+    }
     const currentMidia = midias[activeMidiaIndex];
     if (showMedia && currentMidia && currentMidia.tipo === 'video' && videoRef.current) {
       // We do not call load() blindly because it resets the video if it's the same src.
@@ -559,8 +577,16 @@ export default function MediaIndoor() {
         </div>
       </header>
 
-      {/* Main Body Area */}
-      <div className="flex-1 flex overflow-hidden relative">
+      {/* Intelligent Layout Wrapper */}
+      <div className={`flex-1 flex overflow-hidden relative ${smartMediaSettings.midia_indoor_ativa && smartMediaSettings.midia_indoor_layout === 'rodape' ? 'flex-col' : 'flex-row'}`}>
+      
+        {smartMediaSettings.midia_indoor_ativa && (smartMediaSettings.midia_indoor_layout === 'background' || smartMediaSettings.midia_indoor_layout === 'full') && (
+          <SmartMediaLayer layout={smartMediaSettings.midia_indoor_layout} isCalling={!showMedia} onNext={nextMedia} />
+        )}
+
+        <div className="flex-1 flex flex-col overflow-hidden relative z-10">
+          {/* Main Body Area */}
+          <div className="flex-1 flex overflow-hidden relative">
         {layout === 'l-shape' ? (
           <div className="flex-1 flex flex-col overflow-hidden bg-[#041a14]">
             <div className="flex-1 flex overflow-hidden">
@@ -881,6 +907,12 @@ export default function MediaIndoor() {
           </div>
         </footer>
       )}
+        </div>
+        
+        {smartMediaSettings.midia_indoor_ativa && (smartMediaSettings.midia_indoor_layout === 'lateral' || smartMediaSettings.midia_indoor_layout === 'rodape') && (
+          <SmartMediaLayer layout={smartMediaSettings.midia_indoor_layout} isCalling={!showMedia} onNext={nextMedia} />
+        )}
+      </div>
       <style>{`
         @keyframes marquee {
           0% { transform: translateX(100vw); }

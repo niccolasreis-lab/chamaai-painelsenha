@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import AdminLayout from './AdminLayout';
 import { getApiUrl } from '../shared/apiConfig';
+import OnboardingWizard from './OnboardingWizard';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -13,6 +14,7 @@ export default function Dashboard() {
   });
   const [appVersion, setAppVersion] = useState('...');
   const [isNewInstall, setIsNewInstall] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
   
   const [chartDataHora, setChartDataHora] = useState<any[]>([]);
   const [chartDataBalcao, setChartDataBalcao] = useState<any[]>([]);
@@ -65,11 +67,18 @@ export default function Dashboard() {
     };
     checkStatus();
     
+    if (!localStorage.getItem('onboarding_completed')) {
+      setShowWizard(true);
+    }
+    
     return () => clearInterval(interval);
   }, []);
 
   return (
     <AdminLayout>
+      {showWizard && (
+        <OnboardingWizard onComplete={() => setShowWizard(false)} />
+      )}
       <div className="max-w-7xl mx-auto space-y-8 font-sans">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">

@@ -28,7 +28,7 @@ export default function LicenseGate({ children }: LicenseGateProps) {
       }
 
       // Cache diário: se já validou hoje, liberar sem consultar o Supabase
-      const today = new Date().toISOString().split('T')[0]; // "2026-05-05"
+      const today = new Date().toLocaleDateString('sv-SE'); // "2026-05-05"
       const lastCheck = localStorage.getItem('license_last_check');
 
       if (lastCheck === today) {
@@ -82,7 +82,7 @@ export default function LicenseGate({ children }: LicenseGateProps) {
     const result = await validateLicense(serialCode.trim());
 
     if (result.isValid) {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('sv-SE');
       localStorage.setItem('app_license_key', serialCode.trim());
       localStorage.setItem('license_last_check', today);
       localStorage.setItem('license_last_success', today);

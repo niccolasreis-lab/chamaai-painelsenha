@@ -98,6 +98,8 @@ export function initDatabase() {
       INSERT OR IGNORE INTO configuracoes VALUES ('painel_habilitar_devolver', '1', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('painel_habilitar_nao_compareceu', '1', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('painel_habilitar_concluir', '1', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('midia_indoor_ativa', '1', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('midia_indoor_layout', 'lateral', datetime('now'));
     `);
 
     db.exec(`
@@ -168,6 +170,67 @@ export function initDatabase() {
         ordem     INTEGER NOT NULL DEFAULT 0,
         ativo     INTEGER NOT NULL DEFAULT 1,
         criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Mídia Indoor Inteligente (Novas tabelas)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS media_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        type TEXT NOT NULL,
+        source_url TEXT,
+        local_path TEXT,
+        duration_seconds INTEGER DEFAULT 15,
+        sort_order INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
+        start_at TEXT,
+        end_at TEXT,
+        weekdays TEXT,
+        campaign_id INTEGER,
+        priority INTEGER DEFAULT 0,
+        metadata_json TEXT,
+        created_at TEXT DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+      );
+
+      CREATE TABLE IF NOT EXISTS media_campaigns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        is_active INTEGER DEFAULT 1,
+        starts_at TEXT,
+        ends_at TEXT,
+        priority INTEGER DEFAULT 0,
+        theme_id INTEGER,
+        replace_default_schedule INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+      );
+
+      CREATE TABLE IF NOT EXISTS media_themes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        primary_color TEXT,
+        secondary_color TEXT,
+        background_image TEXT,
+        overlay_image TEXT,
+        logo_path TEXT,
+        custom_css_json TEXT,
+        is_active INTEGER DEFAULT 1,
+        starts_at TEXT,
+        ends_at TEXT,
+        created_at TEXT DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+      );
+
+      CREATE TABLE IF NOT EXISTS weather_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        latitude REAL,
+        longitude REAL,
+        data_json TEXT,
+        updated_at TEXT DEFAULT (datetime('now', 'localtime'))
       );
     `);
 

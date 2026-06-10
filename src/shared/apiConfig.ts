@@ -1,7 +1,7 @@
 export const getApiUrl = () => {
   // Permite sobrescrever o IP via localStorage para dispositivos móveis/APK
   const savedIp = localStorage.getItem('server_ip_override');
-  if (savedIp) return `http://${savedIp}:3000`;
+  if (savedIp) return `http://${savedIp}:3001`;
 
   if (typeof window !== 'undefined') {
     const protocol = window.location.protocol;
@@ -11,13 +11,13 @@ export const getApiUrl = () => {
 
     // Se estiver rodando dentro do Electron (protocolo file:), o servidor local é o localhost
     if (protocol === 'file:') {
-      return `http://localhost:3000`;
+      return `http://localhost:3001`;
     }
 
     // No Android Emulator, 'localhost' refere-se ao próprio dispositivo.
     // O IP 10.0.2.2 mapeia para o localhost da máquina hospedeira.
     if (isAndroid && (hostname === 'localhost' || hostname === '127.0.0.1')) {
-      return `http://10.0.2.2:3000`;
+      return `http://10.0.2.2:3001`;
     }
 
     // Se estiver rodando no navegador (protocolo http ou https)
@@ -33,12 +33,12 @@ export const getApiUrl = () => {
 
     // Se acessarmos via IP (ex: no celular/tablet via app), o hostname já é o servidor
     if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      return `http://${hostname}:3000`;
+      return `http://${hostname}:3001`;
     }
   }
 
   // Fallback para o servidor local padrão
-  return `http://localhost:3000`;
+  return `http://localhost:3001`;
 };
 
 export const setServerIp = (ip: string) => {

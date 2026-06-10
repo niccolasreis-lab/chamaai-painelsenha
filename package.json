@@ -8,7 +8,7 @@
     "dev:electron": "tsc -p tsconfig.electron.json && electron .",
     "dev:server": "tsx start-server.ts",
     "dev:web": "concurrently \"npm run dev:vite\" \"npm run dev:server\"",
-    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
+    "dev": "concurrently \"npm run dev:vite\" \"wait-on http://localhost:5175 && npm run dev:electron\"",
     "build:electron": "tsc -p tsconfig.electron.json && node -e \"const fs = require('fs'); fs.copyFileSync('server/categorias.json', 'dist-electron/server/categorias.json');\"",
     "build": "tsc -b && vite build && npm run build:electron",
     "rebuild:native": "npx @electron/rebuild -f -w better-sqlite3",

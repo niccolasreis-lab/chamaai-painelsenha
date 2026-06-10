@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChamaAí — Sistema Inteligente de Gestão de Filas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #1b1b24;
+      background: #fcf8ff;
+      -webkit-font-smoothing: antialiased;
+    }
+    :root {
+      --primary: #3525cd;
+      --primary-light: #4f46e5;
+      --primary-container: #e2dfff;
+      --secondary: #00687a;
+      --cyan: #57dffe;
+      --green: #10b981;
+      --surface: #fcf8ff;
+      --surface-dim: #f0ecf9;
+      --on-surface: #1b1b24;
+      --on-surface-variant: #464555;
+      --outline: #c7c4d8;
+      --font-display: 'Syne', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+    }
+
+    /* ─── Navigation ─── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(252,248,255,0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--outline);
+      padding: 0 5vw;
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--primary);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+    .nav-logo small { font-size: 10px; font-weight: 600; color: var(--on-surface-variant); letter-spacing: 0.15em; display: block; margin-top: -4px; }
+    .nav-links { display: flex; gap: 32px; align-items: center; }
+    .nav-links a {
+      text-decoration: none;
+      color: var(--on-surface-variant);
+      font-weight: 600;
+      font-size: 15px;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--primary); }
+    .nav-cta {
+      background: var(--primary);
+      color: #fff;
+      padding: 10px 24px;
+      border-radius: 12px;
+      font-weight: 700;
+      transition: all 0.2s;
+    }
+    .nav-cta:hover { background: var(--primary-light); transform: scale(1.03); }
+
+    /* ─── Hero ─── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 120px 5vw 80px;
+      background: linear-gradient(135deg, #f0ecf9 0%, #fcf8ff 40%, #eef2ff 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.12;
+      pointer-events: none;
+    }
+    .hero-glow.g1 { top: -20%; right: -10%; width: 600px; height: 600px; background: var(--primary); }
+    .hero-glow.g2 { bottom: -20%; left: -10%; width: 500px; height: 500px; background: var(--cyan); }
+    .hero-content {
+      max-width: 1100px;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--primary-container);
+      color: var(--primary);
+      font-weight: 700;
+      font-size: 13px;
+      padding: 8px 20px;
+      border-radius: 100px;
+      margin-bottom: 24px;
+      letter-spacing: 0.02em;
+    }
+    .hero-badge .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      animation: pulse-dot 1.5s infinite;
+    }
+    @keyframes pulse-dot {
+      0% { transform: scale(0.9); opacity: 1; }
+      50% { transform: scale(1.4); opacity: 0.5; }
+      100% { transform: scale(0.9); opacity: 1; }
+    }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: clamp(42px, 6vw, 72px);
+      font-weight: 800;
+      line-height: 1.08;
+      color: var(--on-surface);
+      margin-bottom: 20px;
+      letter-spacing: -0.02em;
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--primary), #7c3aed);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      font-size: clamp(17px, 2vw, 21px);
+      color: var(--on-surface-variant);
+      line-height: 1.6;
+      max-width: 640px;
+      margin: 0 auto 36px;
+    }
+    .hero-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, var(--primary), #7c3aed);
+      color: #fff;
+      font-weight: 700;
+      font-size: 17px;
+      padding: 16px 36px;
+      border-radius: 14px;
+      text-decoration: none;
+      transition: all 0.2s;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 8px 30px rgba(53,37,205,0.25);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(53,37,205,0.35); }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #fff;
+      color: var(--primary);
+      font-weight: 700;
+      font-size: 17px;
+      padding: 16px 36px;
+      border-radius: 14px;
+      text-decoration: none;
+      border: 2px solid var(--outline);
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover { border-color: var(--primary); }
+
+    /* ─── Dashboard Mockup ─── */
+    .hero-mockup {
+      margin-top: 60px;
+      width: 100%;
+      max-width: 960px;
+      border-radius: 20px;
+      box-shadow: 0 30px 80px rgba(53,37,205,0.12);
+      border: 1px solid var(--outline);
+      background: #fff;
+      overflow: hidden;
+      position: relative;
+    }
+    .mockup-header {
+      background: #f8faff;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--outline);
+    }
+    .mockup-tabs {
+      display: flex;
+      gap: 6px;
+    }
+    .mockup-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      background: transparent;
+      color: var(--on-surface-variant);
+    }
+    .mockup-tab.active {
+      background: var(--primary-container);
+      color: var(--primary);
+    }
+    .mockup-time {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--on-surface);
+    }
+    .mockup-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      min-height: 260px;
+    }
+    .mockup-main {
+      padding: 36px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #f8faff 0%, #fff 100%);
+    }
+    .mockup-label {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--on-surface-variant);
+      margin-bottom: 8px;
+    }
+    .mockup-number {
+      font-family: var(--font-display);
+      font-size: clamp(56px, 8vw, 96px);
+      font-weight: 800;
+      color: var(--primary);
+      line-height: 1;
+      letter-spacing: -0.03em;
+      background: #eef2ff;
+      padding: 16px 48px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+    }
+    .mockup-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #d1fae5;
+      color: #065f46;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 6px 16px;
+      border-radius: 100px;
+    }
+    .mockup-side {
+      padding: 24px;
+      border-left: 1px solid var(--outline);
+      background: #fcf8ff;
+    }
+    .mockup-side h4 {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--on-surface-variant);
+      margin-bottom: 16px;
+    }
+    .mockup-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #e4e1ee;
+    }
+    .mockup-row:last-child { border-bottom: none; }
+    .mockup-row-num {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--primary);
+    }
+    .mockup-row-info {
+      font-size: 13px;
+      color: var(--on-surface-variant);
+    }
+    .mockup-row-badge {
+      font-size: 11px;
+      font-weight: 700;
+      background: var(--primary-container);
+      color: var(--primary);
+      padding: 2px 10px;
+      border-radius: 100px;
+    }
+
+    /* ─── Sections ─── */
+    section { padding: 100px 5vw; }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 4vw, 48px);
+      font-weight: 800;
+      text-align: center;
+      color: var(--on-surface);
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+    .section-sub {
+      text-align: center;
+      font-size: 18px;
+      color: var(--on-surface-variant);
+      max-width: 600px;
+      margin: 0 auto 60px;
+      line-height: 1.6;
+    }
+    .section-sub a { color: var(--primary); text-decoration: underline; }
+
+    /* ─── Products / Screens ─── */
+    #products { background: var(--surface-dim); }
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .product-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 36px 28px;
+      border: 1px solid var(--outline);
+      transition: all 0.3s;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(79,70,229,0.06);
+    }
+    .product-card:hover { transform: translateY(-4px); border-color: var(--primary); box-shadow: 0 16px 48px rgba(79,70,229,0.10); }
+    .product-icon {
+      width: 64px; height: 64px;
+      background: var(--primary-container);
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin: 0 auto 18px;
+    }
+    .product-card h3 {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .product-card p {
+      font-size: 14px;
+      color: var(--on-surface-variant);
+      line-height: 1.6;
+      margin-bottom: 14px;
+    }
+    .product-tag {
+      display: inline-block;
+      background: var(--primary-container);
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 12px;
+      border-radius: 100px;
+      margin: 2px 3px;
+    }
+
+    /* ─── Features ─── */
+    #features { background: #fff; }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 28px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .feature-card {
+      background: var(--surface-dim);
+      border-radius: 20px;
+      padding: 32px 28px;
+      border: 1px solid transparent;
+      transition: all 0.3s;
+    }
+    .feature-card:hover { border-color: var(--primary); }
+    .feature-icon {
+      width: 48px; height: 48px;
+      background: var(--primary-container);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+    .feature-card h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .feature-card p {
+      font-size: 14px;
+      color: var(--on-surface-variant);
+      line-height: 1.6;
+    }
+
+    /* ─── How it works ─── */
+    #how-it-works { background: var(--surface-dim); }
+    .steps {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+    .step {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+      background: #fff;
+      border-radius: 20px;
+      padding: 28px 32px;
+      border: 1px solid var(--outline);
+      box-shadow: 0 4px 16px rgba(79,70,229,0.04);
+    }
+    .step-num {
+      min-width: 52px; height: 52px;
+      background: linear-gradient(135deg, var(--primary), #7c3aed);
+      color: #fff;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 800;
+    }
+    .step-content h3 {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .step-content p {
+      color: var(--on-surface-variant);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    /* ─── Tech Stack ─── */
+    #tech {
+      background: linear-gradient(135deg, var(--primary), #1e1b4b);
+      color: #fff;
+      text-align: center;
+    }
+    #tech .section-title { color: #fff; }
+    #tech .section-sub { color: rgba(255,255,255,0.6); }
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 20px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .tech-item {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+      padding: 24px 16px;
+      backdrop-filter: blur(8px);
+    }
+    .tech-item .name {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 18px;
+    }
+    .tech-item .desc {
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 4px;
+    }
+    .tech-icon { font-size: 28px; margin-bottom: 8px; }
+
+    /* ─── CTA ─── */
+    .cta-section {
+      background: #fff;
+      text-align: center;
+      padding: 100px 5vw;
+      border-top: 1px solid var(--outline);
+    }
+    .cta-section h2 {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 4vw, 48px);
+      font-weight: 800;
+      color: var(--on-surface);
+      margin-bottom: 16px;
+    }
+    .cta-section p {
+      font-size: 18px;
+      color: var(--on-surface-variant);
+      max-width: 520px;
+      margin: 0 auto 36px;
+      line-height: 1.6;
+    }
+
+    /* ─── Footer ─── */
+    footer {
+      background: var(--on-surface);
+      padding: 48px 5vw 32px;
+      text-align: center;
+    }
+    .footer-brand {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.02em;
+    }
+    .footer-version {
+      font-size: 12px;
+      color: rgba(255,255,255,0.3);
+      font-weight: 600;
+      margin-top: 2px;
+    }
+    .footer-text {
+      font-size: 14px;
+      color: rgba(255,255,255,0.35);
+      line-height: 1.6;
+      margin-top: 12px;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 640px) {
+      nav { padding: 0 4vw; }
+      .nav-links a:not(.nav-cta) { display: none; }
+      .hero { padding: 100px 4vw 60px; }
+      section { padding: 60px 4vw; }
+      .mockup-body { grid-template-columns: 1fr; }
+      .mockup-side { border-left: none; border-top: 1px solid var(--outline); }
+      .step { flex-direction: column; padding: 20px 24px; }
+      .step-num { min-width: 44px; height: 44px; font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <a href="#" class="nav-logo">ChamaAí<small>SISTEMA DE FILAS</small></a>
+    <div class="nav-links">
+      <a href="#products">Telas</a>
+      <a href="#features">Recursos</a>
+      <a href="#how-it-works">Como Funciona</a>
+      <a href="#tech">Tecnologia</a>
+      <a href="#cta" class="nav-cta">Solicitar Demonstração</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero" id="hero">
+    <div class="hero-glow g1"></div>
+    <div class="hero-glow g2"></div>
+    <div class="hero-content">
+      <div class="hero-badge"><span class="dot"></span> Sistema em Produção — v1.0.122</div>
+      <h1>Gestão inteligente de <span>filas & senhas</span></h1>
+      <p>
+        Um ecossistema completo para supermercados, comércios e varejo: totem de senhas, 
+        painel TV, terminal do operador e admin — tudo integrado em tempo real.
+      </p>
+      <div class="hero-buttons">
+        <a href="#cta" class="btn-primary">Solicitar Demonstração</a>
+        <a href="#products" class="btn-secondary">Conheça as Telas</a>
+      </div>
+
+      <!-- Mockup -->
+      <div class="hero-mockup">
+        <div class="mockup-header">
+          <div class="mockup-tabs">
+            <span class="mockup-tab active">📺 Telão</span>
+            <span class="mockup-tab">🖥️ Admin</span>
+            <span class="mockup-tab">📱 Totem</span>
+          </div>
+          <span class="mockup-time">09:42</span>
+        </div>
+        <div class="mockup-body">
+          <div class="mockup-main">
+            <div class="mockup-label">SENHA CHAMADA</div>
+            <div class="mockup-number">A042</div>
+            <div class="mockup-status">● Caixa 03 — Prioritário</div>
+          </div>
+          <div class="mockup-side">
+            <h4>Senhas Aguardando</h4>
+            <div class="mockup-row">
+              <span class="mockup-row-num">A043</span>
+              <span class="mockup-row-info">Caixa 01</span>
+              <span class="mockup-row-badge">Normal</span>
+            </div>
+            <div class="mockup-row">
+              <span class="mockup-row-num">B012</span>
+              <span class="mockup-row-info">Caixa 05</span>
+              <span class="mockup-row-badge">Preferencial</span>
+            </div>
+            <div class="mockup-row">
+              <span class="mockup-row-num">A044</span>
+              <span class="mockup-row-info">Caixa 02</span>
+              <span class="mockup-row-badge">Normal</span>
+            </div>
+            <div class="mockup-row">
+              <span class="mockup-row-num">C007</span>
+              <span class="mockup-row-info">Caixa 04</span>
+              <span class="mockup-row-badge">Rápido</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Products / Screens -->
+  <section id="products">
+    <h2 class="section-title">Telas do Sistema</h2>
+    <p class="section-sub">Quatro interfaces especializadas para cada ponto do atendimento.</p>
+    <div class="products-grid">
+      <div class="product-card">
+        <div class="product-icon">📺</div>
+        <h3>Telão</h3>
+        <p>Painel de visualização de chamadas com animações, áudio customizado e mídia programática para TVs.</p>
+        <span class="product-tag">React</span>
+        <span class="product-tag">SSE</span>
+        <span class="product-tag">Vite</span>
+      </div>
+      <div class="product-card">
+        <div class="product-icon">📱</div>
+        <h3>Totem</h3>
+        <p>Emissor de senhas interativo com suporte a tela touch, voz e impressão térmica de tickets.</p>
+        <span class="product-tag">Kiosk</span>
+        <span class="product-tag">Touch</span>
+        <span class="product-tag">ESC/POS</span>
+      </div>
+      <div class="product-card">
+        <div class="product-icon">🖥️</div>
+        <h3>Operador</h3>
+        <p>Terminal para guichês chamarem a próxima senha, gerenciarem fila ou reimprimirem tickets.</p>
+        <span class="product-tag">Touch</span>
+        <span class="product-tag">Teclado</span>
+      </div>
+      <div class="product-card">
+        <div class="product-icon">⚙️</div>
+        <h3>Admin</h3>
+        <p>Dashboard de estatísticas, configurações de operadores, impressoras e monitoramento em tempo real.</p>
+        <span class="product-tag">Relatórios</span>
+        <span class="product-tag">Gestão</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features">
+    <h2 class="section-title">Recursos que fazem a diferença</h2>
+    <p class="section-sub">Engenharia robusta para ambientes críticos com tolerância a falhas.</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Tempo Real via SSE</h3>
+        <p>Server-Sent Events de altíssima velocidade para alteração instantânea de senhas entre guichês, telões e operadores.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🖨️</div>
+        <h3>Impressão Térmica Nativa</h3>
+        <p>Comunicação direta via USB, serial ou rede com impressoras Epson/ESC-POS. Impressão automática de tickets.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Modo Kiosk Blindado</h3>
+        <p>Totens com bloqueio estrito de atalhos do Windows (Alt+F4, Ctrl+W). Ideal para autoatendimento público.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">☁️</div>
+        <h3>SQLite + Supabase</h3>
+        <p>Banco local com sincronização assíncrona para nuvem. Funciona 100% offline com backup automático.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📦</div>
+        <h3>Auto-Update Offline</h3>
+        <p>Sistema de atualização automática via rede local sem dependência de internet externa. Ideal para redes corporativas.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚖️</div>
+        <h3>Integração Toledo</h3>
+        <p>Monitor inteligente de arquivos de balanças Toledo para sincronização rápida de preços e encartes.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="how-it-works">
+    <h2 class="section-title">Fluxo Completo</h2>
+    <p class="section-sub">Do totem ao atendimento, tudo integrado em segundos.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Cliente retira a senha no Totem</h3>
+          <p>O totem emite uma senha com código único, imprime o ticket térmico e exibe as instruções na tela touch.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Operador chama a próxima senha</h3>
+          <p>No terminal do operador (touch ou teclado), o atendente chama a senha. O sistema envia via SSE para todos os painéis.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Telão exibe e anuncia em voz</h3>
+          <p>O painel TV mostra o número com animação em destaque, toca som customizado e faz a chamada por voz.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>Cliente é atendido</h3>
+          <p>O cliente se dirige ao guichê indicado. O admin registra tudo: tempo de espera, histórico e estatísticas.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tech Stack -->
+  <section id="tech">
+    <h2 class="section-title">Tecnologia de Ponta</h2>
+    <p class="section-sub">Construído com as melhores ferramentas para performance e confiabilidade.</p>
+    <div class="tech-grid">
+      <div class="tech-item">
+        <div class="tech-icon">⚛️</div>
+        <div class="name">React 19</div>
+        <div class="desc">Interface reativa</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">⚡</div>
+        <div class="name">Vite 8</div>
+        <div class="desc">Build ultrarrápido</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🖥️</div>
+        <div class="name">Electron 30</div>
+        <div class="desc">Desktop nativo</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🗄️</div>
+        <div class="name">SQLite</div>
+        <div class="desc">Dados locais</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">☁️</div>
+        <div class="name">Supabase</div>
+        <div class="desc">Cloud sync</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🌐</div>
+        <div class="name">Express</div>
+        <div class="desc">Servidor local</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">📱</div>
+        <div class="name">Capacitor</div>
+        <div class="desc">Android nativo</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🎨</div>
+        <div class="name">Tailwind CSS</div>
+        <div class="desc">Design system</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section" id="cta">
+    <h2>Pronto para simplificar suas filas?</h2>
+    <p>Solicite uma demonstração gratuita e descubra como o ChamaAí transforma a experiência dos seus clientes.</p>
+    <a href="#" class="btn-primary">📅 Agendar Demonstração</a>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-brand">ChamaAí</div>
+    <div class="footer-version">v1.0.122 — Sistema de Gestão de Filas e Totem de Senhas</div>
+    <p class="footer-text">
+      ChamaAí Tecnologia Ltda. &copy; 2026. Todos os direitos reservados.
+    </p>
+  </footer>
+
+</body>
+</html>

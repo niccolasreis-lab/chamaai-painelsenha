@@ -13,6 +13,7 @@ import { migrateDatabaseAndConfigs } from './categorizador';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { setupMediaIndoorRoutes } from './media-indoor';
 
 const app = express();
 app.set('trust proxy', true);
@@ -363,7 +364,7 @@ let heartbeatInterval: NodeJS.Timeout | null = null;
 
 
 export function startServer() {
-  const PORT = 3000;
+  const PORT = 3001;
   
   // Resolve o caminho para uma pasta local visível e fácil de gerenciar
   const userDataPath = 'C:\\ChamaAi';
@@ -2910,6 +2911,8 @@ export function startServer() {
   });
 
   // ═══════════════════════════════════════════════════════════════════
+  
+  setupMediaIndoorRoutes(app, broadcastEvent, requireMaster);
 
   // Catch-all 404 handler for API
   app.use('/api', (req, res) => {

@@ -23,8 +23,8 @@ interface Stats {
 
 export default function Relatorios() {
   const { API_URL } = useAPI();
-  const [dataInicio, setDataInicio] = useState(new Date().toISOString().split('T')[0]);
-  const [dataFim, setDataFim] = useState(new Date().toISOString().split('T')[0]);
+  const [dataInicio, setDataInicio] = useState(new Date().toLocaleDateString('sv-SE'));
+  const [dataFim, setDataFim] = useState(new Date().toLocaleDateString('sv-SE'));
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<Stats>({
     total: 0,

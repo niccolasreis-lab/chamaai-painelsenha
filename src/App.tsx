@@ -10,6 +10,7 @@ import SenhaChamada from './telao/SenhaChamada';
 import Dashboard from './admin/Dashboard';
 import Configuracoes from './admin/Configuracoes';
 import GerenciarMidias from './admin/GerenciarMidias';
+import MediaIndoorAdmin from './admin/MediaIndoorAdmin';
 import Devices from './admin/Devices';
 import Queue from './admin/Queue';
 import Operators from './admin/Operators';
@@ -394,6 +395,7 @@ export default function App() {
           <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><Configuracoes /></ProtectedRoute>} />
           <Route path="/admin/seguranca" element={<ProtectedRoute requireAdmin><Seguranca /></ProtectedRoute>} />
           <Route path="/admin/midias" element={<ProtectedRoute requireAdmin><GerenciarMidias /></ProtectedRoute>} />
+          <Route path="/admin/media-indoor" element={<ProtectedRoute requireAdmin><MediaIndoorAdmin /></ProtectedRoute>} />
           <Route path="/admin/devices" element={<ProtectedRoute requireAdmin><Devices /></ProtectedRoute>} />
           <Route path="/admin/queue" element={<ProtectedRoute requireAdmin><ProtectedRouteQueue><Queue /></ProtectedRouteQueue></ProtectedRoute>} />
           <Route path="/admin/operators" element={<ProtectedRoute requireAdmin><Operators /></ProtectedRoute>} />
