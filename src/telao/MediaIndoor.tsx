@@ -268,6 +268,16 @@ export default function MediaIndoor() {
   };
 
   useEffect(() => {
+    const hoje = new Date().toDateString();
+    const ultimaData = localStorage.getItem('chamaaai_ultima_data');
+
+    if (ultimaData && ultimaData !== hoje) {
+      localStorage.removeItem('chamaaai_ultima_data');
+      setUltimaSenha(null);
+      setHistorico([]);
+    }
+    localStorage.setItem('chamaaai_ultima_data', hoje);
+
     fetchConfig();
     fetchSmartMediaSettings();
     fetchMidias();
@@ -422,6 +432,17 @@ export default function MediaIndoor() {
       setTelaoCode(null);
       setPerfil(null);
       setActiveModules([]);
+    } else if (telaoSseEvent.event === 'DIA_RESETADO') {
+      setUltimaSenha(null);
+      setHistorico([]);
+      setShowMedia(true);
+      setIsRepeticao(false);
+      if (repeticaoTimerRef.current) {
+        clearTimeout(repeticaoTimerRef.current);
+      }
+      fetchAguardando();
+      fetchRecentCalls();
+      console.log('[ChamaAí] Dia resetado — estado recarregado');
     } else if (telaoSseEvent.event === 'RECARREGAR_PAGINA') {
       window.location.reload();
     }
@@ -429,9 +450,9 @@ export default function MediaIndoor() {
 
   // Rotate between media and active modules
   const nextMedia = useCallback(() => {
-    if (midias.length > 0) {
+    if (activeModules.includes('midia') && midias.length > 0) {
       const nextIndex = (activeMidiaIndex + 1) % midias.length;
-      const encartePos = parseInt(config.toledo_encarte_posicao || '0', 10);
+      const encartePos = Math.max(0, Math.min(parseInt(config.toledo_encarte_posicao || '0', 10) || 0, midias.length - 1));
       
       if (activeModules.includes('encarte') && !showingEncarte && activeMidiaIndex === encartePos) {
         setShowingEncarte(true);
@@ -476,7 +497,7 @@ export default function MediaIndoor() {
         }, 120000); // 2 minutos máximo por vídeo
         return () => clearTimeout(watchdogTimer);
       }
-    } else if (midias.length === 0 && activeModules.includes('encarte') && !showingEncarte && showMedia) {
+    } else if ((midias.length === 0 || !activeModules.includes('midia')) && activeModules.includes('encarte') && !showingEncarte && showMedia) {
       const timer = setTimeout(() => setShowingEncarte(true), 2000);
       return () => clearTimeout(timer);
     }

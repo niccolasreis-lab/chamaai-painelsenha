@@ -48,6 +48,16 @@ export default function Controle() {
   };
 
   useEffect(() => {
+    const hoje = new Date().toDateString();
+    const ultimaData = localStorage.getItem('chamaaai_ultima_data');
+
+    if (ultimaData && ultimaData !== hoje) {
+      localStorage.removeItem('chamaaai_ultima_data');
+      setSenhaAtual(null);
+      setFila([]);
+    }
+    localStorage.setItem('chamaaai_ultima_data', hoje);
+
     // Inicialização segura
     try {
       const savedTheme = localStorage.getItem('balcao-theme') || 'light';
@@ -76,6 +86,11 @@ export default function Controle() {
       setSenhaAtual(null);
       setFila([]);
       refreshData();
+    } else if (sseEvent.event === 'DIA_RESETADO') {
+      setSenhaAtual(null);
+      setFila([]);
+      refreshData();
+      console.log('[ChamaAí] Dia resetado — estado recarregado');
     }
   }, [sseEvent]);
 

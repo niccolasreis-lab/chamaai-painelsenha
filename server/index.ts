@@ -469,6 +469,14 @@ export function startServer() {
         console.log('[CRON] Otimizando banco de dados (VACUUM)...');
         db.exec("VACUUM");
         
+        // Emitir evento SSE de reset ao virar o dia
+        const eventoReset = {
+          tipo: 'DIA_RESETADO',
+          timestamp: new Date().toISOString(),
+          mensagem: 'Novo dia iniciado. Recarregando estado.'
+        };
+        broadcastEvent('DIA_RESETADO', eventoReset);
+
         // Notifica todos os terminais para recarregarem a página e limparem memória
         broadcastEvent('RECARREGAR_PAGINA', { reason: 'daily_maintenance' });
         
@@ -3107,6 +3115,14 @@ export function startServer() {
           
           // Clear cloud
           syncLimparSenhas();
+
+          // Emitir evento SSE de reset ao virar o dia
+          const eventoReset = {
+            tipo: 'DIA_RESETADO',
+            timestamp: new Date().toISOString(),
+            mensagem: 'Novo dia iniciado. Recarregando estado.'
+          };
+          broadcastEvent('DIA_RESETADO', eventoReset);
           
           console.log('[STARTUP] Reset diário concluído com sucesso.');
         }

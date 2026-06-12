@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getApiUrl } from '../shared/apiConfig';
+import EncartePrecos from './EncartePrecos';
+import EncarteGranel from './EncarteGranel';
 
 interface SmartMediaLayerProps {
   layout: 'lateral' | 'rodape' | 'background' | 'full';
@@ -12,6 +14,8 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
   const [theme, setTheme] = useState<any>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [weather, setWeather] = useState<any>(null);
+  const [config, setConfig] = useState<any>({});
+  const [perfil, setPerfil] = useState<any>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const API_URL = getApiUrl();
@@ -44,17 +48,60 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
     }
   }, [API_URL]);
 
+  const fetchConfig = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/configuracoes`);
+      if (res.ok) {
+        setConfig(await res.json());
+      }
+    } catch (err) {
+      console.error('Erro ao buscar configurações:', err);
+    }
+  }, [API_URL]);
+
+  const fetchPerfil = useCallback(async (code: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/telao/profile/${code}`);
+      if (res.ok) {
+        setPerfil(await res.json());
+      }
+    } catch (err) {
+      console.error('Erro ao buscar perfil do telão:', err);
+    }
+  }, [API_URL]);
+
   useEffect(() => {
     fetchActivePlaylist();
     fetchWeather();
+    fetchConfig();
+    
+    const telaoCode = localStorage.getItem('telao_code');
+    if (telaoCode) {
+      fetchPerfil(telaoCode);
+    }
     
     // Configurar listener para o evento SSE de atualização de campanha
     const handleCampaignUpdate = () => {
       fetchActivePlaylist();
     };
+    
+    const handleConfigUpdate = () => {
+      fetchConfig();
+    };
+
+    const handlePerfilUpdate = (e: any) => {
+      if (e.detail) {
+        setPerfil(e.detail);
+      } else if (telaoCode) {
+        fetchPerfil(telaoCode);
+      }
+    };
+
     window.addEventListener('MEDIA_CAMPAIGN_UPDATED', handleCampaignUpdate);
     window.addEventListener('MEDIA_ITEMS_UPDATED', handleCampaignUpdate);
     window.addEventListener('MEDIA_THEME_UPDATED', handleCampaignUpdate);
+    window.addEventListener('CONFIG_ATUALIZADA', handleConfigUpdate);
+    window.addEventListener('TELAO_ATUALIZADO', handlePerfilUpdate);
     
     // Atualizar clima a cada 30 min
     const weatherInterval = setInterval(fetchWeather, 30 * 60 * 1000);
@@ -63,9 +110,11 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
       window.removeEventListener('MEDIA_CAMPAIGN_UPDATED', handleCampaignUpdate);
       window.removeEventListener('MEDIA_ITEMS_UPDATED', handleCampaignUpdate);
       window.removeEventListener('MEDIA_THEME_UPDATED', handleCampaignUpdate);
+      window.removeEventListener('CONFIG_ATUALIZADA', handleConfigUpdate);
+      window.removeEventListener('TELAO_ATUALIZADO', handlePerfilUpdate);
       clearInterval(weatherInterval);
     };
-  }, [fetchActivePlaylist, fetchWeather]);
+  }, [fetchActivePlaylist, fetchWeather, fetchConfig, fetchPerfil]);
 
   const handleNext = useCallback(() => {
     if (playlist.length > 0) {
@@ -73,6 +122,18 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
     }
     if (onNext) onNext();
   }, [playlist.length, onNext]);
+
+  // Log de diagnóstico temporário para confirmar playlist ativa no telão
+  useEffect(() => {
+    if (playlist.length > 0) {
+      console.log('[Carrossel] Playlist ativa:', playlist.map(item => ({
+        id: item.id,
+        tipo: item.type || item.tipo,
+        nome: item.title || item.nome,
+        ativo: item.is_active !== undefined ? item.is_active : item.ativo
+      })));
+    }
+  }, [playlist]);
 
   useEffect(() => {
     if (playlist.length === 0) return;
@@ -132,6 +193,24 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
           alt={currentMedia.title}
           className="w-full h-full object-contain"
           onError={handleNext}
+        />
+      );
+    }
+
+    if (currentMedia.type === 'tabela' || currentMedia.type === 'encarte') {
+      const parsedCategories = perfil?.encarte_categorias
+        ? perfil.encarte_categorias.split(';').map((c: string) => c.trim()).filter(Boolean)
+        : [];
+      
+      const EncarteComponent = config.toledo_encarte_estilo === 'granel' ? EncarteGranel : EncartePrecos;
+
+      return (
+        <EncarteComponent
+          duracao={currentMedia.duration_seconds || parseInt(config.toledo_encarte_duracao || '15', 10)}
+          itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
+          onComplete={handleNext}
+          config={config}
+          categoriasFiltro={parsedCategories}
         />
       );
     }

@@ -45,6 +45,16 @@ export default function MobileOperador() {
   };
 
   useEffect(() => {
+    const hoje = new Date().toDateString();
+    const ultimaData = localStorage.getItem('chamaaai_ultima_data');
+
+    if (ultimaData && ultimaData !== hoje) {
+      localStorage.removeItem('chamaaai_ultima_data');
+      setSenhaAtual(null);
+      setFila([]);
+    }
+    localStorage.setItem('chamaaai_ultima_data', hoje);
+
     fetchFila();
     fetchConfig();
     const interval = setInterval(fetchFila, 10000);
@@ -60,6 +70,12 @@ export default function MobileOperador() {
     } else if (sseEvent.event === 'SISTEMA_RESETADO') {
       setSenhaAtual(null);
       fetchFila();
+    } else if (sseEvent.event === 'DIA_RESETADO') {
+      setSenhaAtual(null);
+      setFila([]);
+      fetchFila();
+      fetchConfig();
+      console.log('[ChamaAí] Dia resetado — estado recarregado');
     }
   }, [sseEvent]);
 

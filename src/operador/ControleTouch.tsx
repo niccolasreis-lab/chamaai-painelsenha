@@ -37,6 +37,16 @@ export default function ControleTouch() {
 
   // Validate server connection on initial load if configuration already exists
   useEffect(() => {
+    const hoje = new Date().toDateString();
+    const ultimaData = localStorage.getItem('chamaaai_ultima_data');
+
+    if (ultimaData && ultimaData !== hoje) {
+      localStorage.removeItem('chamaaai_ultima_data');
+      setSenhaAtual(null);
+      setQueueCounts({ geral: 0, preferencial: 0 });
+    }
+    localStorage.setItem('chamaaai_ultima_data', hoje);
+
     if (ip && guiche) {
       setIsValidating(true);
       fetch(`http://${ip}:3001/health`)
@@ -83,8 +93,13 @@ export default function ControleTouch() {
           });
         }
       }
+    } else if (sseData.event === 'DIA_RESETADO') {
+      setSenhaAtual(null);
+      setQueueCounts({ geral: 0, preferencial: 0 });
+      fetchInitialData(ip, guiche);
+      console.log('[ChamaAí] Dia resetado — estado recarregado');
     }
-  }, [sseData, guiche]);
+  }, [sseData, guiche, ip]);
 
   // Fetch queue counts and active called ticket on setup success
   const fetchInitialData = async (serverIp: string, guicheNum: string) => {

@@ -24,7 +24,7 @@ taskkill /F /IM "chamaai*" /T >nul 2>&1
 echo.
 
 echo [*] Limpando pastas de compilacoes antigas para evitar divergencia de checksum (sha512)...
-if exist "release" rd /s /q "release"
+if exist "C:\ChamaAi_Build" rd /s /q "C:\ChamaAi_Build"
 if exist "%TARGET_DIR%" del /q "%TARGET_DIR%\*"
 echo.
 
@@ -40,8 +40,8 @@ if %errorlevel% neq 0 (
 
 echo.
 echo [*] Copiando arquivos compilados para a pasta local...
-copy /Y "release\ChamaAi Setup *.exe" "%TARGET_DIR%\" >nul
-copy /Y "release\latest.yml" "%TARGET_DIR%\" >nul
+copy /Y "C:\ChamaAi_Build\ChamaAi Setup *.exe" "%TARGET_DIR%\" >nul
+copy /Y "C:\ChamaAi_Build\latest.yml" "%TARGET_DIR%\" >nul
 
 if %errorlevel% neq 0 (
     echo [ERRO] Falha ao copiar os arquivos para %TARGET_DIR%!
