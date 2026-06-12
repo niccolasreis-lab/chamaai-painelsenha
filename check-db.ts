@@ -1,5 +1,11 @@
 import Database from 'better-sqlite3';
 
-const db = new Database('C:\\\\ChamaAi\\\\database.sqlite');
-const r = db.prepare("SELECT * FROM configuracoes WHERE chave = 'portal_cliente_url'").get();
-console.log('Result:', r);
+try {
+  const db = new Database('C:\\\\ChamaAi\\\\database.sqlite');
+  console.log('Count:', db.prepare('SELECT COUNT(*) as count FROM supabase_sync_queue').get());
+  console.log('Items:', db.prepare('SELECT * FROM supabase_sync_queue LIMIT 5').all());
+  process.exit(0);
+} catch (e) {
+  console.error('Error:', e.message);
+  process.exit(1);
+}

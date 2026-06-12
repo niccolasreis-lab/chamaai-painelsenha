@@ -613,6 +613,23 @@ export function startServer() {
     });
   });
 
+  // --- DEBUG ENDPOINT ---
+  app.get('/api/debug-sync', (req, res) => {
+    try {
+      const db = getDb();
+      const queue = db.prepare('SELECT * FROM supabase_sync_queue').all();
+      res.json({
+        isSupabaseConfigured,
+        queueCount: queue.length,
+        queue: queue.slice(0, 10), // return top 10
+        envUrl: process.env.VITE_SUPABASE_URL ? 'set' : 'not set',
+        envKey: process.env.VITE_SUPABASE_KEY ? 'set' : 'not set'
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // --- Endpoint for Dashboard Charts ---
   app.get('/api/dashboard/metricas', requireMaster, (req, res) => {
     try {
