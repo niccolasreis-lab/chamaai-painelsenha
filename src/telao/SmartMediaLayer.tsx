@@ -81,7 +81,7 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
     const current = playlist[activeIndex];
     if (!current) return;
 
-    if (current.type === 'imagem' || current.type === 'weather') {
+    if (current.type === 'image' || current.type === 'imagem' || current.type === 'weather') {
       const duration = (current.duration_seconds || 15) * 1000;
       const timer = setTimeout(handleNext, duration);
       return () => clearTimeout(timer);
@@ -125,7 +125,7 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
       );
     }
     
-    if (currentMedia.type === 'imagem') {
+    if (currentMedia.type === 'image' || currentMedia.type === 'imagem') {
       return (
         <img 
           src={`${API_URL}${currentMedia.local_path}`} 

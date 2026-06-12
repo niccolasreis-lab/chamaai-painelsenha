@@ -183,7 +183,7 @@ export default function Controle() {
           </div>
           <div className="flex gap-2">
             <button onClick={() => {
-              setTempIp(API_URL.replace('http://', '').replace(':3000', ''));
+              setTempIp(API_URL.replace('http://', '').split(':')[0]);
               setShowIpConfig(true);
             }} className="p-2 rounded-full bg-slate-500/10 text-slate-500">
               <span className="material-symbols-outlined">settings_ethernet</span>

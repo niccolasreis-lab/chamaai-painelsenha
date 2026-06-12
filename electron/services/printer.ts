@@ -116,7 +116,7 @@ export class PrinterService {
       console.error('[PrinterService] Erro ao ler URL do portal:', err);
     }
     // Fallback: usa a rota local (funciona via Wi-Fi da loja)
-    return 'http://localhost:3000/#/cliente';
+    return 'http://localhost:3001/#/cliente';
   }
 
   async printTicket(data: TicketData): Promise<{ success: boolean; error?: string }> {
@@ -355,7 +355,12 @@ export class PrinterService {
             `);
 
             // Calcula a altura real do conteúdo em pixels
-            const heightPx = await this.printWindow.webContents.executeJavaScript("document.getElementById('ticket-content').offsetHeight");
+            let heightPx = await this.printWindow.webContents.executeJavaScript("document.getElementById('ticket-content')?.offsetHeight || 0");
+            
+            // Altura mínima de segurança de 280px para evitar cortes prematuros ou impressões em branco caso a medição falhe
+            if (!heightPx || heightPx < 280) {
+              heightPx = 350;
+            }
 
             // Converte pixels para mícrons (1 pixel ≈ 264.583 mícrons a 96 DPI)
             // Adicionamos apenas 15px extras de margem de segurança para o corte exato

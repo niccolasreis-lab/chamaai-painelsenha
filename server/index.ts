@@ -3558,7 +3558,7 @@ function enviarAnuncio() {
     const anuncio = {
       tipo: 'CHAMAAI_SERVIDOR',
       ip: localIp,
-      porta: 3000,
+      porta: 3001,
       nome: 'ChamaAi'
     };
     const mensagem = Buffer.from(JSON.stringify(anuncio));

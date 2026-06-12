@@ -42,7 +42,7 @@ export default function Bridge() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
-      const res = await fetch(`http://${targetIp}:3000/api/fila`, { 
+      const res = await fetch(`http://${targetIp}:3001/api/fila`, { 
         signal: controller.signal 
       });
       

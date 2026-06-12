@@ -331,7 +331,7 @@ export default function Configuracoes() {
   const handleTestAudioPortal = (tipo: 'sua_vez' | 'prestes_chamar') => {
     const portalBase = (config.portal_cliente_url && config.portal_cliente_url.trim() !== '') 
       ? config.portal_cliente_url.trim() 
-      : 'http://localhost:3000/#/cliente';
+      : 'http://localhost:3001/#/cliente';
     
     let targetUrl: string;
     if (portalBase.includes('#')) {

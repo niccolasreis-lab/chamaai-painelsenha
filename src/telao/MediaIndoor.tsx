@@ -485,7 +485,11 @@ export default function MediaIndoor() {
   // Ensure video element reloads and plays when src changes or when recovering from senha overlay
   useEffect(() => {
     if (smartMediaSettings.midia_indoor_ativa) {
-      if (videoRef.current) videoRef.current.pause();
+      if (videoRef.current) {
+        try {
+          videoRef.current.pause();
+        } catch (e) {}
+      }
       return;
     }
     const currentMidia = midias[activeMidiaIndex];
@@ -494,7 +498,7 @@ export default function MediaIndoor() {
       // But we always ensure it's playing if showMedia is true.
       videoRef.current.play().catch(e => console.warn('Autoplay bloqueado pelo navegador:', e));
     }
-  }, [midias, activeMidiaIndex, showMedia]);
+  }, [midias, activeMidiaIndex, showMedia, smartMediaSettings.midia_indoor_ativa]);
 
   // Apply real-time consolidated waiting count
   useEffect(() => {
@@ -593,7 +597,7 @@ export default function MediaIndoor() {
               {/* Media Area (Centralizada) */}
               <div className="flex-[72] relative bg-[#041a14] overflow-hidden flex items-center justify-center border-r border-outline-variant/10">
                 <div className="h-full w-full">
-                  {showingPriceEncarte ? (
+                  {!smartMediaSettings.midia_indoor_ativa && showingPriceEncarte ? (
                     config.toledo_encarte_estilo === 'granel' ? (
                       <EncarteGranel
                         key={`encarte-granel-${encarteRefreshKey}`}
@@ -613,7 +617,7 @@ export default function MediaIndoor() {
                         categoriasFiltro={parsedCategories}
                       />
                     )
-                  ) : activeModules.includes('midia') && activeMidia ? (
+                  ) : !smartMediaSettings.midia_indoor_ativa && activeModules.includes('midia') && activeMidia ? (
                     <div className="h-full w-full animate-fade-in relative">
                       {activeMidia.tipo === 'video' ? (
                         <video 
@@ -749,7 +753,7 @@ export default function MediaIndoor() {
             {/* Media / Call Focus Area */}
             <div className={`${layout === 'classic' ? 'flex-1' : 'flex-[78]'} relative bg-[#041a14] overflow-hidden border-r border-outline-variant/20`}>
               <div className="h-full w-full">
-                {showingPriceEncarte ? (
+                {!smartMediaSettings.midia_indoor_ativa && showingPriceEncarte ? (
                   config.toledo_encarte_estilo === 'granel' ? (
                     <EncarteGranel
                       key={`encarte-granel-${encarteRefreshKey}`}
@@ -769,7 +773,7 @@ export default function MediaIndoor() {
                       categoriasFiltro={parsedCategories}
                     />
                   )
-                ) : activeModules.includes('midia') && activeMidia ? (
+                ) : !smartMediaSettings.midia_indoor_ativa && activeModules.includes('midia') && activeMidia ? (
                   <div className="h-full w-full animate-fade-in relative">
                     {activeMidia.tipo === 'video' ? (
                       <video 

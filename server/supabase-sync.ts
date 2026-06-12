@@ -287,7 +287,7 @@ async function processarComandoRemoto(data: any) {
     await supabase.from('comandos_operador').update({ status: 'processando' }).eq('id', data.id);
 
     // Processa o comando simulando uma requisição local
-    const apiUrl = 'http://localhost:3000';
+    const apiUrl = 'http://localhost:3001';
     let res;
 
     if (data.comando === 'CHAMAR_PROXIMA') {

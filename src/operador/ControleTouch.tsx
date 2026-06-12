@@ -39,7 +39,7 @@ export default function ControleTouch() {
   useEffect(() => {
     if (ip && guiche) {
       setIsValidating(true);
-      fetch(`http://${ip}:3000/health`)
+      fetch(`http://${ip}:3001/health`)
         .then((res) => {
           if (res.ok) {
             setIsSetup(true);
@@ -59,7 +59,7 @@ export default function ControleTouch() {
 
   // Set up real-time SSE syncing
   const { data: sseData, connected: sseConnected } = useSSE(
-    isSetup ? `http://${ip}:3000/events` : null
+    isSetup ? `http://${ip}:3001/events` : null
   );
 
   // Listen to SSE updates
@@ -90,7 +90,7 @@ export default function ControleTouch() {
   const fetchInitialData = async (serverIp: string, guicheNum: string) => {
     try {
       // 1. Fetch queue counts
-      const queueRes = await fetch(`http://${serverIp}:3000/api/fila`);
+      const queueRes = await fetch(`http://${serverIp}:3001/api/fila`);
       if (queueRes.ok) {
         const queueData = await queueRes.json();
         const geral = queueData.filter((s: any) => s.preferencial === 0).length;
@@ -99,7 +99,7 @@ export default function ControleTouch() {
       }
 
       // 2. Fetch last called ticket to find if there is an active one for this guichê
-      const ticketsRes = await fetch(`http://${serverIp}:3000/api/senhas`);
+      const ticketsRes = await fetch(`http://${serverIp}:3001/api/senhas`);
       if (ticketsRes.ok) {
         const ticketsData = await ticketsRes.json();
         const active = ticketsData.find(
@@ -115,7 +115,7 @@ export default function ControleTouch() {
       }
 
       // 3. Fetch configurations
-      const configRes = await fetch(`http://${serverIp}:3000/api/configuracoes`);
+      const configRes = await fetch(`http://${serverIp}:3001/api/configuracoes`);
       if (configRes.ok) {
         const configData = await configRes.json();
         setConfig(configData);
@@ -133,10 +133,10 @@ export default function ControleTouch() {
     setErrorMsg('');
     setIsValidating(true);
 
-    const cleanIp = ip.trim().replace(/^https?:\/\//i, '').replace(/:3000\/?$/, '');
+    const cleanIp = ip.trim().replace(/^https?:\/\//i, '').replace(/:300[01]\/?$/, '');
 
     try {
-      const res = await fetch(`http://${cleanIp}:3000/health`);
+      const res = await fetch(`http://${cleanIp}:3001/health`);
       if (res.ok) {
         localStorage.setItem('server_ip_override', cleanIp);
         localStorage.setItem('operator_guiche', guiche.trim());
@@ -164,7 +164,7 @@ export default function ControleTouch() {
     triggerVibration(100); // Short vibration
 
     try {
-      const res = await fetch(`http://${ip}:3000/api/operador/proximo`, {
+      const res = await fetch(`http://${ip}:3001/api/operador/proximo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ guiche }),
@@ -198,7 +198,7 @@ export default function ControleTouch() {
     triggerVibration(50); // Single tap vibration
 
     try {
-      const res = await fetch(`http://${ip}:3000/api/operador/repetir`, {
+      const res = await fetch(`http://${ip}:3001/api/operador/repetir`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ guiche }),
@@ -220,7 +220,7 @@ export default function ControleTouch() {
     triggerVibration([50, 50, 50]); // Triple short vibration
 
     try {
-      const res = await fetch(`http://${ip}:3000/api/operador/devolver`, {
+      const res = await fetch(`http://${ip}:3001/api/operador/devolver`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ guiche }),
@@ -243,7 +243,7 @@ export default function ControleTouch() {
     triggerVibration(50);
 
     try {
-      const res = await fetch(`http://${ip}:3000/api/senhas/concluir`, {
+      const res = await fetch(`http://${ip}:3001/api/senhas/concluir`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ senha_id: senhaAtual.id, guiche: `Guichê ${guiche}` }),
@@ -266,7 +266,7 @@ export default function ControleTouch() {
     triggerVibration(50);
 
     try {
-      const res = await fetch(`http://${ip}:3000/api/senhas/cancelar`, {
+      const res = await fetch(`http://${ip}:3001/api/senhas/cancelar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ senha_id: senhaAtual.id, guiche: `Guichê ${guiche}` }),

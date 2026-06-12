@@ -635,10 +635,10 @@ if (!gotTheLock) {
         // Configuração dinâmica de atualização local/offline
         const localUpdatePath = getCustomUpdatePath();
         if (localUpdatePath) {
-          autoUpdateLogger.info(`Atualizador local/offline ativado! Redirecionando para servidor HTTP local: http://localhost:3000/local-updates (lendo de ${localUpdatePath})`);
+          autoUpdateLogger.info(`Atualizador local/offline ativado! Redirecionando para servidor HTTP local: http://localhost:3001/local-updates (lendo de ${localUpdatePath})`);
           autoUpdater.setFeedURL({
             provider: 'generic',
-            url: 'http://localhost:3000/local-updates'
+            url: 'http://localhost:3001/local-updates'
           });
         } else {
           autoUpdateLogger.info('Usando canal padrão de atualizações (GitHub Releases).');

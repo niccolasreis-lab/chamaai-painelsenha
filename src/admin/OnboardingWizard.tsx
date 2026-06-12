@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Building2, Palette, CheckCircle2, ChevronRight, Check, Target, Users, MonitorPlay, ArrowRight } from 'lucide-react';
+import { getApiUrl } from '../shared/apiConfig';
 
 interface OnboardingWizardProps {
   onComplete: () => void;
@@ -45,9 +46,26 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
     if (step < 3) setStep(step + 1);
   };
 
-  const handleFinish = () => {
-    // Aqui você enviaria os dados para o Supabase/Backend
-    console.log('Dados do Onboarding:', formData);
+  const handleFinish = async () => {
+    try {
+      const API_URL = getApiUrl();
+      const res = await fetch(`${API_URL}/api/configuracoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome_estabelecimento: formData.nome_estabelecimento,
+          cor_primaria: formData.cor_primaria,
+          cnpj_estabelecimento: formData.cnpj,
+          categoria_estabelecimento: formData.categoria
+        })
+      });
+      if (!res.ok) {
+        throw new Error('Falha ao salvar as configurações no servidor.');
+      }
+    } catch (e: any) {
+      console.error('Erro ao salvar onboarding:', e);
+      alert('Aviso: Não foi possível salvar as configurações no servidor local, mas seu progresso foi marcado como concluído localmente.');
+    }
     
     // Marca como completo no storage
     localStorage.setItem('onboarding_completed', 'true');
