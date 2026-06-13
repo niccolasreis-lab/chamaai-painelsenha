@@ -1,3 +1,25 @@
+# Relatório de Alterações - 13 de Junho de 2026
+
+Este documento resume as alterações e melhorias de resiliência implementadas no projeto **ChamaAI** hoje (13/06/2026). As modificações corrigem a sincronização do painel do cliente com a nuvem (Supabase) e a exibição do status da fila e catálogo de produtos no portal web em produção.
+
+---
+
+## 📁 Resumo de Arquivos Alterados ou Criados
+
+### 🖥️ Electron & Backend (Sincronização Nuvem)
+* **[MODIFY]** [`electron/main.ts`](file:///z:/01%20-%20ADMINISTRATIVO/N%C3%ADcolas/saas/chamaAI_novo/electron/main.ts) - Implementação de suporte para leitura robusta de variáveis de ambiente do arquivo persistente `C:\ChamaAi\.env` em ambientes empacotados de produção.
+* **[MODIFY]** [`server/supabase-sync.ts`](file:///z:/01%20-%20ADMINISTRATIVO/N%C3%ADcolas/saas/chamaAI_novo/server/supabase-sync.ts) - Adicionado carregamento resiliente do arquivo `.env` global de produção e configurada a chave do Supabase padrão como fallback de segurança para manter o sincronizador de senhas e produtos ativo.
+
+---
+
+## 🛠️ Detalhes das Implementações
+
+### 1. Carregamento de Variáveis de Ambiente e Fallback do Supabase
+* **Problema Resolvido**: Em produção, a aplicação empacotada (`ChamaAi.exe`) roda com o diretório de execução do sistema operacional e não conseguia localizar o arquivo `.env` para carregar as chaves de conexão do Supabase. Com isso, o mecanismo de sincronização em segundo plano ficava desativado, impedindo que novos tickets de senhas e alterações do catálogo chegassem à nuvem, resultando em tela de "Acesso Inválido" ou "Sessão Expirada" ao escanear o QR Code.
+* **Resiliência de Configuração**: Modificamos a inicialização do `dotenv` para verificar o diretório `C:\ChamaAi\.env` e adicionamos como fallback no código a URL e a Anon Key pública padrão do Supabase da aplicação. Assim, a sincronização funciona nativamente de forma independente e segura sem exigir arquivos adicionais.
+
+---
+
 # Relatório de Alterações - 10 de Junho de 2026
 
 Este documento resume todas as alterações e melhorias implementadas no projeto **ChamaAI** no dia de hoje (10/06/2026). As modificações abrangem a arquitetura do banco de dados, novos endpoints no servidor, melhorias de sincronização em tempo real, novas telas no painel administrativo (como o gerenciamento inteligente de mídia indoor e o assistente de onboarding) e configurações de infraestrutura/portas.

@@ -18,18 +18,30 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
-// As chaves agora devem vir do .env
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.VITE_SUPABASE_KEY || '';
+// Load default .env from current working directory
+dotenv.config();
+
+// Try loading from the persistent data directory C:\ChamaAi\.env
+const prodEnvPath = 'C:\\ChamaAi\\.env';
+if (fs.existsSync(prodEnvPath)) {
+  dotenv.config({ path: prodEnvPath });
+}
+
+// Chaves padrão do Supabase de fallback caso não estejam configuradas no .env
+const DEFAULT_SUPABASE_URL = 'https://npfqnsgjicmxwmurwosu.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5wZnFuc2dqaWNteHdtdXJ3b3N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3ODQyNDQsImV4cCI6MjA5MjM2MDI0NH0.wLIFMxZkE9rjGQjZF7eFi0dyDioOGQfg1jfhRy32O90';
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+const SUPABASE_KEY = process.env.VITE_SUPABASE_KEY || DEFAULT_SUPABASE_KEY;
 
 export const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_KEY);
 
-// Inicializa o cliente com placeholders válidos se não estiver configurado para evitar crash no createClient
-const urlToUse = isSupabaseConfigured ? SUPABASE_URL : 'https://placeholder-chamaai.supabase.co';
-const keyToUse = isSupabaseConfigured ? SUPABASE_KEY : 'placeholder-key';
-
-export const supabase = createClient(urlToUse, keyToUse);
+// Inicializa o cliente com as credenciais válidas ou padrão
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── Fila Local de Sincronização (Outbox Pattern) ────────────────────────────────
 

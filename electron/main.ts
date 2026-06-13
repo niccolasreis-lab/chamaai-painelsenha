@@ -1,7 +1,17 @@
-require('dotenv').config();
-import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as dotenv from 'dotenv';
+
+// Load default .env from current working directory
+dotenv.config();
+
+// Try loading from the persistent data directory C:\ChamaAi\.env
+const prodEnvPath = 'C:\\ChamaAi\\.env';
+if (fs.existsSync(prodEnvPath)) {
+  dotenv.config({ path: prodEnvPath });
+}
+
+import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import { initDatabase, getDb, closeDatabase } from './services/database';
 import { startServer, stopServer } from '../server/index';
 import { PrinterService, PrinterConfig } from './services/printer';
