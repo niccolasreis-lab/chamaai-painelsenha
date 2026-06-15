@@ -1,5 +1,20 @@
 # Histórico de Progresso do Projeto
 
+## 2026-06-12
+### O que foi feito
+- Melhoria completa do endpoint `/api/debug-sync` para diagnóstico avançado da fila de sincronização Supabase.
+- Adicionadas estatísticas detalhadas: contagem por tabela, por ação, status de tentativas, idade do item mais antigo.
+- Criados endpoints de ação: retry manual de itens falhos (`POST /api/debug-sync/retry`), limpeza da fila (`POST /api/debug-sync/clear`), e exclusão de item específico (`DELETE /api/debug-sync/:id`).
+- Atualizado `check-db.ts` para incluir diagnóstico completo da fila e verificação de outras tabelas importantes.
+
+### Arquivos alterados
+- [server/index.ts](file:///z:/01%20-%20ADMINISTRATIVO/N%C3%ADcolas/saas/chamaAI_novo/server/index.ts) - Expansão do endpoint debug-sync com 4 novas rotas
+- [check-db.ts](file:///z:/01%20-%20ADMINISTRATIVO/N%C3%ADcolas/saas/chamaAI_novo/check-db.ts) - Script de diagnóstico completo do banco
+
+### Próximos passos
+- Testar o endpoint debug-sync em ambiente de produção
+- Implementar dashboard visual no painel admin para monitoramento da fila
+
 ## 2026-06-09
 ### O que foi feito
 - Criação da estrutura de memória persistente na pasta `.ai/` contendo documentações de arquitetura, decisões técnicas, backlog de tarefas, status de handoff e detalhes do projeto.

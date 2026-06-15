@@ -7,7 +7,7 @@ import os from 'os';
 import dgram from 'dgram';
 import cron from 'node-cron';
 import { getDb } from '../electron/services/database';
-import { startToledoWatcher, forceToledoRefresh, reloadCategorias, setBroadcastFn } from './toledo-watcher';
+import { startToledoWatcher, forceToledoRefresh, reloadCategorias, setBroadcastFn, syncToCatalogoProduto } from './toledo-watcher';
 import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica, startSyncWorker, stopSyncWorker, supabase, isSupabaseConfigured, setLoopbackToken } from './supabase-sync';
 import { migrateDatabaseAndConfigs } from './categorizador';
 import crypto from 'crypto';
@@ -381,12 +381,55 @@ export function startServer() {
       cb(null, UPLOADS_DIR);
     },
     filename: (req, file, cb) => {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+  const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
       cb(null, uniqueSuffix + path.extname(file.originalname));
     }
   });
 
   const upload = multer({ storage });
+
+  function reconcileMidias() {
+    try {
+      const db = getDb();
+      // Only process media that aren't marked as deleted or failed
+      const activeMidias = db.prepare("SELECT id, caminho, file_status FROM midias WHERE deleted_at IS NULL AND file_status != 'failed'").all() as any[];
+      let missingCount = 0;
+      
+      for (const m of activeMidias) {
+        const filePath = path.join(process.cwd(), m.caminho.replace(/^[\\/\\\\]/, ''));
+        const exists = fs.existsSync(filePath);
+        
+        if (!exists && m.file_status !== 'missing') {
+          db.prepare("UPDATE midias SET file_status = 'missing' WHERE id = ?").run(m.id);
+          missingCount++;
+        } else if (exists && m.file_status === 'missing') {
+          db.prepare("UPDATE midias SET file_status = 'active' WHERE id = ?").run(m.id);
+        }
+      }
+      
+      // Checking for orphan files in UPLOADS_DIR (that are not in DB)
+      if (fs.existsSync(UPLOADS_DIR)) {
+        const files = fs.readdirSync(UPLOADS_DIR);
+        for (const file of files) {
+          const expectedPath = `/uploads/${file}`;
+          const dbEntry = db.prepare("SELECT id FROM midias WHERE caminho = ?").get(expectedPath);
+          const configEntry = db.prepare("SELECT chave FROM configuracoes WHERE valor = ?").get(expectedPath);
+          if (!dbEntry && !configEntry && file !== 'desktop.ini') {
+            console.warn(`[RECONCILE] Arquivo órfão detectado: ${file}`);
+          }
+        }
+      }
+      
+      if (missingCount > 0) {
+        console.warn(`[RECONCILE] ${missingCount} mídias marcadas como 'missing' (arquivo não encontrado).`);
+      }
+    } catch (err) {
+      console.error('[RECONCILE] Erro ao reconciliar mídias:', err);
+    }
+  }
+
+  // Execute reconciliation on startup
+  reconcileMidias();
 
   // Upload configurado especificamente para arquivos de backup grandes
   const backupUpload = multer({ 
@@ -613,18 +656,114 @@ export function startServer() {
     });
   });
 
-  // --- DEBUG ENDPOINT ---
+  // --- DEBUG SYNC ENDPOINT (Inspeção Completa da Fila Supabase) ---
   app.get('/api/debug-sync', (req, res) => {
     try {
       const db = getDb();
-      const queue = db.prepare('SELECT * FROM supabase_sync_queue').all();
+
+      // 1. Estatísticas gerais da fila
+      const totalItems = db.prepare('SELECT COUNT(*) as count FROM supabase_sync_queue').get() as any;
+      
+      // 2. Contagem por tabela
+      const byTable = db.prepare(
+        'SELECT tabela, COUNT(*) as count FROM supabase_sync_queue GROUP BY tabela ORDER BY count DESC'
+      ).all();
+
+      // 3. Contagem por ação
+      const byAction = db.prepare(
+        'SELECT acao, COUNT(*) as count FROM supabase_sync_queue GROUP BY acao ORDER BY count DESC'
+      ).all();
+
+      // 4. Itens que falharam (excederam max_tentativas)
+      const failedItems = db.prepare(
+        'SELECT * FROM supabase_sync_queue WHERE tentativas >= max_tentativas ORDER BY id DESC LIMIT 10'
+      ).all();
+
+      // 5. Itens pendentes com tentativas (risco de falha)
+      const retryItems = db.prepare(
+        'SELECT * FROM supabase_sync_queue WHERE tentativas > 0 AND tentativas < max_tentativas ORDER BY tentativas DESC LIMIT 10'
+      ).all();
+
+      // 6. Últimos 10 itens enfileirados (_fifo)
+      const recentItems = db.prepare(
+        'SELECT * FROM supabase_sync_queue ORDER BY id DESC LIMIT 10'
+      ).all();
+
+      // 7. Idade do item mais antigo
+      const oldestItem = db.prepare(
+        'SELECT id, tabela, acao, tentativas, criado_em FROM supabase_sync_queue ORDER BY id ASC LIMIT 1'
+      ).get();
+
+      // 8. Status de tentativas
+      const attemptStats = db.prepare(
+        'SELECT tentativas, COUNT(*) as count FROM supabase_sync_queue GROUP BY tentativas ORDER BY tentativas ASC'
+      ).all();
+
       res.json({
         isSupabaseConfigured,
-        queueCount: queue.length,
-        queue: queue.slice(0, 10), // return top 10
         envUrl: process.env.VITE_SUPABASE_URL ? 'set' : 'not set',
-        envKey: process.env.VITE_SUPABASE_KEY ? 'set' : 'not set'
+        envKey: process.env.VITE_SUPABASE_KEY ? 'set' : 'not set',
+        queue: {
+          total: totalItems?.count || 0,
+          byTable,
+          byAction,
+          attemptStats,
+          oldestItem: oldestItem || null,
+          failedItems,
+          retryItems,
+          recentItems
+        }
       });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- DEBUG SYNC: Retry manual de itens falhos ---
+  app.post('/api/debug-sync/retry', (req, res) => {
+    try {
+      const db = getDb();
+      const result = db.prepare(
+        'UPDATE supabase_sync_queue SET tentativas = 0 WHERE tentativas >= max_tentativas'
+      ).run();
+      res.json({ 
+        message: `${result.changes} itens resetados para retry`,
+        retriedCount: result.changes 
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- DEBUG SYNC: Limpar fila inteira ---
+  app.post('/api/debug-sync/clear', (req, res) => {
+    try {
+      const db = getDb();
+      const count = db.prepare('SELECT COUNT(*) as count FROM supabase_sync_queue').get() as any;
+      db.prepare('DELETE FROM supabase_sync_queue').run();
+      res.json({ 
+        message: `${count?.count || 0} itens removidos da fila`,
+        clearedCount: count?.count || 0 
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- DEBUG SYNC: Deletar item específico por ID ---
+  app.delete('/api/debug-sync/:id', (req, res) => {
+    try {
+      const db = getDb();
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'ID inválido' });
+      }
+      const item = db.prepare('SELECT * FROM supabase_sync_queue WHERE id = ?').get(id);
+      if (!item) {
+        return res.status(404).json({ error: 'Item não encontrado' });
+      }
+      db.prepare('DELETE FROM supabase_sync_queue WHERE id = ?').run(id);
+      res.json({ message: `Item ${id} removido`, deletedItem: item });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1897,7 +2036,8 @@ export function startServer() {
   app.get('/api/midias', (req, res) => {
     try {
       const db = getDb();
-      const midias = db.prepare('SELECT * FROM midias ORDER BY ordem ASC, id DESC').all();
+      // HARD FIX DE SEGURANÇA: sempre filtrar WHERE deleted_at IS NULL e file_status != 'missing'
+      const midias = db.prepare("SELECT * FROM midias WHERE deleted_at IS NULL AND file_status != 'missing' ORDER BY ordem ASC, id DESC").all();
       res.json(midias);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -1917,9 +2057,10 @@ export function startServer() {
 
       console.log('Inserting media into DB:', { nome, caminho });
 
-      const stmt = db.prepare('INSERT INTO midias (nome, caminho, tipo, ordem, ativo) VALUES (?, ?, ?, ?, 1)');
+      const stmt = db.prepare("INSERT INTO midias (nome, caminho, tipo, ordem, ativo, file_status) VALUES (?, ?, ?, ?, 1, 'active')");
       const result = stmt.run(nome || req.file.originalname, caminho, tipo || (req.file.mimetype.startsWith('video') ? 'video' : 'imagem'), ordem || 0);
 
+      reconcileMidias();
       broadcastEvent('MIDIAS_ATUALIZADAS', { action: 'upload' });
 
       res.status(201).json({ 
@@ -1941,18 +2082,32 @@ export function startServer() {
       const { id } = req.params;
       const db = getDb();
 
-      // Get file path before deleting from DB
+      // Soft delete imediatamente para garantir que saia do telão mesmo se a deleção do arquivo falhar
+      try {
+        db.prepare("UPDATE midias SET deleted_at = datetime('now', 'localtime') WHERE id = ?").run(id);
+      } catch (e) {
+        // Ignora erro caso a coluna não exista (o db.exec de alter table cuidará disso)
+      }
+
+      // Tenta remover o arquivo físico
       const midia = db.prepare('SELECT caminho FROM midias WHERE id = ?').get(id) as any;
       
       if (midia) {
-        const filePath = path.join(process.cwd(), midia.caminho.replace(/^\//, ''));
+        const filePath = path.join(process.cwd(), midia.caminho.replace(/^[\\/\\\\]/, ''));
         console.log('Deleting file:', filePath);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (fileErr) {
+          console.error('Erro ao deletar arquivo físico (pode estar em uso):', fileErr);
+          try {
+            db.prepare("UPDATE midias SET file_status = 'failed' WHERE id = ?").run(id);
+          } catch(e) {}
         }
       }
 
-      db.prepare('DELETE FROM midias WHERE id = ?').run(id);
+      reconcileMidias();
       broadcastEvent('MIDIAS_ATUALIZADAS', { action: 'delete' });
       res.json({ success: true });
     } catch (err: any) {
@@ -2678,7 +2833,493 @@ export function startServer() {
     }
   });
 
-  // ── CRUD de Categorias Dinâmicas ───────────────────────────────────────────
+  
+  // ── Funções Auxiliares do Catálogo ───────────────────────────────────────
+  const generateUniqueSlug = (db: any, tableName: string, baseName: string, ignoreId?: number): string => {
+    if (!baseName) return '';
+    let baseSlug = baseName
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+
+    if (!baseSlug) baseSlug = `${tableName.slice(0, 3)}-${Date.now()}`;
+
+    let finalSlug = baseSlug;
+    let counter = 1;
+
+    let query = `SELECT id FROM ${tableName} WHERE slug = ?`;
+    let params: any[] = [finalSlug];
+    if (ignoreId) {
+      query += " AND id != ?";
+      params.push(ignoreId);
+    }
+
+    while (db.prepare(query).get(...params)) {
+      finalSlug = `${baseSlug}-${counter}`;
+      params[0] = finalSlug;
+      counter++;
+    }
+
+    return finalSlug;
+  };
+
+  const registerAuditLog = (db: any, acao: string, entidade: string, id: number, details: any) => {
+    try {
+      db.prepare(`
+        INSERT INTO audit_logs (acao, entidade, entidade_id, detalhes_json, criado_em)
+        VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
+      `).run(acao, entidade, id, JSON.stringify(details));
+    } catch (err) {
+      console.error('Falha ao gravar audit log:', err);
+    }
+  };
+
+  const parseJsonField = (fieldValue: any) => {
+    if (fieldValue === null || fieldValue === undefined) return null;
+    if (typeof fieldValue === 'string') {
+      if (fieldValue.trim() === '') return null; // Treat empty string as null or valid? The user said don't overwrite if not sent, but if sent as empty string, maybe it's valid? Wait, JSON.parse('') throws. Let's just JSON.parse it to validate.
+      JSON.parse(fieldValue);
+      return fieldValue;
+    }
+    return JSON.stringify(fieldValue);
+  };
+
+  // ── FASE 2: ROTAS DO CATÁLOGO DE PRODUTOS (NOVAS) ────────────────────────
+  
+  app.get('/api/catalogo/produtos', (req, res) => {
+    try {
+      const db = getDb();
+      const { search, categoria_id, status, deleted } = req.query;
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.max(1, parseInt(req.query.limit as string) || 50);
+      const offset = (page - 1) * limit;
+
+      let baseQuery = " FROM produtos WHERE 1=1";
+      const params: any[] = [];
+
+      if (deleted !== 'true') baseQuery += " AND deleted_at IS NULL";
+
+      if (categoria_id) {
+        baseQuery += " AND categoria_id = ?";
+        params.push(categoria_id);
+      }
+      if (status !== undefined) {
+        baseQuery += " AND status = ?";
+        params.push(status);
+      }
+      if (search) {
+        baseQuery += " AND (nome LIKE ? OR plu LIKE ? OR categoria_legada LIKE ?)";
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      }
+
+      // Ordenação segura (Whitelist)
+      const allowedSortFields = ['nome', 'preco', 'categoria_id', 'status', 'created_at', 'updated_at', 'ordem'];
+      let sortField = 'nome';
+      let sortDirection = 'ASC';
+
+      if (req.query.sort && allowedSortFields.includes(req.query.sort as string)) {
+        sortField = req.query.sort as string;
+      }
+      if (req.query.order && String(req.query.order).toUpperCase() === 'DESC') {
+        sortDirection = 'DESC';
+      }
+
+      const countRow = db.prepare(`SELECT COUNT(*) as total ${baseQuery}`).get(...params) as any;
+      const total = countRow ? countRow.total : 0;
+      const totalPages = Math.ceil(total / limit);
+
+      baseQuery += ` ORDER BY ${sortField} ${sortDirection} LIMIT ? OFFSET ?`;
+      params.push(limit, offset);
+
+      const items = db.prepare(`SELECT * ${baseQuery}`).all(...params);
+
+      res.json({
+        success: true,
+        data: {
+          items,
+          pagination: { page, limit, total, totalPages }
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.get('/api/catalogo/produtos/:id', (req, res) => {
+    try {
+      const db = getDb();
+      const id = req.params.id;
+      const produto = db.prepare("SELECT * FROM produtos WHERE id = ? AND deleted_at IS NULL").get(id);
+      if (!produto) return res.status(404).json({ success: false, error: "Produto não encontrado" });
+      res.json({ success: true, data: produto });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/catalogo/produtos', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const body = req.body;
+      
+      if (!body.nome) return res.status(400).json({ success: false, error: "Nome é obrigatório" });
+      
+      const preco = Number(body.preco) || 0;
+      if (isNaN(preco) || preco < 0) return res.status(400).json({ success: false, error: "Preço inválido" });
+      
+      const estoque = Number(body.estoque) || 0;
+      if (isNaN(estoque)) return res.status(400).json({ success: false, error: "Estoque inválido" });
+      
+      const status = body.status === undefined ? 1 : (body.status ? 1 : 0);
+      
+      let categoria_id = body.categoria_id || null;
+      if (categoria_id) {
+        const cat = db.prepare("SELECT id FROM categorias WHERE id = ? AND deleted_at IS NULL").get(categoria_id);
+        if (!cat) return res.status(400).json({ success: false, error: "Categoria informada não existe ou está excluída." });
+      }
+
+      let links = null, imagens = null, variacoes = null, configuracoes_internas = null;
+      try {
+        if (body.links) links = parseJsonField(body.links);
+        if (body.imagens) imagens = parseJsonField(body.imagens);
+        if (body.variacoes) variacoes = parseJsonField(body.variacoes);
+        if (body.configuracoes_internas) configuracoes_internas = parseJsonField(body.configuracoes_internas);
+      } catch (e) {
+        return res.status(400).json({ success: false, error: "Campo JSON inválido" });
+      }
+
+      const slug = generateUniqueSlug(db, 'produtos', body.nome);
+
+      const result = db.prepare(`
+        INSERT INTO produtos (
+          slug, nome, descricao, preco, status, estoque,
+          categoria_id, categoria_legada, plu, ordem, links, imagens,
+          variacoes, configuracoes_internas, created_at, updated_at
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?,
+          ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime')
+        )
+      `).run(
+        slug, body.nome, body.descricao || null, preco, status, estoque,
+        categoria_id, body.categoria_legada || null, body.plu || null, Number(body.ordem) || 0, links, imagens,
+        variacoes, configuracoes_internas
+      );
+
+      const novoId = result.lastInsertRowid;
+      registerAuditLog(db, 'CREATE_PRODUTO', 'PRODUTO', Number(novoId), { created: body });
+
+      res.json({ success: true, data: { id: novoId }, message: "Produto criado com sucesso" });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  const updateProdutoSeguro = (req: any, res: any) => {
+    try {
+      const db = getDb();
+      const id = req.params.id;
+      const body = req.body;
+      
+      const existing = db.prepare("SELECT * FROM produtos WHERE id = ? AND deleted_at IS NULL").get(id) as any;
+      if (!existing) return res.status(404).json({ success: false, error: "Produto não encontrado ou excluído." });
+
+      const updates: string[] = [];
+      const params: any[] = [];
+
+      if (body.nome !== undefined) {
+        updates.push("nome = ?");
+        params.push(body.nome);
+        if (body.nome !== existing.nome && !body.slug) {
+          updates.push("slug = ?");
+          params.push(generateUniqueSlug(db, 'produtos', body.nome, existing.id));
+        }
+      }
+      if (body.slug !== undefined) {
+        updates.push("slug = ?");
+        params.push(generateUniqueSlug(db, 'produtos', body.slug, existing.id));
+      }
+      
+      if (body.descricao !== undefined) { updates.push("descricao = ?"); params.push(body.descricao); }
+      if (body.preco !== undefined) { 
+        const preco = Number(body.preco) || 0;
+        if (isNaN(preco) || preco < 0) return res.status(400).json({ success: false, error: "Preço inválido" });
+        updates.push("preco = ?"); params.push(preco); 
+      }
+      if (body.status !== undefined) { updates.push("status = ?"); params.push(body.status ? 1 : 0); }
+      if (body.estoque !== undefined) { 
+        const estoque = Number(body.estoque) || 0;
+        if (isNaN(estoque)) return res.status(400).json({ success: false, error: "Estoque inválido" });
+        updates.push("estoque = ?"); params.push(estoque); 
+      }
+      if (body.categoria_id !== undefined) { 
+        let catId = body.categoria_id;
+        if (catId) {
+          const cat = db.prepare("SELECT id FROM categorias WHERE id = ? AND deleted_at IS NULL").get(catId);
+          if (!cat) return res.status(400).json({ success: false, error: "Categoria informada não existe ou está excluída." });
+        }
+        updates.push("categoria_id = ?"); params.push(catId || null); 
+      }
+      if (body.categoria_legada !== undefined) { updates.push("categoria_legada = ?"); params.push(body.categoria_legada); }
+      if (body.plu !== undefined) { updates.push("plu = ?"); params.push(body.plu); }
+      if (body.ordem !== undefined) { updates.push("ordem = ?"); params.push(Number(body.ordem) || 0); }
+
+      // JSONs
+      try {
+        if (body.links !== undefined) { updates.push("links = ?"); params.push(parseJsonField(body.links)); }
+        if (body.imagens !== undefined) { updates.push("imagens = ?"); params.push(parseJsonField(body.imagens)); }
+        if (body.variacoes !== undefined) { updates.push("variacoes = ?"); params.push(parseJsonField(body.variacoes)); }
+        if (body.configuracoes_internas !== undefined) { updates.push("configuracoes_internas = ?"); params.push(parseJsonField(body.configuracoes_internas)); }
+      } catch (e) {
+        return res.status(400).json({ success: false, error: "Campo JSON inválido" });
+      }
+
+      if (updates.length === 0) return res.json({ success: true, message: "Nada a atualizar." });
+
+      updates.push("updated_at = datetime('now', 'localtime')");
+      params.push(id);
+
+      db.prepare(`UPDATE produtos SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+
+      registerAuditLog(db, 'UPDATE_PRODUTO', 'PRODUTO', Number(id), { before: existing, changed_keys: Object.keys(body) });
+
+      res.json({ success: true, message: "Produto atualizado com sucesso." });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  };
+
+  app.put('/api/catalogo/produtos/:id', requireMaster, updateProdutoSeguro);
+  app.patch('/api/catalogo/produtos/:id', requireMaster, updateProdutoSeguro);
+
+  app.delete('/api/catalogo/produtos/:id', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const id = req.params.id;
+      const existing = db.prepare("SELECT * FROM produtos WHERE id = ? AND deleted_at IS NULL").get(id);
+      if (!existing) return res.status(404).json({ success: false, error: "Produto não encontrado ou já excluído." });
+
+      db.prepare("UPDATE produtos SET deleted_at = datetime('now', 'localtime'), updated_at = datetime('now', 'localtime') WHERE id = ?").run(id);
+      registerAuditLog(db, 'SOFT_DELETE', 'PRODUTO', Number(id), { message: 'Produto movido para lixeira' });
+
+      res.json({ success: true, message: "Produto movido para a lixeira." });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.patch('/api/catalogo/produtos/:id/restaurar', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const id = req.params.id;
+      db.prepare("UPDATE produtos SET deleted_at = NULL, updated_at = datetime('now', 'localtime') WHERE id = ?").run(id);
+      registerAuditLog(db, 'RESTORE', 'PRODUTO', Number(id), { message: 'Produto restaurado' });
+      res.json({ success: true, message: "Produto restaurado com sucesso." });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ── FASE 2: ROTAS DO CATÁLOGO DE CATEGORIAS (NOVAS) ──────────────────────
+
+  app.get('/api/catalogo/categorias', (req, res) => {
+    try {
+      const db = getDb();
+      const { deleted } = req.query;
+      let query = "SELECT * FROM categorias WHERE 1=1";
+      if (deleted !== 'true') query += " AND deleted_at IS NULL";
+      query += " ORDER BY ordem ASC, id ASC";
+      const rows = db.prepare(query).all();
+      res.json({ success: true, data: rows });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.get('/api/catalogo/categorias/:id', (req, res) => {
+    try {
+      const db = getDb();
+      const cat = db.prepare("SELECT * FROM categorias WHERE id = ? AND deleted_at IS NULL").get(req.params.id);
+      if (!cat) return res.status(404).json({ success: false, error: "Categoria não encontrada" });
+      res.json({ success: true, data: cat });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/catalogo/categorias', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const { nome, emoji, descricao, ordem, ativo } = req.body;
+      if (!nome) return res.status(400).json({ success: false, error: "Nome é obrigatório" });
+      
+      const slug = generateUniqueSlug(db, 'categorias', nome);
+      const isAtivo = ativo === undefined ? 1 : (ativo ? 1 : 0);
+
+      const result = db.prepare(`
+        INSERT INTO categorias (nome, slug, emoji, descricao, ordem, ativo)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(nome, slug, emoji || '', descricao || '', Number(ordem) || 0, isAtivo);
+      
+      const novoId = result.lastInsertRowid;
+      registerAuditLog(db, 'CREATE_CATEGORIA', 'CATEGORIA', Number(novoId), { created: req.body });
+      res.json({ success: true, data: { id: novoId }, message: "Categoria criada" });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.patch('/api/catalogo/categorias/ordenar', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const { ordem } = req.body; // Array de { id, ordem }
+      if (!Array.isArray(ordem)) return res.status(400).json({ success: false, error: "Formato inválido" });
+
+      const transaction = db.transaction((itens: any[]) => {
+        const stmt = db.prepare("UPDATE categorias SET ordem = ? WHERE id = ? AND deleted_at IS NULL");
+        for (const item of itens) {
+          if (item.id !== undefined && item.ordem !== undefined) {
+            stmt.run(Number(item.ordem), item.id);
+          }
+        }
+      });
+      transaction(ordem);
+      registerAuditLog(db, 'REORDER', 'CATEGORIA', 0, { items: ordem.length });
+      res.json({ success: true, message: "Categorias reordenadas" });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  const updateCategoriaSegura = (req: any, res: any) => {
+    try {
+      const db = getDb();
+      const id = req.params.id;
+      const body = req.body;
+      const existing = db.prepare("SELECT * FROM categorias WHERE id = ? AND deleted_at IS NULL").get(id) as any;
+      if (!existing) return res.status(404).json({ success: false, error: "Categoria não encontrada" });
+
+      const updates: string[] = [];
+      const params: any[] = [];
+
+      if (body.nome !== undefined) {
+        updates.push("nome = ?"); params.push(body.nome);
+        if (body.nome !== existing.nome && !body.slug) {
+          updates.push("slug = ?"); params.push(generateUniqueSlug(db, 'categorias', body.nome, existing.id));
+        }
+      }
+      if (body.slug !== undefined) {
+        updates.push("slug = ?"); params.push(generateUniqueSlug(db, 'categorias', body.slug, existing.id));
+      }
+      if (body.emoji !== undefined) { updates.push("emoji = ?"); params.push(body.emoji); }
+      if (body.descricao !== undefined) { updates.push("descricao = ?"); params.push(body.descricao); }
+      if (body.ordem !== undefined) { updates.push("ordem = ?"); params.push(Number(body.ordem) || 0); }
+      if (body.ativo !== undefined) { updates.push("ativo = ?"); params.push(body.ativo ? 1 : 0); }
+
+      if (updates.length === 0) return res.json({ success: true, message: "Nada a atualizar" });
+
+      params.push(id);
+      db.prepare(`UPDATE categorias SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      
+      registerAuditLog(db, 'UPDATE_CATEGORIA', 'CATEGORIA', Number(id), { before: existing, changed_keys: Object.keys(body) });
+      res.json({ success: true, message: "Categoria atualizada" });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  };
+
+  app.put('/api/catalogo/categorias/:id', requireMaster, updateCategoriaSegura);
+  app.patch('/api/catalogo/categorias/:id', requireMaster, updateCategoriaSegura);
+
+  app.delete('/api/catalogo/categorias/:id', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const id = req.params.id;
+      const cat = db.prepare("SELECT * FROM categorias WHERE id = ? AND deleted_at IS NULL").get(id);
+      if (!cat) return res.status(404).json({ success: false, error: "Categoria não encontrada" });
+
+      const countRow = db.prepare("SELECT COUNT(*) as count FROM produtos WHERE categoria_id = ? AND deleted_at IS NULL").get(id) as any;
+      if (countRow && countRow.count > 0) {
+        return res.status(409).json({ 
+          success: false, 
+          error: "Não é possível excluir", 
+          details: { vinculados: countRow.count },
+          message: `Existem ${countRow.count} produto(s) vinculados a esta categoria. Mova-os primeiro ou inative a categoria.`
+        });
+      }
+
+      db.prepare("UPDATE categorias SET deleted_at = datetime('now', 'localtime') WHERE id = ?").run(id);
+      registerAuditLog(db, 'SOFT_DELETE', 'CATEGORIA', Number(id), { message: 'Categoria movida para lixeira' });
+      res.json({ success: true, message: "Categoria movida para a lixeira." });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.patch('/api/catalogo/categorias/:id/mover-produtos', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const oldId = req.params.id;
+      const { nova_categoria_id } = req.body;
+      
+      if (!nova_categoria_id) return res.status(400).json({ success: false, error: "nova_categoria_id é obrigatório" });
+      if (String(oldId) === String(nova_categoria_id)) return res.status(400).json({ success: false, error: "A nova categoria deve ser diferente" });
+
+      const oldCat = db.prepare("SELECT id FROM categorias WHERE id = ?").get(oldId);
+      if (!oldCat) return res.status(404).json({ success: false, error: "Categoria antiga não encontrada" });
+      
+      const newCat = db.prepare("SELECT id FROM categorias WHERE id = ? AND deleted_at IS NULL").get(nova_categoria_id);
+      if (!newCat) return res.status(400).json({ success: false, error: "Nova categoria não encontrada ou está excluída" });
+
+      const result = db.prepare("UPDATE produtos SET categoria_id = ?, updated_at = datetime('now', 'localtime') WHERE categoria_id = ? AND deleted_at IS NULL").run(nova_categoria_id, oldId);
+      
+      registerAuditLog(db, 'MOVER_PRODUTOS', 'CATEGORIA', Number(oldId), { para: nova_categoria_id, quantidade: result.changes });
+      res.json({ success: true, message: `${result.changes} produto(s) movidos com sucesso.` });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.patch('/api/catalogo/categorias/:id/restaurar', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const id = req.params.id;
+      db.prepare("UPDATE categorias SET deleted_at = NULL WHERE id = ?").run(id);
+      registerAuditLog(db, 'RESTORE', 'CATEGORIA', Number(id), { message: 'Categoria restaurada' });
+      res.json({ success: true, message: "Categoria restaurada" });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.patch('/api/catalogo/categorias/:id/inativar', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const id = req.params.id;
+      db.prepare("UPDATE categorias SET ativo = 0 WHERE id = ? AND deleted_at IS NULL").run(id);
+      registerAuditLog(db, 'INATIVAR', 'CATEGORIA', Number(id), { message: 'Categoria inativada' });
+      res.json({ success: true, message: "Categoria inativada" });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.patch('/api/catalogo/categorias/:id/ativar', requireMaster, (req, res) => {
+    try {
+      const db = getDb();
+      const id = req.params.id;
+      db.prepare("UPDATE categorias SET ativo = 1 WHERE id = ? AND deleted_at IS NULL").run(id);
+      registerAuditLog(db, 'ATIVAR', 'CATEGORIA', Number(id), { message: 'Categoria ativada' });
+      res.json({ success: true, message: "Categoria ativada" });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+
+// ── CRUD de Categorias Dinâmicas ───────────────────────────────────────────
 
   // GET all categories
   app.get('/api/categorias', (req, res) => {
@@ -2929,6 +3570,10 @@ export function startServer() {
       }
       
       broadcastEvent('TOLEDO_PRECOS_ATUALIZADOS', { action: 'description_update' });
+      // Sync manual change to catalog
+      const updatedItem = db.prepare("SELECT plu, preco, descricao, categoria, unidade FROM toledo_produtos WHERE plu = ?").get(plu);
+      if (updatedItem) syncToCatalogoProduto(db, updatedItem as any);
+
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -2940,6 +3585,32 @@ export function startServer() {
   setupMediaIndoorRoutes(app, broadcastEvent, requireMaster);
 
   // Catch-all 404 handler for API
+  
+  // --- TEMPORARY TEST ENDPOINT ---
+  app.get('/api/dev/test-fase2-1', (req, res) => {
+    try {
+      const db = getDb();
+      const plu = "5881";
+      
+      // Update custom fields in catalog to simulate manual edit
+      db.prepare(`UPDATE produtos SET imagens = '["img1.png"]', tags = '["premium"]', slug = 'alho-custom' WHERE plu = ?`).run(plu);
+      
+      // Force a sync update from Toledo side
+      const toledo = db.prepare("SELECT plu, preco, descricao, categoria, unidade FROM toledo_produtos WHERE plu = ?").get(plu);
+      if (toledo) {
+        syncToCatalogoProduto(db, toledo as any);
+      }
+      
+      // Fetch result
+      const prod = db.prepare("SELECT plu, nome, imagens, tags, slug, preco FROM produtos WHERE plu = ?").get(plu);
+      const logs = db.prepare("SELECT acao, detalhes_json, criado_em FROM audit_logs WHERE entidade = 'produtos' AND entidade_id = (SELECT id FROM produtos WHERE plu = ?) ORDER BY id DESC LIMIT 5").all(plu);
+      
+      res.json({ prod, logs });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.use('/api', (req, res) => {
     console.warn(`404 - Not Found: ${req.method} ${req.url}`);
     res.status(404).json({ error: `Rota não encontrada: ${req.method} ${req.url}` });

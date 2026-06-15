@@ -21,6 +21,7 @@ export interface ElectronAPI {
   checkForUpdates: () => Promise<{ success: boolean; message: string }>;
   installUpdate: () => Promise<{ success: boolean; message?: string }>;
   ping: () => string;
+  rendererReady: () => void;
 }
 
 declare global {

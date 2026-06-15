@@ -55,5 +55,6 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('update-error', subscription);
     return () => { ipcRenderer.off('update-error', subscription); };
   },
-  ping: () => 'pong'
+  ping: () => 'pong',
+  rendererReady: () => ipcRenderer.send('renderer-ready')
 });

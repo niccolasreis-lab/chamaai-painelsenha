@@ -1,3 +1,5 @@
+import { writeRecoveryLog } from './recovery';
+import { resetSafeModeCounter } from './safemode';
 import Database from 'better-sqlite3';
 import { app } from 'electron';
 import * as path from 'path';
@@ -5,16 +7,17 @@ import * as fs from 'fs';
 
 let db: Database.Database;
 
-export function initDatabase() {
+export async function initDatabase({ appVersion }: { appVersion: string }): Promise<{ status: 'OK' | 'ERROR' | 'RECOVERED' | 'MIGRATION_REQUIRED', db?: Database.Database, error?: string, reason?: string, details?: any }> {
+  const userDataPath = 'C:\\ChamaAi';
+  const dbPath = path.join(userDataPath, 'database.sqlite');
+  const backupPath = path.join(userDataPath, 'Backups', '_update_backup.sqlite');
+  const isFreshInstall = !fs.existsSync(dbPath);
+
   try {
-    const userDataPath = 'C:\\ChamaAi';
-  
     if (!fs.existsSync(userDataPath)) {
       fs.mkdirSync(userDataPath, { recursive: true });
     }
   
-    const dbPath = path.join(userDataPath, 'database.sqlite');
-
     const initializeDb = () => {
       db = new Database(dbPath);
       db.pragma('journal_mode = WAL');
@@ -39,6 +42,67 @@ export function initDatabase() {
       }
     }
 
+    // Check actual migration needs
+    let needsMigration = false;
+    if (!isFreshInstall) {
+      const sysVerCheck = db.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='system_version'").get() as any;
+      if (sysVerCheck.count === 0) needsMigration = true;
+      
+      if (!needsMigration) {
+        const updHistCheck = db.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='update_history'").get() as any;
+        if (updHistCheck.count === 0) needsMigration = true;
+        
+        const recHistCheck = db.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='recovery_history'").get() as any;
+        if (recHistCheck.count === 0) needsMigration = true;
+
+        const midiasCheck = db.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='midias'").get() as any;
+        if (midiasCheck.count > 0) {
+          const midiasCols = db.prepare("PRAGMA table_info(midias)").all() as any[];
+          if (!midiasCols.find(c => c.name === 'deleted_at')) needsMigration = true;
+          if (!midiasCols.find(c => c.name === 'file_status')) needsMigration = true;
+        }
+
+        const categoriasCheck = db.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='categorias'").get() as any;
+        if (categoriasCheck.count > 0) {
+          const catCols = db.prepare("PRAGMA table_info(categorias)").all() as any[];
+          if (!catCols.find(c => c.name === 'deleted_at')) needsMigration = true;
+        }
+      }
+
+      if (needsMigration) {
+        await backupDatabase(dbPath, path.join(userDataPath, 'Backups', `schema_before_${Date.now()}.sqlite`), db);
+      }
+    }
+
+
+    // ── System and Recovery Tables ──────────────────────
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS system_version (
+        id INTEGER PRIMARY KEY,
+        app_version TEXT,
+        db_version TEXT,
+        schema_hash TEXT,
+        updated_at TEXT DEFAULT (datetime('now','localtime'))
+      );
+      
+      CREATE TABLE IF NOT EXISTS update_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        version TEXT,
+        status TEXT,
+        rollback_reason TEXT,
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+      );
+      
+      CREATE TABLE IF NOT EXISTS recovery_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_type TEXT NOT NULL,
+        severity TEXT DEFAULT 'info',
+        module TEXT,
+        message TEXT,
+        details_json TEXT,
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+      );
+    `);
 
     // ── Inline migrations (run safely on every startup) ──────────────────────
     // Configurações
@@ -158,6 +222,17 @@ export function initDatabase() {
     try {
       db.exec('ALTER TABLE operadores ADD COLUMN primeiro_acesso INTEGER DEFAULT 1;');
       console.log("[DATABASE] Coluna 'primeiro_acesso' adicionada à tabela operadores.");
+    } catch (e) {}
+
+    // Add deleted_at to midias for soft deletes
+    try {
+      db.exec('ALTER TABLE midias ADD COLUMN deleted_at TEXT;');
+    } catch (e) {}
+
+    // Add file_status to midias
+    try {
+      db.exec("ALTER TABLE midias ADD COLUMN file_status TEXT DEFAULT 'active';");
+      console.log("[DATABASE] Coluna 'file_status' adicionada à tabela midias.");
     } catch (e) {}
 
     // Mídias
@@ -292,6 +367,215 @@ export function initDatabase() {
     }
 
 
+    // ---------------------------------------------------------
+    // FASE 1: MÓDULO DE PRODUTOS E CATEGORIAS (MIGRAÇÃO SEGURA)
+    // ---------------------------------------------------------
+    try {
+      // 1. Tabela de controle de migrações
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+          id TEXT PRIMARY KEY,
+          executada_em TEXT DEFAULT (datetime('now', 'localtime'))
+        );
+      `);
+
+      // Verifica se a FASE 1 já rodou
+      const migracaoFase1 = db.prepare("SELECT id FROM schema_migrations WHERE id = 'catalogo_produtos_fase_1'").get();
+      
+      if (!migracaoFase1) {
+        console.log('[FASE 1] Iniciando migração de catálogo de produtos...');
+        
+        // 2. Criar backup do banco antes da migração via VACUUM INTO (Síncrono e Seguro para WAL)
+        const backupDir = path.join(userDataPath, 'backups');
+        if (!fs.existsSync(backupDir)) {
+          fs.mkdirSync(backupDir, { recursive: true });
+        }
+        const backupPath = path.join(backupDir, `backup_fase1_${Date.now()}.sqlite`);
+        
+        // VACUUM INTO é o jeito seguro e nativo do SQLite de fazer hot backup síncrono
+        db.exec(`VACUUM INTO '${backupPath.replace(/'/g, "''")}';`);
+        console.log(`[FASE 1] 📦 Backup físico criado com sucesso em: ${backupPath}`);
+
+        // 3. Iniciar Transação (rollback seguro via db.inTransaction)
+        db.exec('BEGIN TRANSACTION;');
+
+        // 4. Tabela Audit Logs
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            acao TEXT NOT NULL,
+            entidade TEXT NOT NULL,
+            entidade_id INTEGER NOT NULL,
+            detalhes_json TEXT,
+            operador_id INTEGER,
+            criado_em TEXT DEFAULT (datetime('now', 'localtime'))
+          );
+        `);
+
+        // 5. Ajustes Seguros na Tabela Categorias
+        try { 
+          db.prepare("ALTER TABLE categorias ADD COLUMN slug TEXT").run(); 
+        } catch (e: any) {
+          if (!String(e.message).includes('duplicate column name')) {
+            console.warn('[FASE 1] Aviso ao adicionar coluna slug:', e.message);
+          }
+        }
+        try { 
+          db.prepare("ALTER TABLE categorias ADD COLUMN deleted_at TEXT").run(); 
+        } catch (e: any) {
+          if (!String(e.message).includes('duplicate column name')) {
+            console.warn('[FASE 1] Aviso ao adicionar coluna deleted_at:', e.message);
+          }
+        }
+        
+        // 5.1. Preencher slugs vazios com Normalização NFD
+        const categoriasSemSlug = db.prepare("SELECT id, nome FROM categorias WHERE slug IS NULL OR slug = ''").all() as any[];
+        const updateSlugStmt = db.prepare("UPDATE categorias SET slug = ? WHERE id = ?");
+        const checkSlugExists = db.prepare("SELECT id FROM categorias WHERE slug = ?");
+        
+        for (const cat of categoriasSemSlug) {
+          let baseSlug = cat.nome
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\\u0300-\\u036f]/g, '') // Remove acentos
+            .replace(/[^a-z0-9]+/g, '-')       // Troca não-alfanuméricos por traço
+            .replace(/(^-|-$)+/g, '');         // Remove traços nas bordas
+            
+          if (!baseSlug) baseSlug = `categoria-${cat.id}`;
+
+          let finalSlug = baseSlug;
+          let counter = 1;
+          
+          while (checkSlugExists.get(finalSlug)) {
+            finalSlug = `${baseSlug}-${counter}`;
+            counter++;
+          }
+          updateSlugStmt.run(finalSlug, cat.id);
+        }
+        
+        // 5.2. Criar índice único para slug
+        db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_categorias_slug ON categorias(slug);`);
+
+        // 6. Tabela Produtos
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS produtos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plu TEXT UNIQUE,
+            nome TEXT NOT NULL,
+            slug TEXT,
+            descricao TEXT,
+            preco REAL NOT NULL DEFAULT 0,
+            estoque REAL DEFAULT 0,
+            unidade TEXT DEFAULT 'kg',
+            categoria_id INTEGER,
+            categoria_legada TEXT,
+            status INTEGER DEFAULT 1,
+            links TEXT,
+            imagens TEXT,
+            variacoes TEXT,
+            ordem INTEGER DEFAULT 0,
+            tags TEXT,
+            configuracoes_internas TEXT,
+            deleted_at TEXT,
+            created_at TEXT DEFAULT (datetime('now', 'localtime')),
+            updated_at TEXT DEFAULT (datetime('now', 'localtime')),
+            FOREIGN KEY (categoria_id) REFERENCES categorias(id)
+          );
+          CREATE INDEX IF NOT EXISTS idx_produtos_plu ON produtos(plu);
+          CREATE INDEX IF NOT EXISTS idx_produtos_categoria_id ON produtos(categoria_id);
+          CREATE INDEX IF NOT EXISTS idx_produtos_status ON produtos(status);
+          CREATE INDEX IF NOT EXISTS idx_produtos_deleted_at ON produtos(deleted_at);
+          CREATE INDEX IF NOT EXISTS idx_produtos_nome ON produtos(nome);
+        `);
+
+        // 7. Migrar Dados Carga Inicial (Rodará Apenas 1x devido ao schema_migrations)
+        const toledoProds = db.prepare("SELECT plu, descricao, preco, categoria, unidade, atualizado_em FROM toledo_produtos").all() as any[];
+        // Busca ignorando maiusculas/minusculas/espaços
+        const getCategoriaId = db.prepare(`
+          SELECT id FROM categorias 
+          WHERE LOWER(TRIM(nome)) = LOWER(TRIM(?))
+          AND deleted_at IS NULL
+          LIMIT 1
+        `);
+        const getProdutoExistente = db.prepare("SELECT id FROM produtos WHERE plu = ?");
+        
+        const insertProduto = db.prepare(`
+          INSERT INTO produtos (plu, nome, preco, unidade, categoria_id, categoria_legada, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        let migrados = 0;
+        let ignorados = 0;
+        let semVinculo = 0;
+
+        for (const prod of toledoProds) {
+          const existe = getProdutoExistente.get(prod.plu);
+          if (existe) {
+            ignorados++;
+            continue;
+          }
+
+          const catRecord = getCategoriaId.get(prod.categoria) as any;
+          const catId = catRecord ? catRecord.id : null;
+          if (!catId) semVinculo++;
+
+          const nomeProduto = (prod.descricao || '').trim() || `Produto ${prod.plu}`;
+
+          insertProduto.run(
+            prod.plu,
+            nomeProduto, // nome
+            prod.preco,
+            prod.unidade || 'kg',
+            catId,
+            prod.categoria, // categoria_legada
+            prod.atualizado_em || new Date().toISOString()
+          );
+          migrados++; 
+        }
+
+        // 8. Log de Auditoria
+        const catCount = db.prepare("SELECT COUNT(*) as count FROM categorias").get() as any;
+        const prodTotais = db.prepare("SELECT COUNT(*) as count FROM produtos").get() as any;
+
+        db.prepare(`
+          INSERT INTO audit_logs (acao, entidade, entidade_id, detalhes_json, criado_em)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(
+          'MIGRACAO_PRODUTOS_FASE_1',
+          'SISTEMA',
+          0,
+          JSON.stringify({
+            totais: {
+              categoriasEncontradas: catCount.count,
+              produtosToledoOriginais: toledoProds.length,
+              produtosInseridos: migrados,
+              produtosIgnoradosJaExistentes: ignorados,
+              produtosSemVinculoCategoria: semVinculo,
+              totalProdutosNaBase: prodTotais.count
+            },
+            backupPath: backupPath
+          }),
+          new Date().toISOString()
+        );
+
+        // 9. Registrar que a migração foi executada e fechar transação
+        db.prepare("INSERT INTO schema_migrations (id) VALUES ('catalogo_produtos_fase_1')").run();
+        
+        if (db.inTransaction) {
+          db.exec('COMMIT;');
+        }
+        
+        console.log(`[FASE 1] ✅ Migração concluída. Inseridos: ${migrados} | Ignorados: ${ignorados} | Sem vínculo de categoria: ${semVinculo}`);
+      }
+    } catch (err: any) {
+      console.error('[FASE 1] ❌ Erro Crítico na Migração:', err.message);
+      // Rollback seguro
+      if (db.inTransaction) {
+        console.log('[FASE 1] Executando ROLLBACK...');
+        db.exec('ROLLBACK;');
+      }
+    }
+    // ---------------------------------------------------------
 
     // Seed das novas categorias oficiais
     try {
@@ -460,11 +744,43 @@ export function initDatabase() {
       console.error("[DATABASE] Erro ao inicializar a tabela usuarios:", e);
     }
 
+    // Atualiza a versão se recém migrado ou recém instalado
+    if (needsMigration || isFreshInstall) {
+      db.prepare("INSERT INTO system_version (id, app_version) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET app_version = excluded.app_version").run(appVersion);
+    }
+
+    // Reset do Safe Mode após boot do BD com sucesso
+    resetSafeModeCounter(['migration_failed', 'database_restore_failed', 'schema_invalid']);
+
     console.log('SQLite Database initialized at', dbPath);
-    return db;
-  } catch (err) {
+    return { status: 'OK', db };
+  } catch (err: any) {
     console.error('Erro ao inicializar o banco de dados:', err);
-    throw err;
+    writeRecoveryLog('Falha crítica na migração/inicialização do banco', err);
+    if (db && db.open) { db.close(); db = null as any; }
+
+    if (!isFreshInstall) {
+      const restored = restoreDatabase(backupPath, dbPath);
+      if (restored) {
+        try {
+          db = new Database(dbPath);
+          db.exec(`
+            CREATE TABLE IF NOT EXISTS update_history (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              version TEXT,
+              status TEXT,
+              rollback_reason TEXT,
+              created_at TEXT DEFAULT (datetime('now','localtime'))
+            );
+          `);
+          db.prepare("INSERT INTO update_history (version, status, rollback_reason) VALUES (?, 'rolled_back', ?)").run(appVersion, err.message);
+          db.close();
+        } catch(logErr) { writeRecoveryLog('Falha ao logar rollback no banco restaurado', logErr); }
+        
+        return { status: "RECOVERED", reason: "ROLLBACK_SUCCESSFUL", details: err.message };
+      }
+    }
+    return { status: "ERROR", reason: isFreshInstall ? "FRESH_INSTALL_FAILED" : "ROLLBACK_FAILED", details: err.message };
   }
 }
 
@@ -483,5 +799,48 @@ export function closeDatabase() {
     } catch (err) {
       console.error('Erro ao fechar o banco de dados:', err);
     }
+  }
+}
+
+export async function backupDatabase(dbPath: string, backupPath: string, dbInstance?: any): Promise<boolean> {
+  try {
+    fs.mkdirSync(path.dirname(backupPath), { recursive: true });
+    
+    if (dbInstance && dbInstance.open) {
+      await dbInstance.backup(backupPath);
+      return true;
+    }
+    
+    // Fallback: abre temporariamente
+    if (fs.existsSync(dbPath)) {
+      const tempDb = new Database(dbPath);
+      await tempDb.backup(backupPath);
+      tempDb.close();
+      return true;
+    }
+    return false;
+  } catch (err) {
+    writeRecoveryLog(`Falha ao realizar backup do banco ${dbPath} para ${backupPath}`, err);
+    return false;
+  }
+}
+
+export function restoreDatabase(backupPath: string, dbPath: string): boolean {
+  try {
+    if (!fs.existsSync(backupPath)) return false;
+    
+    // Nunca sobrescrever o banco ativo
+    closeDatabase();
+
+    const brokenPath = `${dbPath}.broken_${Date.now()}`;
+    if (fs.existsSync(dbPath)) {
+      fs.renameSync(dbPath, brokenPath);
+    }
+    fs.copyFileSync(backupPath, dbPath);
+    writeRecoveryLog(`Restore de banco concluído de ${backupPath}`);
+    return true;
+  } catch (err) {
+    writeRecoveryLog(`Falha ao restaurar banco ${backupPath} para ${dbPath}`, err);
+    return false;
   }
 }

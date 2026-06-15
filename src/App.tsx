@@ -332,6 +332,11 @@ function hexToRgb(hexColor: string): [number, number, number] {
 
 export default function App() {
   useEffect(() => {
+    // Notifica o Electron main process que a UI carregou (reseta o watchdog)
+    if ((window as any).api && (window as any).api.rendererReady) {
+      (window as any).api.rendererReady();
+    }
+    
     const applyPrimaryColor = async () => {
       try {
         const API_URL = getApiUrl();

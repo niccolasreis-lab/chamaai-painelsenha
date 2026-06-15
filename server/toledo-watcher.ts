@@ -506,3 +506,97 @@ export function reloadCategorias() {
     console.error('[TOLEDO] Erro ao recarregar categorias:', err);
   }
 }
+
+
+// ── Sincronização com Catálogo ──────────────────────────────────────────────────
+export function syncToCatalogoProduto(db: any, item: ToledoItem) {
+  try {
+    // 1. Achar categoria_id
+    let categoria_id = null;
+    if (item.categoria) {
+      const cat = db.prepare("SELECT id FROM categorias WHERE LOWER(TRIM(nome)) = LOWER(TRIM(?)) AND deleted_at IS NULL LIMIT 1").get(item.categoria);
+      if (cat) categoria_id = cat.id;
+    }
+
+    const existing = db.prepare("SELECT id, preco, nome, categoria_id FROM produtos WHERE plu = ?").get(item.plu);
+
+    if (!existing) {
+      // Criação via Toledo -> gerar slug simples
+      let baseSlug = item.descricao.toLowerCase().replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      if (!baseSlug) baseSlug = 'produto-' + item.plu;
+      
+      let slug = baseSlug;
+      let counter = 1;
+      while (db.prepare("SELECT id FROM produtos WHERE slug = ?").get(slug)) {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+
+      db.prepare(`
+        INSERT INTO produtos (plu, nome, slug, preco, categoria_id, categoria_legada, unidade, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+      `).run(item.plu, item.descricao, slug, item.preco, categoria_id, item.categoria, item.unidade || 'kg');
+
+      const newProd = db.prepare("SELECT last_insert_rowid() as id").get();
+
+      db.prepare(`
+        INSERT INTO audit_logs (entidade, entidade_id, acao, usuario_id, detalhes_json)
+        VALUES ('produtos', ?, 'SYNC_TOLEDO_INSERT', 'sistema', ?)
+      `).run(newProd.id, JSON.stringify({
+        plu: item.plu,
+        nome: item.descricao,
+        preco: item.preco,
+        categoria_legada: item.categoria,
+        categoria_id
+      }));
+
+    } else {
+      // Atualização via Toledo
+      const diff: any = {};
+      const updates: string[] = [];
+      const params: any[] = [];
+
+      if (existing.preco !== item.preco) {
+        diff.preco_antes = existing.preco;
+        diff.preco_depois = item.preco;
+        updates.push("preco = ?");
+        params.push(item.preco);
+      }
+
+      if (existing.nome !== item.descricao) {
+        diff.nome_antes = existing.nome;
+        diff.nome_depois = item.descricao;
+        updates.push("nome = ?");
+        params.push(item.descricao);
+      }
+
+      // Atualiza categoria APENAS se estiver vazio
+      if (existing.categoria_id === null && categoria_id !== null) {
+        diff.categoria_id_antes = existing.categoria_id;
+        diff.categoria_id_depois = categoria_id;
+        updates.push("categoria_id = ?");
+        params.push(categoria_id);
+      }
+
+      // Sempre atualiza legacy cat e unidade, mas não gera log de diff a não ser que importante
+      updates.push("categoria_legada = ?"); params.push(item.categoria);
+      updates.push("unidade = ?"); params.push(item.unidade || 'kg');
+
+      if (updates.length > 0) {
+        updates.push("updated_at = datetime('now', 'localtime')");
+        params.push(existing.id);
+
+        db.prepare(`UPDATE produtos SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+
+        if (Object.keys(diff).length > 0) {
+          db.prepare(`
+            INSERT INTO audit_logs (entidade, entidade_id, acao, usuario_id, detalhes_json)
+            VALUES ('produtos', ?, 'SYNC_TOLEDO_UPDATE', 'sistema', ?)
+          `).run(existing.id, JSON.stringify({ diff }));
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[SYNC CATÁLOGO] Erro ao sincronizar produto:", err);
+  }
+}

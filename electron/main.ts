@@ -16,6 +16,47 @@ import { initDatabase, getDb, closeDatabase } from './services/database';
 import { startServer, stopServer } from '../server/index';
 import { PrinterService, PrinterConfig } from './services/printer';
 import { autoUpdater } from 'electron-updater';
+import { launchSafeMode, resetSafeModeCounter } from './services/safemode';
+import { writeRecoveryLog } from './services/recovery';
+
+// Watchdog State
+let watchdogWarn: NodeJS.Timeout;
+let watchdogAction: NodeJS.Timeout;
+let reloadAttempts = 0;
+const isDev = !app.isPackaged;
+
+function startWatchdog() {
+  clearWatchdog();
+  watchdogWarn = setTimeout(() => {
+    console.warn('[WATCHDOG] Renderer demorando a responder...');
+  }, isDev ? 30000 : 15000);
+
+  watchdogAction = setTimeout(() => {
+    if (reloadAttempts === 0) {
+      console.warn('[WATCHDOG] Tentando recarregar mainWindow...');
+      reloadAttempts++;
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.reload();
+      startWatchdog(); // Reinicia o ciclo após recarregar
+    } else {
+      console.error('[WATCHDOG] Falha crítica de UI contínua. Entrando em Safe Mode.');
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy();
+      launchSafeMode('Timeout crítico de renderização', undefined, 'renderer_timeout');
+    }
+  }, isDev ? 60000 : 30000);
+}
+
+function clearWatchdog() {
+  clearTimeout(watchdogWarn);
+  clearTimeout(watchdogAction);
+}
+
+ipcMain.on('renderer-ready', (event) => {
+  if (mainWindow && event.sender.id === mainWindow.webContents.id) {
+    clearWatchdog();
+    reloadAttempts = 0;
+    resetSafeModeCounter(['renderer_timeout']);
+  }
+});
 
 function logUpdate(level: 'INFO' | 'WARN' | 'ERROR', message: string) {
   try {
@@ -138,6 +179,10 @@ function sendToAllWindows(channel: string, ...args: any[]) {
   });
 }
 
+function createSafeModeWindow(errorMsg?: string) {
+  launchSafeMode(errorMsg || 'Erro desconhecido', undefined, 'unknown');
+}
+
 function createWindow(customRoute?: string) {
   // Initialize printer with DB config
   if (!printerService) {
@@ -224,6 +269,7 @@ function createWindow(customRoute?: string) {
   }
 
   newWindow.on('closed', () => {
+    clearWatchdog();
     if (newWindow === mainWindow) {
       mainWindow = null;
     }
@@ -231,6 +277,8 @@ function createWindow(customRoute?: string) {
       app.quit(); // Garante que todos os processos ocultos sejam finalizados quando todas as janelas forem fechadas
     }
   });
+
+  startWatchdog();
 }
 
 // Global error handling
@@ -587,7 +635,17 @@ if (!gotTheLock) {
       await cleanZombieProcesses();
       
       console.log('Initializing system...');
-      initDatabase();
+      const dbInitResult = await initDatabase({ appVersion: app.getVersion() });
+
+      if (dbInitResult.status === 'ERROR') {
+        console.error('[SAFE MODE] Banco de dados falhou de forma crítica:', dbInitResult.error || dbInitResult.details);
+        launchSafeMode(dbInitResult.error || dbInitResult.details || 'Falha Crítica do DB', undefined, dbInitResult.reason as any || 'unknown');
+        return; // Halt normal boot
+      } else if (dbInitResult.status === 'RECOVERED') {
+        console.warn('[RECOVERY] Banco restaurado, mas iniciando sistema com aviso:', dbInitResult.details);
+        writeRecoveryLog('Boot prosseguindo após RECOVERED mode', dbInitResult);
+      }
+      
       startServer();
 
       const isServerOnly = process.argv.some(arg => arg.includes('--server'));
@@ -668,9 +726,30 @@ if (!gotTheLock) {
           autoUpdateLogger.info(`Progresso do Download: ${Math.round(progress.percent || 0)}%`);
           sendToAllWindows('download-progress', progress);
         });
-        autoUpdater.on('update-downloaded', (info) => {
-          autoUpdateLogger.info('Atualização baixada e pronta para instalar.');
-          sendToAllWindows('update-downloaded', info);
+        autoUpdater.on('update-downloaded', async (info) => {
+          autoUpdateLogger.info('Atualização baixada, iniciando backup seguro do SQLite...');
+          writeRecoveryLog('Update baixado, iniciando procedimento de backup seguro');
+          
+          const { backupDatabase, getDb } = require('./services/database');
+          const userDataPath = 'C:\\ChamaAi';
+          const dbPath = path.join(userDataPath, 'database.sqlite');
+          const backupPath = path.join(userDataPath, 'Backups', '_update_backup.sqlite');
+          
+          let dbInstance;
+          try { dbInstance = getDb(); } catch(e) {}
+          
+          const backupOk = await backupDatabase(dbPath, backupPath, dbInstance);
+          
+          if (backupOk) {
+            autoUpdateLogger.info('Backup seguro do SQLite concluído. Informando renderer...');
+            sendToAllWindows('update-downloaded', info);
+            // NOTA: Em nosso fluxo, o app fará autoUpdater.quitAndInstall() 
+            // através do renderer (se estiver configurado) ou manualmente.
+            // Se o comportamento for instalar direto, colocamos quitAndInstall() aqui.
+          } else {
+            autoUpdateLogger.error('Update retido: Falha ao criar o backup prévio do banco SQLite.');
+            writeRecoveryLog('Update cancelado devido a falha no backup preventivo do SQLite.');
+          }
         });
 
         autoUpdater.checkForUpdates();
