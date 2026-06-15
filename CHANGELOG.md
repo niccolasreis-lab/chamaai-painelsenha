@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.129] - 2026-06-15
+## [1.0.131] - 2026-06-15
 ### Adicionado
 - Implementado sistema Boot Guard e Safe Mode desacoplado do ciclo de inicialização do UI.
 - Criado watchdog progressivo anti tela branca que garante o recarregamento do processo ou isolamento gráfico.
