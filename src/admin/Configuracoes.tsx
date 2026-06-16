@@ -13,6 +13,7 @@ export default function Configuracoes() {
   const [isMasterServer, setIsMasterServer] = useState(true);
   const [hasMasterPassword, setHasMasterPassword] = useState(false);
   const [showMasterLogin, setShowMasterLogin] = useState(false);
+  const [showUpdateLogin, setShowUpdateLogin] = useState(false);
   const [masterPassword, setMasterPassword] = useState('');
   const [masterLoginError, setMasterLoginError] = useState('');
   const [masterLoginLoading, setMasterLoginLoading] = useState(false);
@@ -60,6 +61,7 @@ export default function Configuracoes() {
     update_path: '',
     habilitar_filas_avancadas: '0',
     acesso_local_exige_auth: '0',
+    atualizacao_automatica: '1',
     cor_primaria: '#2563eb',
     totem_screensaver_ativo: '0',
     totem_screensaver_timeout: '120',
@@ -127,6 +129,36 @@ export default function Configuracoes() {
         window.location.reload();
       } else {
         setMasterLoginError(data.error || 'Erro ao autenticar.');
+      }
+    } catch (err) {
+      setMasterLoginError('Erro de conexão com o servidor.');
+    } finally {
+      setMasterLoginLoading(false);
+    }
+  };
+
+  const handleUpdateLogin = async () => {
+    setMasterLoginLoading(true);
+    setMasterLoginError('');
+    try {
+      const res = await fetch(`${API_URL}/api/admin/auth-master`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha: masterPassword }),
+      });
+      const data = await res.json();
+      if (res.ok && data.token) {
+        setShowUpdateLogin(false);
+        setMasterPassword('');
+        const api = (window as any).api;
+        if (api?.checkForUpdates) {
+          const updateRes = await api.checkForUpdates();
+          alert(updateRes.message);
+        } else {
+          alert('⚠️ Use o App Desktop (.exe) para buscar atualizações.');
+        }
+      } else {
+        setMasterLoginError(data.error || 'Senha incorreta.');
       }
     } catch (err) {
       setMasterLoginError('Erro de conexão com o servidor.');
@@ -1637,6 +1669,25 @@ export default function Configuracoes() {
                 Atualização do Sistema
               </h2>
               <div className="grid grid-cols-1 gap-4">
+                <div className="p-5 bg-surface-variant rounded-xl border border-outline-variant/30 mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-ink text-sm">Atualizações Automáticas</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        name="atualizacao_automatica" 
+                        checked={config.atualizacao_automatica !== '0'} 
+                        onChange={handleChange} 
+                        className="sr-only peer" 
+                      />
+                      <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-success transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5"></div>
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-ink-secondary/60 mt-1 font-medium">
+                    Se desativado, o sistema não baixará novas versões em segundo plano. Verifique atualizações manualmente com a Senha Master abaixo.
+                  </p>
+                </div>
+                
                 <div className="mb-2">
                   <label className="block font-bold tracking-widest text-ink-secondary mb-2 text-xs">Pasta de atualizações locais (offline)</label>
                   <input
@@ -1653,6 +1704,10 @@ export default function Configuracoes() {
                 </div>
                 <button 
                   onClick={async () => {
+                    if (config.atualizacao_automatica === '0') {
+                      setShowUpdateLogin(true);
+                      return;
+                    }
                     const api = (window as any).api;
                     if (api?.checkForUpdates) {
                       const res = await api.checkForUpdates();
@@ -1769,6 +1824,42 @@ export default function Configuracoes() {
           )}
         </fieldset>
       </div>
+
+      {showUpdateLogin && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-surface rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-outline-variant/20">
+            <h3 className="text-xl font-bold text-ink mb-2">Autenticação Necessária</h3>
+            <p className="text-sm text-ink-secondary mb-6">
+              Insira a Senha Master Remota para buscar atualizações do sistema.
+            </p>
+            <input
+              type="password"
+              placeholder="Senha Master"
+              value={masterPassword}
+              onChange={(e) => setMasterPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleUpdateLogin()}
+              className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold mb-2"
+              autoFocus
+            />
+            {masterLoginError && <p className="text-error text-xs font-bold mb-4">{masterLoginError}</p>}
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => { setShowUpdateLogin(false); setMasterLoginError(''); setMasterPassword(''); }}
+                className="flex-1 px-4 py-3 bg-surface-variant text-ink rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-outline-variant/30 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleUpdateLogin}
+                disabled={masterLoginLoading || !masterPassword}
+                className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary-hover transition-all disabled:opacity-50"
+              >
+                {masterLoginLoading ? 'Verificando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

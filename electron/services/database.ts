@@ -117,6 +117,7 @@ export async function initDatabase({ appVersion }: { appVersion: string }): Prom
       INSERT OR IGNORE INTO configuracoes VALUES ('volume_audio', '80', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('intervalo_midia_seg', '10', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('reset_diario_automatico', '1', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('atualizacao_automatica', '1', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('fila_normal_ativa', '1', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('fila_preferencial_ativa', '1', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('tipo_som', 'bell', datetime('now'));

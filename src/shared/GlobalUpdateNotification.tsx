@@ -61,29 +61,38 @@ export default function GlobalUpdateNotification() {
       // Erros de atualização só serão mostrados em formato de alerta quando buscados manualmente em Configurações.
     });
 
-    // Check for updates periodically (e.g. every 1 hour)
-    const checkInterval = setInterval(() => {
+    const runUpdateCheck = async () => {
       try {
-        api.checkForUpdates();
-      } catch (e) {
-        console.error('Erro ao verificar atualizações:', e);
-      }
-    }, 60 * 60 * 1000);
-
-    // Initial check on mount
-    try {
-      api.checkForUpdates().then((res: any) => {
-        if (res && res.updateDownloaded) {
-           setVersionInfo(res.info);
+        // Fetch config to check if auto update is enabled
+        const host = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '';
+        const res = await fetch(`${host}/api/config`);
+        if (res.ok) {
+          const config = await res.json();
+          if (config.atualizacao_automatica === '0') {
+            return; // Skip auto update
+          }
+        }
+        
+        const updateRes = await api.checkForUpdates();
+        if (updateRes && updateRes.updateDownloaded) {
+           setVersionInfo(updateRes.info);
            setUpdateState('downloaded');
            setDismissed(false);
-        } else if (res && res.updateAvailable) {
-           setVersionInfo(res.info);
+        } else if (updateRes && updateRes.updateAvailable) {
+           setVersionInfo(updateRes.info);
            setUpdateState('available');
            setDismissed(false);
         }
-      }).catch((e: any) => console.error(e));
-    } catch (e) {}
+      } catch (e) {
+        console.error('Erro ao verificar atualizações:', e);
+      }
+    };
+
+    // Check for updates periodically (e.g. every 1 hour)
+    const checkInterval = setInterval(runUpdateCheck, 60 * 60 * 1000);
+
+    // Initial check on mount
+    runUpdateCheck();
 
     return () => {
       if (typeof cleanupAvailable === 'function') cleanupAvailable();
