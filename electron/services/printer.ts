@@ -93,6 +93,18 @@ export class PrinterService {
     }
   }
 
+  destroy() {
+    console.log('[PrinterService] Destruindo printWindow...');
+    if (this.printWindow && !this.printWindow.isDestroyed()) {
+      try {
+        this.printWindow.destroy();
+      } catch (e) {
+        console.error('[PrinterService] Erro ao destruir printWindow:', e);
+      }
+    }
+    this.printWindow = null;
+  }
+
   updateConfig(newConfig: Partial<PrinterConfig>) {
     this.config = { ...this.config, ...newConfig };
     this.simulationMode = !this.config.interface || this.config.interface === '';

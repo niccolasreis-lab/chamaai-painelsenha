@@ -149,6 +149,11 @@ function isRequestLocal(req: express.Request): boolean {
   return localIPs.has(clientIP);
 }
 
+function isLoopback(req: express.Request): boolean {
+  const clientIP = req.ip || req.socket.remoteAddress || '';
+  return clientIP === '127.0.0.1' || clientIP === '::1' || clientIP === '::ffff:127.0.0.1';
+}
+
 // Middleware: injeta header X-Is-Master em todas as respostas
 function injectMasterHeader(req: express.Request, res: express.Response, next: express.NextFunction) {
   let isMaster = isRequestLocal(req);
@@ -281,10 +286,24 @@ function getJwtSecret(): string {
 }
 
 function remoteAuthMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const localNoLoginEnabled = process.env.LOCAL_APP_NO_LOGIN === 'true';
+  const isLocal = isLoopback(req);
+  const isElectron = typeof process !== 'undefined' && !!process.versions.electron;
+
+  if (localNoLoginEnabled && isLocal && isElectron) {
+    (req as any).user = {
+      id: 1,
+      login: 'local_admin',
+      perfil: 'admin',
+      origem: 'electron_local'
+    };
+    return next();
+  }
+
   // 1. Verificar se req.ip é loopback
   const clientIP = req.ip || req.socket.remoteAddress || '';
   const localIPs = getLocalIPs();
-  const isLoopback = clientIP === '127.0.0.1' || clientIP === '::1' || clientIP === '::ffff:127.0.0.1' || localIPs.has(clientIP);
+  const isLoopbackVal = clientIP === '127.0.0.1' || clientIP === '::1' || clientIP === '::ffff:127.0.0.1' || localIPs.has(clientIP);
 
   // Obter a configuração auth_local_obrigatorio
   let authLocalObrigatorio = false;
@@ -296,7 +315,7 @@ function remoteAuthMiddleware(req: express.Request, res: express.Response, next:
     }
   } catch (e) {}
 
-  if (isLoopback && !authLocalObrigatorio) {
+  if (isLoopbackVal && !authLocalObrigatorio) {
     return next();
   }
 
@@ -806,7 +825,11 @@ export function startServer() {
     const clientIP = req.ip || req.socket.remoteAddress || 'unknown';
     
     // Rate limiting check
-    if (isRateLimited(clientIP)) {
+    const isLocal = isLoopback(req);
+    const isElectron = typeof process !== 'undefined' && !!process.versions.electron;
+    const bypassRateLimit = process.env.LOCAL_APP_NO_LOGIN === 'true' && isLocal && isElectron;
+
+    if (isRateLimited(clientIP) && !bypassRateLimit) {
       return res.status(429).json({ 
         error: 'Muitas tentativas. Tente novamente em 15 minutos.',
         blockedUntil: loginAttempts.get(clientIP)?.blockedUntil 
@@ -1229,7 +1252,11 @@ export function startServer() {
     const clientIP = req.ip || req.socket.remoteAddress || 'unknown';
     
     // Rate limiting check
-    if (isRateLimited(clientIP)) {
+    const isLocal = isLoopback(req);
+    const isElectron = typeof process !== 'undefined' && !!process.versions.electron;
+    const bypassRateLimit = process.env.LOCAL_APP_NO_LOGIN === 'true' && isLocal && isElectron;
+
+    if (isRateLimited(clientIP) && !bypassRateLimit) {
       return res.status(429).json({ 
         error: 'Muitas tentativas. Tente novamente em 15 minutos.',
         blockedUntil: loginAttempts.get(clientIP)?.blockedUntil 

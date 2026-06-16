@@ -51,6 +51,7 @@ function clearWatchdog() {
 }
 
 ipcMain.on('renderer-ready', (event) => {
+  console.log('[WATCHDOG] renderer-ready recebido de sender ID:', event.sender.id, 'mainWindow ID:', mainWindow?.webContents?.id);
   if (mainWindow && event.sender.id === mainWindow.webContents.id) {
     clearWatchdog();
     reloadAttempts = 0;
@@ -119,6 +120,8 @@ app.commandLine.appendSwitch('ignore-certificate-errors');
 let mainWindow: BrowserWindow | null = null;
 let printerService: PrinterService;
 let isQuitting = false;
+let isUpdating = false;
+let shutdownStarted = false;
 let isServerStopped = false;
 
 /** Carrega config de impressora do banco */
@@ -212,6 +215,24 @@ function createWindow(customRoute?: string) {
     console.error(`[RENDERER FAILED LOAD] Code: ${errorCode}, Description: ${errorDescription}, URL: ${validatedURL}`);
   });
 
+  newWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error(`[RENDERER CRASH] Reason: ${details.reason}, Exit Code: ${details.exitCode}`);
+  });
+
+  newWindow.webContents.on('dom-ready', () => {
+    console.log('[RENDERER] dom-ready disparado');
+  });
+
+  newWindow.webContents.on('did-finish-load', () => {
+    console.log('[RENDERER] did-finish-load disparado');
+  });
+
+  try {
+    newWindow.webContents.on('preload-error', (event, preloadPath, error) => {
+      console.error(`[PRELOAD ERROR] Path: ${preloadPath}, Error:`, error);
+    });
+  } catch (e) {}
+
   if (!mainWindow) {
     mainWindow = newWindow;
   }
@@ -273,8 +294,10 @@ function createWindow(customRoute?: string) {
     if (newWindow === mainWindow) {
       mainWindow = null;
     }
-    if (BrowserWindow.getAllWindows().length === 0) {
-      app.quit(); // Garante que todos os processos ocultos sejam finalizados quando todas as janelas forem fechadas
+    const visibleWindows = BrowserWindow.getAllWindows().filter(win => !win.isDestroyed() && win.isVisible() && win !== newWindow);
+    if (visibleWindows.length === 0) {
+      console.log('[SYSTEM] Todas as janelas visíveis foram fechadas. Chamando gracefulShutdown...');
+      gracefulShutdown('user_close');
     }
   });
 
@@ -490,35 +513,14 @@ ipcMain.handle('install-update', async () => {
     
     logUpdate('INFO', `Instalador encontrado em: ${installerPath}`);
     
-    // 2. Desativa flags e inicia shutdown gracioso do app
-    isQuitting = true;
-    globalShortcut.unregisterAll();
-    
-    if (!isServerStopped) {
-      try { 
-        await stopServer(); 
-        isServerStopped = true;
-        logUpdate('INFO', 'Graceful shutdown do Express concluído.');
-      } catch (e: any) { 
-        logUpdate('ERROR', `Erro no stopServer: ${e.message || e}`); 
-      }
-    }
-    
-    try {
-      closeDatabase();
-      logUpdate('INFO', 'Banco de dados SQLite fechado com segurança.');
-    } catch (e: any) {
-      logUpdate('ERROR', `Erro ao fechar banco de dados: ${e.message || e}`);
-    }
-    
-    // 3. Caminho temporário para o arquivo .bat de atualização em C:\ChamaAi
+    // 2. Caminho temporário para o arquivo .bat de atualização em C:\ChamaAi
     const userDataPath = 'C:\\ChamaAi';
     if (!fs.existsSync(userDataPath)) {
       fs.mkdirSync(userDataPath, { recursive: true });
     }
     const batPath = path.join(userDataPath, 'executar_atualizacao.bat');
     
-    // 4. Cria o conteúdo do Script Separado de atualização (.bat)
+    // 3. Cria o conteúdo do Script Separado de atualização (.bat)
     // Esse script espera 2s, força o encerramento do ChamaAi por completo e roda o instalador.
     let restartPath = process.execPath;
     if (!app.isPackaged) {
@@ -550,7 +552,7 @@ exit
     fs.writeFileSync(batPath, batContent, 'utf8');
     logUpdate('INFO', `Script de atualização .bat gravado em: ${batPath}`);
     
-    // 5. Executa o Script Separado via cmd.exe para garantir execução direta na estação
+    // 4. Executa o Script Separado via cmd.exe para garantir execução direta na estação
     const { spawn } = require('child_process');
     const comspec = process.env.ComSpec || 'cmd.exe';
     const child = spawn(comspec, ['/c', 'start', '""', batPath], {
@@ -560,9 +562,10 @@ exit
     });
     child.unref();
     
-    // 6. Encerra o Electron de forma instantânea
-    logUpdate('INFO', 'Saindo da aplicação imediatamente para liberação de arquivos.');
-    app.exit(0);
+    // 5. Aciona o encerramento seguro e controlado com flags adequadas
+    isUpdating = true;
+    logUpdate('INFO', 'Saindo da aplicação de forma graciosa para liberação de arquivos.');
+    await gracefulShutdown('auto_update');
     
     return { success: true };
   } catch (err: any) {
@@ -609,8 +612,8 @@ ipcMain.handle('test-printer', async () => {
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
-  console.log('[SYSTEM] Outra instância já está rodando. Encerrando (SingleInstanceLock)...');
-  app.quit();
+  console.log('[SYSTEM] Outra instância já está rodando. Encerrando imediatamente (SingleInstanceLock)...');
+  app.exit(0);
 } else {
   app.on('second-instance', (event, commandLine) => {
     // Lê os argumentos passados pelo atalho clicado e redireciona a tela abrindo uma nova janela se for o caso
@@ -769,52 +772,127 @@ if (!gotTheLock) {
   });
 }
 
+async function gracefulShutdown(reason: string) {
+  if (shutdownStarted) {
+    console.log(`[SYSTEM] [SHUTDOWN] gracefulShutdown ignorado. Shutdown já está em referência (origem atual: ${reason}).`);
+    return;
+  }
+  shutdownStarted = true;
+  isQuitting = true;
+
+  console.log(`[SYSTEM] [SHUTDOWN] Iniciando Graceful Shutdown... Motivo: ${reason}`);
+  writeRecoveryLog(`Graceful shutdown iniciado. Motivo: ${reason}`);
+
+  // Safety fallback: se o shutdown demorar mais de 5s, força encerramento
+  const fallbackTimeout = setTimeout(() => {
+    console.warn('[SYSTEM] [SHUTDOWN] Shutdown demorou muito. Forçando encerramento imediato via app.exit(0).');
+    writeRecoveryLog('Shutdown forçado por exceder o tempo limite');
+    app.exit(0);
+  }, 5000);
+
+  // 1. Limpar timers do watchdog
+  try {
+    clearWatchdog();
+    console.log('[SYSTEM] [SHUTDOWN] Watchdog timers limpos.');
+  } catch (e) {
+    console.error('[SYSTEM] [SHUTDOWN] Erro ao limpar watchdog:', e);
+  }
+
+  // 2. Desregistrar atalhos globais
+  try {
+    globalShortcut.unregisterAll();
+    console.log('[SYSTEM] [SHUTDOWN] Atalhos globais desregistrados.');
+  } catch (e) {}
+
+  // Log das janelas abertas antes de fechar
+  try {
+    const wins = BrowserWindow.getAllWindows();
+    console.log(`[SYSTEM] [SHUTDOWN] Janelas abertas detectadas antes de fechar: ${wins.length}`);
+    wins.forEach((w, index) => {
+      console.log(`  Window ${index + 1}: Title="${w.getTitle()}", Visible=${w.isVisible()}, Destroyed=${w.isDestroyed()}`);
+    });
+  } catch (e) {}
+
+  // 3. Encerrar recursos do PrinterService / printWindow
+  if (printerService) {
+    try {
+      console.log('[SYSTEM] [SHUTDOWN] Solicitando fechamento do PrinterService/printWindow...');
+      if (typeof printerService.destroy === 'function') {
+        printerService.destroy();
+        console.log('[SYSTEM] [SHUTDOWN] PrinterService/printWindow destruído com sucesso.');
+      } else {
+        console.warn('[SYSTEM] [SHUTDOWN] PrinterService não possui método destroy.');
+      }
+    } catch (e: any) {
+      console.error('[SYSTEM] [SHUTDOWN] Erro ao destruir PrinterService:', e);
+      writeRecoveryLog('Erro ao destruir PrinterService', e);
+    }
+  }
+
+  // 4. Fechar backend Express (stopServer libera as portas e limpa timers)
+  if (!isServerStopped) {
+    try {
+      console.log('[SYSTEM] [SHUTDOWN] Parando o servidor backend Express...');
+      await stopServer();
+      isServerStopped = true;
+      console.log('[SYSTEM] [SHUTDOWN] Servidor Express parado com sucesso (portas liberadas).');
+    } catch (e: any) {
+      console.error('[SYSTEM] [SHUTDOWN] Erro ao parar o servidor Express:', e);
+      writeRecoveryLog('Erro ao parar o servidor Express', e);
+    }
+  }
+
+  // 5. Fechar banco SQLite com segurança
+  try {
+    console.log('[SYSTEM] [SHUTDOWN] Fechando conexão SQLite...');
+    closeDatabase();
+    console.log('[SYSTEM] [SHUTDOWN] Banco de dados SQLite fechado com segurança.');
+  } catch (e: any) {
+    console.error('[SYSTEM] [SHUTDOWN] Erro ao fechar banco de dados SQLite:', e);
+    writeRecoveryLog('Erro ao fechar banco de dados SQLite', e);
+  }
+
+  // 6. Destruir todas as janelas restantes
+  try {
+    const windows = BrowserWindow.getAllWindows();
+    if (windows.length > 0) {
+      console.log(`[SYSTEM] [SHUTDOWN] Destruindo ${windows.length} janelas restantes...`);
+      windows.forEach((win) => {
+        if (!win.isDestroyed()) {
+          win.destroy();
+        }
+      });
+      console.log('[SYSTEM] [SHUTDOWN] Todas as janelas restantes destruídas.');
+    }
+  } catch (e) {}
+
+  clearTimeout(fallbackTimeout);
+
+  console.log('[SYSTEM] [SHUTDOWN] Processo finalizado com sucesso. Encerrando processo.');
+  writeRecoveryLog(`Graceful shutdown finalizado com sucesso. Motivo: ${reason}`);
+
+  app.exit(0);
+}
+
 app.on('window-all-closed', () => {
-  console.log('[SYSTEM] window-all-closed acionado. Verificando se deve fechar...');
-  const isServerOnly = process.argv.some(arg => arg.includes('--server'));
-  if (process.platform !== 'darwin' && !isServerOnly) {
-    console.log('[SYSTEM] Fechando a aplicação porque as janelas fecharam.');
-    app.quit();
+  console.log('[SYSTEM] window-all-closed acionado.');
+  if (!isUpdating) {
+    gracefulShutdown('window_all_closed');
   }
 });
 
-app.on('before-quit', async (event) => {
-  if (!isQuitting) {
-    event.preventDefault();
-    isQuitting = true;
-    console.log('[SYSTEM] Iniciando Graceful Shutdown...');
-    
-    // Safety fallback: if shutdown takes more than 1.5s, force quit to avoid zombie process
-    setTimeout(() => {
-      console.warn('[SYSTEM] Shutdown demorou muito. Forçando encerramento imediato.');
-      app.exit(0);
-    }, 1500);
-
-    globalShortcut.unregisterAll();
-    
-    // Só chama stopServer se ainda não foi chamado pelo install-update
-    if (!isServerStopped) {
-      try { 
-        await stopServer();
-        isServerStopped = true;
-      } catch (e) { 
-        console.error('[SYSTEM] Erro no stopServer durante o desligamento:', e); 
-      }
-    }
-    
-    // Garante que a conexão do SQLite foi encerrada de forma redundante e segura
-    try {
-      closeDatabase();
-      console.log('[SYSTEM] Banco de dados SQLite fechado com segurança durante o desligamento.');
-    } catch (e) {
-      console.error('[SYSTEM] Erro ao fechar banco de dados durante o desligamento:', e);
-    }
-    
-    console.log('[SYSTEM] Cleanup finalizado. Encerrando processo.');
-    app.exit(0);
+app.on('before-quit', (event) => {
+  if (shutdownStarted) {
+    console.log('[SYSTEM] before-quit acionado, mas o shutdown já está em andamento. Permitindo prosseguir.');
+    return;
   }
+  console.log('[SYSTEM] before-quit acionado pela primeira vez. Iniciando gracefulShutdown...');
+  event.preventDefault();
+  gracefulShutdown('before_quit');
 });
 
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
+  try {
+    globalShortcut.unregisterAll();
+  } catch (e) {}
 });

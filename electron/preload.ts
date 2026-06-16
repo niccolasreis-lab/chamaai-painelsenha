@@ -56,5 +56,7 @@ contextBridge.exposeInMainWorld('api', {
     return () => { ipcRenderer.off('update-error', subscription); };
   },
   ping: () => 'pong',
-  rendererReady: () => ipcRenderer.send('renderer-ready')
+  rendererReady: () => ipcRenderer.send('renderer-ready'),
+  LOCAL_APP_NO_LOGIN: typeof process !== 'undefined' ? (process.env.LOCAL_APP_NO_LOGIN === 'true' || process.env.LOCAL_APP_NO_LOGIN === '1') : false
 });
+

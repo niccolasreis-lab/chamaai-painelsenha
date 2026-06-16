@@ -25,6 +25,19 @@ export default function Login() {
   // Se já tiver token válido em localStorage, tenta ir direto pro painel
   useEffect(() => {
     const checkLogged = async () => {
+      const isElectron = !!(window as any).api;
+      const isLocalAppNoLogin = isElectron && ((window as any).api?.LOCAL_APP_NO_LOGIN || import.meta.env.VITE_LOCAL_APP_NO_LOGIN === 'true');
+
+      if (isLocalAppNoLogin) {
+        if (!localStorage.getItem('user_token')) {
+          localStorage.setItem('user_token', 'LOCAL_ELECTRON_SESSION');
+          localStorage.setItem('user_perfil', 'admin');
+          localStorage.setItem('user_session', JSON.stringify({ token: 'LOCAL_ELECTRON_SESSION' }));
+        }
+        redirecionarUsuario('admin');
+        return;
+      }
+
       const token = localStorage.getItem('user_token');
       if (!token) return;
 
@@ -49,6 +62,7 @@ export default function Login() {
     };
     checkLogged();
   }, []);
+
 
   const handleSaveConnection = () => {
     if (tempIp.trim() === '') {

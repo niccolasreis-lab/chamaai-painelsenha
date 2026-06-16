@@ -22,6 +22,7 @@ export interface ElectronAPI {
   installUpdate: () => Promise<{ success: boolean; message?: string }>;
   ping: () => string;
   rendererReady: () => void;
+  LOCAL_APP_NO_LOGIN?: boolean;
 }
 
 declare global {

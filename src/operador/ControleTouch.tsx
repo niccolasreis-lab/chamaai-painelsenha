@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSSE } from '../shared/useSSE';
 
 export default function ControleTouch() {
-  const [ip, setIp] = useState(localStorage.getItem('server_ip_override') || '');
+  const [ip] = useState(window.location.hostname || 'localhost');
   const [guiche, setGuiche] = useState(localStorage.getItem('operator_guiche') || '');
   const [isSetup, setIsSetup] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -141,8 +141,8 @@ export default function ControleTouch() {
   };
 
   const handleConnect = async () => {
-    if (!ip.trim() || !guiche.trim()) {
-      setErrorMsg('Preencha os campos de IP e Guichê.');
+    if (!guiche.trim()) {
+      setErrorMsg('Preencha o Número do Guichê.');
       return;
     }
     setErrorMsg('');
@@ -312,17 +312,7 @@ export default function ControleTouch() {
           </div>
 
           <div className="w-full space-y-5">
-            {/* IP Address Field */}
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">IP do Servidor</label>
-              <input
-                type="text"
-                value={ip}
-                onChange={(e) => setIp(e.target.value)}
-                placeholder="Ex: 192.168.1.100"
-                className="w-full bg-[#F8F9FA] border border-slate-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10 rounded-2xl px-5 py-4 focus:outline-none font-bold text-lg text-slate-800 placeholder:text-slate-300"
-              />
-            </div>
+
 
             {/* Guichê Field */}
             <div>

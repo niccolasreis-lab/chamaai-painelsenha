@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { setServerIp } from '../shared/apiConfig';
+
 import packageJson from '../../package.json';
 
 export default function Bridge() {
-  const [ip, setIp] = useState(localStorage.getItem('server_ip_override') || '');
+  const [ip] = useState(window.location.hostname || 'localhost');
   const [status, setStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -60,13 +60,7 @@ export default function Bridge() {
     }
   };
 
-  const handleConnect = () => {
-    if (!ip) {
-      setServerIp('');
-      return;
-    }
-    setServerIp(ip);
-  };
+
 
   return (
     <div className="min-h-[100dvh] bg-[#020617] text-white flex flex-col items-center justify-center p-6 font-sans overflow-hidden">
@@ -98,26 +92,6 @@ export default function Bridge() {
 
         {/* Card */}
         <div className="w-full bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-[40px] p-8 shadow-2xl animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
-          <div className="mb-8">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4 ml-2">
-              Endereço IP do Servidor
-            </label>
-            <div className="relative group">
-              <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-500 group-focus-within:text-blue-500 transition-colors">
-                lan
-              </span>
-              <input 
-                type="text" 
-                placeholder="Ex: 192.168.1.100"
-                value={ip}
-                onChange={(e) => setIp(e.target.value)}
-                className="w-full bg-slate-800/50 border border-white/5 rounded-2xl py-5 pl-14 pr-6 text-xl font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-700"
-              />
-            </div>
-            <p className="mt-4 text-[10px] text-slate-500 leading-relaxed px-2">
-              Digite o endereço IP que aparece na tela principal do sistema (PC do Telão).
-            </p>
-          </div>
 
           {/* Status Indicator */}
           {status !== 'idle' && (
@@ -140,12 +114,12 @@ export default function Bridge() {
 
           <div className="space-y-4">
             <button 
-              onClick={handleConnect}
+              onClick={() => testConnection(ip)}
               disabled={status === 'testing'}
               className="w-full bg-white/10 hover:bg-white/20 text-white transition-all py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 border border-white/10 disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-xl">sync</span>
-              Salvar e Testar Conexão
+              Testar Conexão Novamente
             </button>
 
             {status === 'success' && (

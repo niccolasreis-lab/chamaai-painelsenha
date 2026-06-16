@@ -34,6 +34,17 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
 
   useEffect(() => {
     const verifyToken = async () => {
+      const isElectron = !!(window as any).api;
+      const isLocalAppNoLogin = isElectron && ((window as any).api?.LOCAL_APP_NO_LOGIN || import.meta.env.VITE_LOCAL_APP_NO_LOGIN === 'true');
+
+      if (isLocalAppNoLogin) {
+        if (!localStorage.getItem('user_token')) {
+          localStorage.setItem('user_token', 'LOCAL_ELECTRON_SESSION');
+          localStorage.setItem('user_perfil', 'admin');
+          localStorage.setItem('user_session', JSON.stringify({ token: 'LOCAL_ELECTRON_SESSION' }));
+        }
+      }
+
       const token = localStorage.getItem('user_token');
       if (!token) {
         setAuthorized(false);
@@ -56,14 +67,24 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
             setAuthorized(true);
           }
         } else {
-          localStorage.removeItem('user_token');
-          localStorage.removeItem('user_perfil');
-          setAuthorized(false);
+          if (isLocalAppNoLogin) {
+            setUserProfile({ login: 'local_admin', perfil: 'admin', primeiro_acesso: 0 });
+            setAuthorized(true);
+          } else {
+            localStorage.removeItem('user_token');
+            localStorage.removeItem('user_perfil');
+            setAuthorized(false);
+          }
         }
       } catch (err) {
         console.error('Erro de rede ao validar autenticação:', err);
-        // Em erro de rede (PC acordando/Wi-Fi oscilando), mantém autorizado temporariamente
-        setAuthorized(true);
+        if (isLocalAppNoLogin) {
+          setUserProfile({ login: 'local_admin', perfil: 'admin', primeiro_acesso: 0 });
+          setAuthorized(true);
+        } else {
+          // Em erro de rede (PC acordando/Wi-Fi oscilando), mantém autorizado temporariamente
+          setAuthorized(true);
+        }
       } finally {
         setChecking(false);
       }
@@ -126,7 +147,7 @@ function ProtectedRouteQueue({ children }: { children: React.ReactNode }) {
 function Home() {
   // Só redireciona automaticamente dentro do Electron (app empacotado).
   // No navegador web (localhost), sempre mostra o menu de seleção.
-  const isElectron = !!(window as any).electronAPI;
+  const isElectron = !!(window as any).api;
   const appMode = localStorage.getItem('app_mode');
   if (isElectron && appMode === 'touch') {
     return <Navigate to="/operador-touch" replace />;
@@ -332,11 +353,17 @@ function hexToRgb(hexColor: string): [number, number, number] {
 
 export default function App() {
   useEffect(() => {
-    // Notifica o Electron main process que a UI carregou (reseta o watchdog)
+    console.log('[RENDERER] renderer-ready tentando enviar');
+
     if ((window as any).api && (window as any).api.rendererReady) {
       (window as any).api.rendererReady();
     }
-    
+    if ((window as any).electronAPI && (window as any).electronAPI.rendererReady) {
+      (window as any).electronAPI.rendererReady();
+    }
+
+    console.log('[RENDERER] renderer-ready chamado');
+
     const applyPrimaryColor = async () => {
       try {
         const API_URL = getApiUrl();
