@@ -72,7 +72,17 @@ export default function GlobalUpdateNotification() {
 
     // Initial check on mount
     try {
-      api.checkForUpdates();
+      api.checkForUpdates().then((res: any) => {
+        if (res && res.updateDownloaded) {
+           setVersionInfo(res.info);
+           setUpdateState('downloaded');
+           setDismissed(false);
+        } else if (res && res.updateAvailable) {
+           setVersionInfo(res.info);
+           setUpdateState('available');
+           setDismissed(false);
+        }
+      }).catch((e: any) => console.error(e));
     } catch (e) {}
 
     return () => {

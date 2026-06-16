@@ -123,6 +123,7 @@ let isQuitting = false;
 let isUpdating = false;
 let shutdownStarted = false;
 let isServerStopped = false;
+let updateDownloadedInfo: any = null;
 
 /** Carrega config de impressora do banco */
 function loadPrinterConfig(): Partial<PrinterConfig> {
@@ -429,14 +430,17 @@ ipcMain.handle('check-for-updates', async () => {
   const isPackagedOrTesting = app.isPackaged || fs.existsSync(path.join(app.getAppPath(), 'dev-app-update.yml'));
   if (!isPackagedOrTesting) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
   try {
+    if (updateDownloadedInfo) {
+      return { success: true, updateDownloaded: true, info: updateDownloadedInfo };
+    }
     const result = await autoUpdater.checkForUpdates();
     if (result && result.updateInfo) {
       if (result.updateInfo.version === app.getVersion()) {
-         return { success: true, message: 'Você já está usando a versão mais recente!' };
+         return { success: true, message: 'Você já está usando a versão mais recente!', isLatest: true };
       }
-      return { success: true, message: `A atualização (${result.updateInfo.version}) foi encontrada e está sendo baixada. Clique em Instalar Atualização Agora para aplicá-la quando terminar.` };
+      return { success: true, updateAvailable: true, info: result.updateInfo, message: `A atualização (${result.updateInfo.version}) foi encontrada e está sendo baixada. Clique em Instalar Atualização Agora para aplicá-la quando terminar.` };
     }
-    return { success: true, message: 'O sistema já está atualizado.' };
+    return { success: true, message: 'O sistema já está atualizado.', isLatest: true };
   } catch (err: any) {
     return { success: false, message: `Erro ao verificar atualizações: ${err.message}` };
   }
@@ -744,6 +748,7 @@ if (!gotTheLock) {
           const backupOk = await backupDatabase(dbPath, backupPath, dbInstance);
           
           if (backupOk) {
+            updateDownloadedInfo = info;
             autoUpdateLogger.info('Backup seguro do SQLite concluído. Informando renderer...');
             sendToAllWindows('update-downloaded', info);
             // NOTA: Em nosso fluxo, o app fará autoUpdater.quitAndInstall() 
@@ -755,7 +760,7 @@ if (!gotTheLock) {
           }
         });
 
-        autoUpdater.checkForUpdates();
+        // Removido o autoUpdater.checkForUpdates() daqui para evitar concorrência com o React
       }
     } catch (err: any) {
       console.error('[SYSTEM] Erro Fatal na Inicialização:', err);
