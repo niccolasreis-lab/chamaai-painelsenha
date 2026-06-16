@@ -50,6 +50,19 @@ function clearWatchdog() {
   clearTimeout(watchdogAction);
 }
 
+function isVersionGreater(remote: string, local: string): boolean {
+  const parse = (v: string) => v.replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+  const r = parse(remote);
+  const l = parse(local);
+  for (let i = 0; i < Math.max(r.length, l.length); i++) {
+    const rv = r[i] || 0;
+    const lv = l[i] || 0;
+    if (rv > lv) return true;
+    if (rv < lv) return false;
+  }
+  return false;
+}
+
 ipcMain.on('renderer-ready', (event) => {
   console.log('[WATCHDOG] renderer-ready recebido de sender ID:', event.sender.id, 'mainWindow ID:', mainWindow?.webContents?.id);
   if (mainWindow && event.sender.id === mainWindow.webContents.id) {
@@ -435,7 +448,7 @@ ipcMain.handle('check-for-updates', async () => {
     }
     const result = await autoUpdater.checkForUpdates();
     if (result && result.updateInfo) {
-      if (result.updateInfo.version === app.getVersion()) {
+      if (!isVersionGreater(result.updateInfo.version, app.getVersion())) {
          return { success: true, message: 'Você já está usando a versão mais recente!', isLatest: true };
       }
       return { success: true, updateAvailable: true, info: result.updateInfo, message: `A atualização (${result.updateInfo.version}) foi encontrada e está sendo baixada. Clique em Instalar Atualização Agora para aplicá-la quando terminar.` };
@@ -721,6 +734,10 @@ if (!gotTheLock) {
         
         autoUpdater.on('checking-for-update', () => autoUpdateLogger.info('Verificando se há atualizações...'));
         autoUpdater.on('update-available', (info) => {
+          if (!isVersionGreater(info.version, app.getVersion())) {
+            autoUpdateLogger.info(`Ignorando versão ${info.version} pois não é mais recente que a atual (${app.getVersion()}).`);
+            return;
+          }
           autoUpdateLogger.info(`Atualização disponível: ${info.version}`);
           sendToAllWindows('update-available', info);
         });
