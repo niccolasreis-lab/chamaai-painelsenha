@@ -212,10 +212,7 @@ function Home() {
             <span className="material-symbols-outlined text-primary">tablet_landscape</span>
             <span className="font-sans text-sm font-bold text-ink uppercase tracking-wider">Painel Touch (TV)</span>
           </Link>
-          <Link to="/bridge" className="group p-4 bg-blue-600 rounded-[24px] shadow-lg shadow-blue-900/20 hover:bg-blue-500 transition-all flex items-center justify-center gap-3 text-white">
-            <span className="material-symbols-outlined">smartphone</span>
-            <span className="font-sans text-sm font-bold uppercase tracking-wider">Conectar Celular (PWA)</span>
-          </Link>
+
         </div>
         
         {/* Admin */}
