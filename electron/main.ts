@@ -715,6 +715,7 @@ if (!gotTheLock) {
         autoUpdateLogger.info('Iniciando configuração do autoUpdater...');
         autoUpdater.logger = autoUpdateLogger;
         autoUpdater.autoInstallOnAppQuit = false;
+        autoUpdater.autoDownload = false;
 
         if (!app.isPackaged) {
           autoUpdater.forceDevUpdateConfig = true;
@@ -738,8 +739,9 @@ if (!gotTheLock) {
             autoUpdateLogger.info(`Ignorando versão ${info.version} pois não é mais recente que a atual (${app.getVersion()}).`);
             return;
           }
-          autoUpdateLogger.info(`Atualização disponível: ${info.version}`);
+          autoUpdateLogger.info(`Atualização disponível: ${info.version}. Iniciando download...`);
           sendToAllWindows('update-available', info);
+          autoUpdater.downloadUpdate();
         });
         autoUpdater.on('update-not-available', () => autoUpdateLogger.info('Nenhuma atualização encontrada.'));
         autoUpdater.on('error', (err) => {
