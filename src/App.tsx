@@ -18,6 +18,7 @@ import Relatorios from './admin/Relatorios';
 import ToledoConfig from './admin/ToledoConfig';
 import AdminEncarte from './admin/AdminEncarte';
 import Seguranca from './admin/Seguranca';
+import Catalogo from './admin/Catalogo';
 import MobileOperador from './operador/MobileOperador';
 import Bridge from './operador/Bridge';
 import Login from './Login';
@@ -431,6 +432,7 @@ export default function App() {
           <Route path="/admin/relatorios" element={<ProtectedRoute requireAdmin><Relatorios /></ProtectedRoute>} />
           <Route path="/admin/toledo" element={<ProtectedRoute requireAdmin><ToledoConfig /></ProtectedRoute>} />
           <Route path="/admin/encarte" element={<ProtectedRoute requireAdmin><AdminEncarte /></ProtectedRoute>} />
+          <Route path="/admin/catalogo" element={<ProtectedRoute requireAdmin><Catalogo /></ProtectedRoute>} />
         </Routes>
       </HashRouter>
     </LicenseGate>

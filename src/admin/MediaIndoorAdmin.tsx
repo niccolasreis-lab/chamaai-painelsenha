@@ -324,7 +324,10 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
       {/* Modal de Formulário */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
-          <div className="bg-surface rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div 
+            className="bg-surface rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative pointer-events-auto"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between">
               <h3 className="text-xl font-bold text-ink uppercase tracking-wide">{editing ? 'Editar Conteúdo' : 'Novo Conteúdo'}</h3>
               <button onClick={() => setShowForm(false)} className="p-2 hover:bg-surface-variant rounded-xl transition-colors"><Icon name="close" /></button>
@@ -574,7 +577,10 @@ function TabCampaigns({ API_URL, themes, onCampaignsChange }: { API_URL: string;
       {/* Modal campanha */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
-          <div className="bg-surface rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div 
+            className="bg-surface rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative pointer-events-auto"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between">
               <h3 className="text-xl font-bold text-ink uppercase tracking-wide">{editing ? 'Editar Campanha' : 'Nova Campanha'}</h3>
               <button onClick={() => setShowForm(false)} className="p-2 hover:bg-surface-variant rounded-xl transition-colors"><Icon name="close" /></button>
@@ -772,7 +778,10 @@ function TabThemes({ API_URL, onThemesChange }: { API_URL: string; onThemesChang
       {/* Modal tema */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
-          <div className="bg-surface rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div 
+            className="bg-surface rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative pointer-events-auto"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between">
               <h3 className="text-xl font-bold text-ink uppercase tracking-wide">{editing ? 'Editar Tema' : 'Novo Tema'}</h3>
               <button onClick={() => setShowForm(false)} className="p-2 hover:bg-surface-variant rounded-xl transition-colors"><Icon name="close" /></button>

@@ -3,12 +3,14 @@ import 'jspdf-autotable';
 
 // Re-using the interfaces for typing
 export interface ProdutoBase {
-  plu: string | number;
+  id?: number;
+  plu?: string | number;
   descricao: string;
   preco: number | string;
 }
 
 export interface ItemCarrinhoBase {
+  id?: number;
   plu?: string | number;
   quantidade: number;
   tipo: 'unidade' | 'peso';
@@ -117,8 +119,8 @@ export const gerarPDFLista = async ({ carrinho, produtos, config, ticketNumero, 
 
     // --- DADOS DA TABELA ---
     let valorTotalEstimado = 0;
-    const tableData = Object.entries(carrinho).map(([plu, item]) => {
-      const p = produtos.find(x => String(x.plu) === String(plu));
+    const tableData = Object.entries(carrinho).map(([key, item]) => {
+      const p = produtos.find(x => (x.id && String(x.id) === String(key)) || String(x.plu) === String(key));
       const precoRaw = p ? (typeof p.preco === 'number' ? p.preco : parseFloat(p.preco || '0')) : 0;
       
       // Ajuste para lidar com preço em centavos vs decimais dependendo da fonte
@@ -132,8 +134,8 @@ export const gerarPDFLista = async ({ carrinho, produtos, config, ticketNumero, 
       valorTotalEstimado += totalEst;
       
       return [
-        p?.descricao || `Produto ${plu}`,
-        plu,
+        p?.descricao || `Produto ${key}`,
+        p?.plu || '-',
         item.tipo === 'peso' ? `${item.quantidade}g` : `${item.quantidade} un`,
         p ? `R$ ${precoReais.toFixed(2).replace('.', ',')}` : '-',
         `R$ ${totalEst.toFixed(2).replace('.', ',')}`

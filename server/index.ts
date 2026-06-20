@@ -8,7 +8,7 @@ import dgram from 'dgram';
 import cron from 'node-cron';
 import { getDb } from '../electron/services/database';
 import { startToledoWatcher, forceToledoRefresh, reloadCategorias, setBroadcastFn, syncToCatalogoProduto } from './toledo-watcher';
-import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica, startSyncWorker, stopSyncWorker, supabase, isSupabaseConfigured, setLoopbackToken } from './supabase-sync';
+import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica, startSyncWorker, stopSyncWorker, supabase, isSupabaseConfigured, setLoopbackToken, syncCatalogoCategorias, syncCatalogoProdutos, syncDeleteCatalogoItem } from './supabase-sync';
 import { migrateDatabaseAndConfigs } from './categorizador';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
@@ -2654,10 +2654,14 @@ export function startServer() {
       const mapNomes = new Map();
       nomes.forEach(n => mapNomes.set(n.codigo_produto, n.nome_exibicao));
 
-      // 3. Buscar os produtos
-      let produtos = db.prepare(
-        'SELECT plu, descricao, preco, categoria, unidade, atualizado_em FROM toledo_produtos ORDER BY categoria ASC, descricao ASC'
-      ).all() as any[];
+      // 3. Buscar os produtos da tabela unificada (produtos + categorias)
+      let produtos = db.prepare(`
+        SELECT p.id, p.plu, p.nome as descricao, p.preco, COALESCE(c.nome, p.categoria_legada, 'Outros') as categoria, p.unidade, p.updated_at as atualizado_em
+        FROM produtos p
+        LEFT JOIN categorias c ON p.categoria_id = c.id
+        WHERE p.deleted_at IS NULL AND p.status = 1
+        ORDER BY categoria ASC, p.nome ASC
+      `).all() as any[];
 
       // 4. Aplicar filtros e renomeação
       const finalProdutos = [];
@@ -3037,6 +3041,7 @@ export function startServer() {
 
       const novoId = result.lastInsertRowid;
       registerAuditLog(db, 'CREATE_PRODUTO', 'PRODUTO', Number(novoId), { created: body });
+      syncCatalogoProdutos();
 
       res.json({ success: true, data: { id: novoId }, message: "Produto criado com sucesso" });
     } catch (err: any) {
@@ -3111,6 +3116,7 @@ export function startServer() {
       db.prepare(`UPDATE produtos SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
       registerAuditLog(db, 'UPDATE_PRODUTO', 'PRODUTO', Number(id), { before: existing, changed_keys: Object.keys(body) });
+      syncCatalogoProdutos();
 
       res.json({ success: true, message: "Produto atualizado com sucesso." });
     } catch (err: any) {
@@ -3130,6 +3136,7 @@ export function startServer() {
 
       db.prepare("UPDATE produtos SET deleted_at = datetime('now', 'localtime'), updated_at = datetime('now', 'localtime') WHERE id = ?").run(id);
       registerAuditLog(db, 'SOFT_DELETE', 'PRODUTO', Number(id), { message: 'Produto movido para lixeira' });
+      syncDeleteCatalogoItem('produtos_publicos', Number(id));
 
       res.json({ success: true, message: "Produto movido para a lixeira." });
     } catch (err: any) {
@@ -3143,6 +3150,7 @@ export function startServer() {
       const id = req.params.id;
       db.prepare("UPDATE produtos SET deleted_at = NULL, updated_at = datetime('now', 'localtime') WHERE id = ?").run(id);
       registerAuditLog(db, 'RESTORE', 'PRODUTO', Number(id), { message: 'Produto restaurado' });
+      syncCatalogoProdutos();
       res.json({ success: true, message: "Produto restaurado com sucesso." });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -3192,6 +3200,7 @@ export function startServer() {
       
       const novoId = result.lastInsertRowid;
       registerAuditLog(db, 'CREATE_CATEGORIA', 'CATEGORIA', Number(novoId), { created: req.body });
+      syncCatalogoCategorias();
       res.json({ success: true, data: { id: novoId }, message: "Categoria criada" });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -3214,6 +3223,7 @@ export function startServer() {
       });
       transaction(ordem);
       registerAuditLog(db, 'REORDER', 'CATEGORIA', 0, { items: ordem.length });
+      syncCatalogoCategorias();
       res.json({ success: true, message: "Categorias reordenadas" });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -3251,6 +3261,7 @@ export function startServer() {
       db.prepare(`UPDATE categorias SET ${updates.join(', ')} WHERE id = ?`).run(...params);
       
       registerAuditLog(db, 'UPDATE_CATEGORIA', 'CATEGORIA', Number(id), { before: existing, changed_keys: Object.keys(body) });
+      syncCatalogoCategorias();
       res.json({ success: true, message: "Categoria atualizada" });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -3279,6 +3290,7 @@ export function startServer() {
 
       db.prepare("UPDATE categorias SET deleted_at = datetime('now', 'localtime') WHERE id = ?").run(id);
       registerAuditLog(db, 'SOFT_DELETE', 'CATEGORIA', Number(id), { message: 'Categoria movida para lixeira' });
+      syncDeleteCatalogoItem('categorias_publicas', Number(id));
       res.json({ success: true, message: "Categoria movida para a lixeira." });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -3303,6 +3315,7 @@ export function startServer() {
       const result = db.prepare("UPDATE produtos SET categoria_id = ?, updated_at = datetime('now', 'localtime') WHERE categoria_id = ? AND deleted_at IS NULL").run(nova_categoria_id, oldId);
       
       registerAuditLog(db, 'MOVER_PRODUTOS', 'CATEGORIA', Number(oldId), { para: nova_categoria_id, quantidade: result.changes });
+      syncCatalogoProdutos();
       res.json({ success: true, message: `${result.changes} produto(s) movidos com sucesso.` });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -3315,6 +3328,7 @@ export function startServer() {
       const id = req.params.id;
       db.prepare("UPDATE categorias SET deleted_at = NULL WHERE id = ?").run(id);
       registerAuditLog(db, 'RESTORE', 'CATEGORIA', Number(id), { message: 'Categoria restaurada' });
+      syncCatalogoCategorias();
       res.json({ success: true, message: "Categoria restaurada" });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -3327,6 +3341,7 @@ export function startServer() {
       const id = req.params.id;
       db.prepare("UPDATE categorias SET ativo = 0 WHERE id = ? AND deleted_at IS NULL").run(id);
       registerAuditLog(db, 'INATIVAR', 'CATEGORIA', Number(id), { message: 'Categoria inativada' });
+      syncCatalogoCategorias();
       res.json({ success: true, message: "Categoria inativada" });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -3339,6 +3354,7 @@ export function startServer() {
       const id = req.params.id;
       db.prepare("UPDATE categorias SET ativo = 1 WHERE id = ? AND deleted_at IS NULL").run(id);
       registerAuditLog(db, 'ATIVAR', 'CATEGORIA', Number(id), { message: 'Categoria ativada' });
+      syncCatalogoCategorias();
       res.json({ success: true, message: "Categoria ativada" });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });

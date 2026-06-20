@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getApiUrl } from '../shared/apiConfig';
+import Logo from '../shared/Logo';
 
 interface SenhaChamadaProps {
   ultimaSenha?: {
@@ -81,10 +82,15 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
 
   if (!ultimaSenha) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#041a14]">
-        <div className="text-center">
-          <span className="font-sans text-4xl font-bold text-white block uppercase">Atendimento</span>
-          <span className="font-sans text-5xl font-black text-primary block uppercase mt-2">{config.rotulo_atendimento_geral || 'Geral'}</span>
+      <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-950 via-slate-950 to-violet-950 p-12 relative overflow-hidden">
+        {/* Glows */}
+        <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] bg-indigo-500/10 rounded-full blur-[150px] pointer-events-none"></div>
+        <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-violet-500/10 rounded-full blur-[150px] pointer-events-none"></div>
+        
+        <Logo variant="vertical" darkMode={true} size={110} className="mb-12 animate-fade-in" />
+        <div className="text-center z-10">
+          <span className="font-syne text-3xl font-bold text-white/40 block uppercase tracking-[0.25em]">Atendimento</span>
+          <span className="font-syne text-5xl font-black text-cyan-400 block uppercase mt-3 tracking-wide">{config.rotulo_atendimento_geral || 'Geral'}</span>
         </div>
       </div>
     );
@@ -93,19 +99,19 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
   const senhaFormatada = String(ultimaSenha.numero).padStart(3, '0');
 
   return (
-    <div className="h-full w-full flex flex-col items-center justify-center bg-[#041a14] p-12 relative overflow-hidden animate-fade-in">
+    <div className="h-full w-full flex flex-col items-center justify-center bg-gradient-to-br from-indigo-950 via-slate-950 to-violet-950 p-12 relative overflow-hidden animate-fade-in">
       {/* Background decoration */}
-      <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-primary rounded-full blur-[150px]"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-primary rounded-full blur-[150px]"></div>
+      <div className="absolute top-0 left-0 w-full h-full opacity-15 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-500 rounded-full blur-[180px]"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-cyan-500 rounded-full blur-[180px]"></div>
       </div>
 
       {/* Top Client Logo */}
-      <div className="absolute top-10 left-10 opacity-50">
+      <div className="absolute top-10 left-10 opacity-90">
         {config.logo_cliente ? (
-          <img src={`${API_URL}${config.logo_cliente}`} className="h-20 object-contain" alt="Logo" />
+          <img src={`${API_URL}${config.logo_cliente}`} className="h-16 object-contain rounded-xl shadow-lg border border-slate-800" alt="Logo" />
         ) : (
-          <h2 className="font-sans text-4xl font-bold text-white uppercase tracking-widest">{config.nome_estabelecimento || 'ChamaAí'}</h2>
+          <Logo variant="horizontal" darkMode={true} size={48} />
         )}
       </div>
 
@@ -113,22 +119,22 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
         {isRepeticao && (
           <div className="badge-segunda-chamada flex items-center justify-center gap-2 mb-4">
             <span className="
-              font-sans text-2xl font-black tracking-widest uppercase
+              font-syne text-2xl font-black tracking-widest uppercase
               text-orange-500 border-2 border-orange-500
-              px-6 py-1 rounded-full
+              px-8 py-2 rounded-full bg-orange-500/10
             ">
               ⚠ 2ª CHAMADA
             </span>
           </div>
         )}
 
-        <h2 className="font-sans text-[3rem] font-semibold text-white/50 tracking-[0.3em] uppercase mb-4">
+        <h2 className="font-syne text-[2.5rem] font-bold text-white/40 tracking-[0.3em] uppercase mb-4">
           Senha Atual
         </h2>
 
         <div 
           key={`call-${ultimaSenha.id}-${isRepeticao}`}
-          className={`font-sans text-[25rem] font-black leading-none tracking-tight ${
+          className={`font-syne text-[26rem] font-extrabold leading-none tracking-tighter ${
             isRepeticao
               ? 'text-orange-500 animate-pulse-orange'
               : `text-white ${pulse ? 'animate-pulse-call' : ''}`
@@ -137,28 +143,28 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
             willChange: 'opacity, transform',
             transform: 'translateZ(0)',
             textShadow: isRepeticao 
-              ? '0 0 40px rgba(249, 115, 22, 0.9)' 
-              : '0 0 30px rgba(255, 255, 255, 0.2)'
+              ? '0 0 50px rgba(249, 115, 22, 0.8)' 
+              : '0 0 40px rgba(79, 70, 229, 0.4)'
           }}
         >
           {senhaFormatada}
         </div>
 
         {ultimaSenha.nome_cliente && (
-          <div className="font-sans text-3xl font-semibold text-white/70 mt-2 select-none">
+          <div className="font-dmsans text-4xl font-medium text-white/80 mt-4 select-none">
             {ultimaSenha.nome_cliente}
           </div>
         )}
 
         {config.telao_ocultar_guiche !== '1' && (
           <div className="mt-8 flex flex-col items-center justify-center gap-4">
-            <div className="bg-white px-12 py-5 rounded-[32px] shadow-2xl flex flex-col items-center justify-center gap-2 border-b-[8px] border-outline-variant/30">
+            <div className="bg-slate-900/60 backdrop-blur-xl px-16 py-6 rounded-[2.5rem] shadow-2xl flex flex-col items-center justify-center gap-2 border border-slate-800 shadow-indigo-500/10">
               {ultimaSenha.balcao_nome && (
-                <span className="font-sans text-[2.5rem] font-black text-primary uppercase tracking-widest leading-none mb-1">
+                <span className="font-syne text-[2.5rem] font-bold text-cyan-400 uppercase tracking-widest leading-none mb-1">
                   {ultimaSenha.balcao_nome}
                 </span>
               )}
-              <span className="font-sans text-[5rem] font-bold text-ink uppercase leading-none tracking-tighter text-center">
+              <span className="font-syne text-[5.5rem] font-extrabold text-white uppercase leading-none tracking-tighter text-center">
                 {config.rotulo_local ? `${config.rotulo_local} ` : 'Guichê '}
                 {(ultimaSenha.guiche || '').replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
               </span>

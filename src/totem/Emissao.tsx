@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiUrl } from '../shared/apiConfig';
 import { useSSE } from '../shared/useSSE';
+import Logo from '../shared/Logo';
 
 export default function Emissao() {
   const navigate = useNavigate();
@@ -529,19 +530,16 @@ export default function Emissao() {
       <NomeModal />
       
       {/* Header */}
-      <header className="bg-primary text-on-primary py-8 shadow-md flex justify-center items-center border-b-[6px] border-primary-hover shrink-0">
+      <header className="bg-primary text-on-primary py-6 shadow-md flex justify-center items-center border-b-[6px] border-primary-hover shrink-0">
         <h1 className="font-sans text-5xl font-bold uppercase tracking-widest flex items-center gap-6">
           {config.logo_cliente ? (
             <img 
               src={`${API_URL}${config.logo_cliente}`} 
               alt="Logo" 
-              className="h-24 w-auto object-contain bg-white/10 rounded-2xl p-2"
+              className="h-20 w-auto object-contain bg-white/10 rounded-2xl p-2"
             />
           ) : (
-            <>
-              <span className="material-symbols-outlined text-[4rem]">storefront</span>
-              {config.nome_estabelecimento || 'ChamaAí'}
-            </>
+            <Logo variant="horizontal" darkMode={true} size={54} />
           )}
         </h1>
       </header>
@@ -549,10 +547,10 @@ export default function Emissao() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-start xl:justify-center p-4 md:p-6 gap-6 lg:gap-8 overflow-y-auto scrollbar-hide w-full">
         <div className="text-center shrink-0 flex flex-col items-center mt-4">
-          <h2 id="titulo-saudacao" className="font-sans text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-ink mb-2 uppercase tracking-wide">
+          <h2 id="titulo-saudacao" className="font-syne text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold text-ink mb-2 uppercase tracking-wide">
             {saudacao}
           </h2>
-          <p className="text-xl sm:text-2xl md:text-3xl text-ink-secondary font-bold tracking-wide">
+          <p className="font-dmsans text-xl sm:text-2xl md:text-3xl text-ink-secondary font-semibold tracking-wide">
             Toque na tela para retirar sua senha
           </p>
           
@@ -570,11 +568,11 @@ export default function Emissao() {
               <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-lg shadow-primary/30">
                 <span className="material-symbols-outlined text-[2rem] md:text-[2.5rem]">group</span>
               </div>
-              <div className="flex flex-col items-start leading-none gap-1 md:gap-2">
-                <span className="font-sans text-[10px] md:text-[11px] font-black uppercase tracking-widest text-ink-secondary">Pessoas Aguardando</span>
-                <span className="font-sans text-5xl md:text-6xl font-black text-primary flex items-baseline gap-1 tracking-tighter">
+              <div className="flex flex-col items-start leading-none gap-1.5 md:gap-2">
+                <span className="font-syne text-[10px] md:text-[11px] font-black uppercase tracking-widest text-ink-secondary">Pessoas Aguardando</span>
+                <span className="font-syne text-5xl md:text-6xl font-black text-primary flex items-baseline gap-1 tracking-tighter">
                   {pessoasAguardando}
-                  <span className="text-sm font-semibold text-ink-secondary/70 font-sans tracking-normal lowercase">clientes</span>
+                  <span className="text-sm font-bold text-ink-secondary/70 font-dmsans tracking-normal lowercase">clientes</span>
                 </span>
               </div>
             </div>
@@ -603,7 +601,7 @@ export default function Emissao() {
                 </span>
               </div>
               <div className="text-center">
-                <span className="font-sans text-5xl md:text-6xl font-black text-primary block uppercase">Emitir Senha</span>
+                <span className="font-syne text-5xl md:text-6xl font-black text-primary block uppercase">Emitir Senha</span>
               </div>
             </button>
           ) : (
@@ -620,8 +618,8 @@ export default function Emissao() {
                     </span>
                   </div>
                   <div className="text-center">
-                    <span className="font-sans text-2xl md:text-3xl font-bold text-ink block uppercase tracking-widest">{config.rotulo_atendimento_geral || 'Atendimento Geral'}</span>
-                    <span className="font-sans text-4xl md:text-5xl font-black text-primary block uppercase mt-3">TOQUE AQUI</span>
+                    <span className="font-syne text-2xl md:text-3xl font-bold text-ink block uppercase tracking-widest">{config.rotulo_atendimento_geral || 'Atendimento Geral'}</span>
+                    <span className="font-syne text-4xl md:text-5xl font-black text-primary block uppercase mt-3 tracking-wide">TOQUE AQUI</span>
                   </div>
                 </button>
               )}
@@ -638,10 +636,10 @@ export default function Emissao() {
                     </span>
                   </div>
                   <div className="text-center">
-                    <span className="font-sans text-2xl md:text-3xl font-bold text-ink block uppercase tracking-widest">{config.rotulo_atendimento_prioritario || 'Atendimento Prioritário'}</span>
-                    <span className="font-sans text-4xl md:text-5xl font-black text-warning block uppercase mt-3">TOQUE AQUI</span>
+                    <span className="font-syne text-2xl md:text-3xl font-bold text-ink block uppercase tracking-widest">{config.rotulo_atendimento_prioritario || 'Atendimento Prioritário'}</span>
+                    <span className="font-syne text-4xl md:text-5xl font-black text-warning block uppercase mt-3 tracking-wide">TOQUE AQUI</span>
                   </div>
-                  <div className="text-ink-secondary text-sm md:text-base font-medium px-4 md:px-8 mt-2">
+                  <div className="font-dmsans text-ink-secondary text-sm md:text-base font-medium px-4 md:px-8 mt-2">
                     Pessoas com deficiência, idosos, gestantes e lactantes.
                   </div>
                 </button>

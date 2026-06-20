@@ -7,14 +7,16 @@ import { playNotificationSound, preLoadCustomAudio } from '../shared/sounds';
 import { Bell, Volume2 } from 'lucide-react';
 
 interface Produto {
-  plu: string;
+  id: number;
+  plu?: string;
   descricao: string;
   preco: number;
   categoria: string;
 }
 
 interface ItemCarrinho {
-  plu: string;
+  id: number;
+  plu?: string;
   quantidade: number; // Gramas para peso (ex: 250), unidades para unidade (ex: 3)
   tipo: 'peso' | 'unidade';
 }
@@ -247,28 +249,36 @@ export default function ClientePortal() {
     }
   }, [ticketStatus, API_URL]);
 
-  // Restaura carrinho local com migração robusta de dados legados
+  // Restaura carrinho local com migração robusta de dados legados e chaves unificadas por ID
   useEffect(() => {
-    if (ticketId) {
+    if (ticketId && produtos.length > 0) {
       const salvo = localStorage.getItem(`carrinho_${ticketId}`);
       if (salvo) {
         try {
           const parsed = JSON.parse(salvo);
           const migrated: Record<string, ItemCarrinho> = {};
           
-          Object.entries(parsed).forEach(([plu, value]) => {
+          Object.entries(parsed).forEach(([key, value]) => {
+            const p = produtos.find(x => String(x.id) === String(key) || (x.plu && String(x.plu) === String(key)));
+            if (!p) return;
+
+            const targetKey = String(p.id);
             if (typeof value === 'number') {
               // Legado (somente o multiplicador)
-              const descEstimada = produtos.find(x => x.plu === plu)?.descricao || '';
-              const tipo = getTipoProduto(descEstimada);
-              migrated[plu] = {
-                plu,
+              const tipo = getTipoProduto(p.descricao);
+              migrated[targetKey] = {
+                id: p.id,
+                plu: p.plu,
                 quantidade: value,
                 tipo
               };
             } else if (value && typeof value === 'object' && 'quantidade' in value) {
               // Estrutura nova
-              migrated[plu] = value as any;
+              migrated[targetKey] = {
+                ...(value as any),
+                id: p.id,
+                plu: p.plu
+              };
             }
           });
           
@@ -291,7 +301,7 @@ export default function ClientePortal() {
 
   const handleOpenDrawer = (product: Produto) => {
     setSelectedProduct(product);
-    const itemExistente = carrinho[product.plu];
+    const itemExistente = carrinho[product.id];
     const tipo = getTipoProduto(product.descricao);
     
     if (itemExistente) {
@@ -308,7 +318,8 @@ export default function ClientePortal() {
     const tipo = getTipoProduto(product.descricao);
     setCarrinho(prev => ({
       ...prev,
-      [product.plu]: {
+      [product.id]: {
+        id: product.id,
         plu: product.plu,
         quantidade: drawerQuantidade,
         tipo
@@ -317,10 +328,10 @@ export default function ClientePortal() {
     setSelectedProduct(null);
   };
 
-  const handleClearItem = (plu: string) => {
+  const handleClearItem = (id: string | number) => {
     setCarrinho(prev => {
       const novo = { ...prev };
-      delete novo[plu];
+      delete novo[id];
       return novo;
     });
   };
@@ -356,7 +367,7 @@ export default function ClientePortal() {
     }
     if (!busca.trim()) return list;
     const term = busca.toLowerCase();
-    return list.filter(p => p.descricao.toLowerCase().includes(term) || p.plu.includes(term));
+    return list.filter(p => p.descricao.toLowerCase().includes(term) || (p.plu && p.plu.includes(term)));
   }, [produtos, busca, categoriaAtiva]);
 
   // Agrupa produtos por categoria para renderização
@@ -412,11 +423,11 @@ export default function ClientePortal() {
                 <ShoppingCart className="w-5 h-5" /> Sua Seleção Final
               </h3>
               <div className="space-y-3 mb-6">
-                {Object.entries(carrinho).map(([plu, item]) => {
-                  const p = produtos.find(x => x.plu === plu) || { descricao: `Produto ${plu}` };
+                {Object.entries(carrinho).map(([id, item]) => {
+                  const p = produtos.find(x => String(x.id) === String(id)) || { descricao: `Produto ${item.plu || id}` };
                   const labelQtd = item.tipo === 'peso' ? `${item.quantidade}g` : `${item.quantidade} un`;
                   return (
-                    <div key={plu} className="flex justify-between items-center bg-surface-variant/50 p-3 rounded-lg text-sm text-left">
+                    <div key={id} className="flex justify-between items-center bg-surface-variant/50 p-3 rounded-lg text-sm text-left">
                       <span className="font-semibold text-ink line-clamp-1 flex-1 pr-2">{p.descricao}</span>
                       <span className="bg-primary/10 text-primary font-bold px-2 py-1 rounded">{labelQtd}</span>
                     </div>
@@ -578,7 +589,7 @@ export default function ClientePortal() {
               </h2>
               <div className="grid grid-cols-1 gap-3">
                 {items.map(p => {
-                  const item = carrinho[p.plu];
+                  const item = carrinho[p.id];
                   const isSelected = !!item;
                   const tipo = getTipoProduto(p.descricao);
                   const labelQuantidade = isSelected
@@ -589,19 +600,21 @@ export default function ClientePortal() {
 
                   return (
                     <div
-                      key={p.plu}
+                      key={p.id}
                       onClick={() => handleOpenDrawer(p)}
                       className={`bg-surface border rounded-2xl p-4 flex justify-between items-center shadow-sm transition-all duration-300 active:scale-[0.98] cursor-pointer ${
                         isSelected
-                          ? 'border-primary ring-2 ring-primary/10 bg-primary/[0.02]'
-                          : 'border-outline-variant/60 hover:border-primary/40'
+                           ? 'border-primary ring-2 ring-primary/10 bg-primary/[0.02]'
+                           : 'border-outline-variant/60 hover:border-primary/40'
                       }`}
                     >
                       <div className="flex-1 pr-4">
                         <div className="flex items-center gap-2 mb-1.5">
-                          <span className="text-[10px] font-mono font-bold text-ink-secondary bg-surface-variant/80 px-2 py-0.5 rounded-md">
-                            PLU {p.plu}
-                          </span>
+                          {p.plu && (
+                            <span className="text-[10px] font-mono font-bold text-ink-secondary bg-surface-variant/80 px-2 py-0.5 rounded-md">
+                              PLU {p.plu}
+                            </span>
+                          )}
                           {isSelected && (
                             <span className="bg-success/15 text-success font-black text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider flex items-center gap-0.5">
                               ✓ {labelQuantidade}
@@ -660,9 +673,11 @@ export default function ClientePortal() {
             {/* Informações do Produto */}
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[10px] font-mono font-bold text-ink-secondary bg-surface-variant px-2 py-0.5 rounded-md">
-                  PLU {selectedProduct.plu}
-                </span>
+                {selectedProduct.plu && (
+                  <span className="text-[10px] font-mono font-bold text-ink-secondary bg-surface-variant px-2 py-0.5 rounded-md">
+                    PLU {selectedProduct.plu}
+                  </span>
+                )}
                 <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md uppercase tracking-wider">
                   {getTipoProduto(selectedProduct.descricao) === 'peso' ? 'Por Peso' : 'Por Unidade'}
                 </span>
@@ -850,14 +865,14 @@ export default function ClientePortal() {
                 className="w-full bg-primary hover:bg-primary-hover text-on-primary py-4 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-primary/10 active:scale-95 transition-transform"
               >
                 <span className="material-symbols-outlined text-lg">check_circle</span>
-                {carrinho[selectedProduct.plu] ? 'Atualizar na Lista' : 'Confirmar e Adicionar'}
+                {carrinho[selectedProduct.id] ? 'Atualizar na Lista' : 'Confirmar e Adicionar'}
               </button>
               
-              {carrinho[selectedProduct.plu] && (
+              {carrinho[selectedProduct.id] && (
                 <button
                   type="button"
                   onClick={() => {
-                    handleClearItem(selectedProduct.plu);
+                    handleClearItem(selectedProduct.id);
                     setSelectedProduct(null);
                   }}
                   className="w-full bg-error/5 hover:bg-error/10 text-error py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1 active:scale-95 transition-transform"
@@ -899,13 +914,13 @@ export default function ClientePortal() {
 
                 {/* Lista de itens no carrinho */}
                 <div className="overflow-y-auto p-4 space-y-3">
-                  {Object.entries(carrinho).map(([plu, item]) => {
-                    const p = produtos.find(x => x.plu === plu) || { descricao: `Produto ${plu}`, preco: 0 };
+                  {Object.entries(carrinho).map(([id, item]) => {
+                    const p = produtos.find(x => String(x.id) === String(id)) || { id: Number(id), descricao: `Produto ${item.plu || id}`, preco: 0 };
                     const labelQtd = item.tipo === 'peso' ? `${item.quantidade}g` : `${item.quantidade} un`;
                     const subtotal = p.preco * (item.tipo === 'peso' ? item.quantidade / 1000 : item.quantidade);
                     
                     return (
-                      <div key={plu} className="flex justify-between items-center bg-surface-variant/20 p-3 rounded-xl border border-outline-variant/30">
+                      <div key={id} className="flex justify-between items-center bg-surface-variant/20 p-3 rounded-xl border border-outline-variant/30">
                         <div className="flex-1 pr-3">
                           <p className="font-bold text-sm text-ink line-clamp-1">{p.descricao}</p>
                           <div className="flex items-center gap-2 mt-1">
@@ -932,7 +947,7 @@ export default function ClientePortal() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleClearItem(plu)}
+                            onClick={() => handleClearItem(id)}
                             className="p-2 text-error hover:bg-error/5 rounded-lg border border-error/20"
                           >
                             <Trash2 className="w-4 h-4" />

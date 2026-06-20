@@ -3,33 +3,55 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ChamaAí — Sistema Inteligente de Gestão de Filas</title>
+  <title>ChamaAí — Sistema Inteligente de Gestão de Filas e Atendimento</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      color: #1b1b24;
-      background: #fcf8ff;
-      -webkit-font-smoothing: antialiased;
-    }
+    /* ─── Design System & CSS Variables ─── */
     :root {
-      --primary: #3525cd;
-      --primary-light: #4f46e5;
-      --primary-container: #e2dfff;
-      --secondary: #00687a;
-      --cyan: #57dffe;
-      --green: #10b981;
-      --surface: #fcf8ff;
-      --surface-dim: #f0ecf9;
-      --on-surface: #1b1b24;
-      --on-surface-variant: #464555;
-      --outline: #c7c4d8;
-      --font-display: 'Syne', sans-serif;
-      --font-body: 'DM Sans', sans-serif;
+      --primary: #7c3aed; /* purple-600 */
+      --primary-light: #9061f9;
+      --primary-dark: #6d28d9;
+      --primary-container: #f5f3ff;
+      --secondary: #0d9488; /* teal-600 */
+      --success: #10b981; /* emerald-500 */
+      --surface: #ffffff;
+      --surface-dim: #f8fafc; /* Soft Slate background */
+      --on-surface: #0f172a; /* Slate 900 */
+      --on-surface-variant: #475569; /* Slate 600 */
+      --outline: #e2e8f0; /* Slate 200 */
+      --outline-variant: #cbd5e1; /* Slate 300 */
+      --shadow-primary: 0 20px 40px -10px rgba(124, 58, 237, 0.12);
+      --font-display: 'Outfit', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-number: 'Syne', sans-serif;
+    }
+
+    * { 
+      margin: 0; 
+      padding: 0; 
+      box-sizing: border-box; 
+    }
+    
+    html { 
+      scroll-behavior: smooth; 
+    }
+    
+    body {
+      font-family: var(--font-body);
+      color: var(--on-surface);
+      background: var(--surface-dim);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
+    }
+
+    /* ─── Typography ─── */
+    h1, h2, h3, h4 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      color: var(--on-surface);
+      line-height: 1.25;
     }
 
     /* ─── Navigation ─── */
@@ -37,250 +59,312 @@
       position: fixed;
       top: 0; left: 0; right: 0;
       z-index: 100;
-      background: rgba(252,248,255,0.88);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--outline);
       padding: 0 5vw;
-      height: 72px;
+      height: 80px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      transition: all 0.3s ease;
     }
     .nav-logo {
+      display: flex;
+      flex-direction: column;
+      text-decoration: none;
+    }
+    .nav-logo-text {
       font-family: var(--font-display);
-      font-size: 24px;
+      font-size: 26px;
       font-weight: 800;
       color: var(--primary);
-      text-decoration: none;
       letter-spacing: -0.02em;
+      line-height: 1;
     }
-    .nav-logo small { font-size: 10px; font-weight: 600; color: var(--on-surface-variant); letter-spacing: 0.15em; display: block; margin-top: -4px; }
-    .nav-links { display: flex; gap: 32px; align-items: center; }
+    .nav-logo-sub {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--on-surface-variant);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    .nav-links { 
+      display: flex; 
+      gap: 36px; 
+      align-items: center; 
+    }
     .nav-links a {
       text-decoration: none;
       color: var(--on-surface-variant);
       font-weight: 600;
       font-size: 15px;
-      transition: color 0.2s;
+      transition: color 0.2s ease;
     }
-    .nav-links a:hover { color: var(--primary); }
+    .nav-links a:hover { 
+      color: var(--primary); 
+    }
     .nav-cta {
       background: var(--primary);
-      color: #fff;
-      padding: 10px 24px;
-      border-radius: 12px;
+      color: #fff !important;
+      padding: 12px 26px;
+      border-radius: 14px;
       font-weight: 700;
-      transition: all 0.2s;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
     }
-    .nav-cta:hover { background: var(--primary-light); transform: scale(1.03); }
+    .nav-cta:hover { 
+      background: var(--primary-dark); 
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(124, 58, 237, 0.25);
+    }
 
-    /* ─── Hero ─── */
+    /* ─── Hero Section ─── */
     .hero {
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 120px 5vw 80px;
-      background: linear-gradient(135deg, #f0ecf9 0%, #fcf8ff 40%, #eef2ff 100%);
+      padding: 140px 5vw 80px;
+      background: radial-gradient(circle at 10% 20%, rgba(245, 243, 255, 0.95) 0%, rgba(255, 255, 255, 1) 90%);
       position: relative;
       overflow: hidden;
     }
     .hero-glow {
       position: absolute;
       border-radius: 50%;
-      filter: blur(120px);
-      opacity: 0.12;
+      filter: blur(140px);
+      opacity: 0.08;
       pointer-events: none;
     }
-    .hero-glow.g1 { top: -20%; right: -10%; width: 600px; height: 600px; background: var(--primary); }
-    .hero-glow.g2 { bottom: -20%; left: -10%; width: 500px; height: 500px; background: var(--cyan); }
-    .hero-content {
-      max-width: 1100px;
-      text-align: center;
-      position: relative;
-      z-index: 1;
+    .hero-glow.g1 { top: -10%; right: -10%; width: 700px; height: 700px; background: var(--primary); }
+    .hero-glow.g2 { bottom: -10%; left: -10%; width: 600px; height: 600px; background: var(--secondary); }
+    
+    .hero-container {
+      max-width: 1200px;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 60px;
+      align-items: center;
+      z-index: 5;
+    }
+    .hero-text {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
     }
     .hero-badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       background: var(--primary-container);
       color: var(--primary);
       font-weight: 700;
       font-size: 13px;
-      padding: 8px 20px;
+      padding: 10px 20px;
       border-radius: 100px;
       margin-bottom: 24px;
-      letter-spacing: 0.02em;
+      border: 1px solid rgba(124, 58, 237, 0.15);
     }
     .hero-badge .dot {
       width: 8px; height: 8px; border-radius: 50%;
-      background: var(--green);
-      animation: pulse-dot 1.5s infinite;
+      background: var(--success);
+      animation: pulse-dot 2s infinite;
     }
     @keyframes pulse-dot {
-      0% { transform: scale(0.9); opacity: 1; }
-      50% { transform: scale(1.4); opacity: 0.5; }
-      100% { transform: scale(0.9); opacity: 1; }
+      0% { transform: scale(0.85); opacity: 1; }
+      50% { transform: scale(1.35); opacity: 0.6; }
+      100% { transform: scale(0.85); opacity: 1; }
     }
     .hero h1 {
-      font-family: var(--font-display);
-      font-size: clamp(42px, 6vw, 72px);
+      font-size: clamp(40px, 4.5vw, 62px);
       font-weight: 800;
-      line-height: 1.08;
-      color: var(--on-surface);
-      margin-bottom: 20px;
-      letter-spacing: -0.02em;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      margin-bottom: 24px;
     }
     .hero h1 span {
-      background: linear-gradient(135deg, var(--primary), #7c3aed);
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
     .hero p {
-      font-size: clamp(17px, 2vw, 21px);
+      font-size: clamp(16px, 1.3vw, 19px);
       color: var(--on-surface-variant);
       line-height: 1.6;
-      max-width: 640px;
-      margin: 0 auto 36px;
+      margin-bottom: 40px;
+      font-weight: 400;
     }
     .hero-buttons {
       display: flex;
-      gap: 16px;
-      justify-content: center;
+      gap: 18px;
       flex-wrap: wrap;
     }
     .btn-primary {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      background: linear-gradient(135deg, var(--primary), #7c3aed);
+      gap: 10px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
       color: #fff;
       font-weight: 700;
-      font-size: 17px;
-      padding: 16px 36px;
-      border-radius: 14px;
+      font-size: 16px;
+      padding: 18px 38px;
+      border-radius: 16px;
       text-decoration: none;
-      transition: all 0.2s;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
       border: none;
       cursor: pointer;
-      box-shadow: 0 8px 30px rgba(53,37,205,0.25);
+      box-shadow: 0 8px 30px rgba(124, 58, 237, 0.25);
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(53,37,205,0.35); }
+    .btn-primary:hover { 
+      transform: translateY(-2px); 
+      box-shadow: 0 12px 35px rgba(124, 58, 237, 0.35); 
+    }
     .btn-secondary {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       background: #fff;
       color: var(--primary);
       font-weight: 700;
-      font-size: 17px;
-      padding: 16px 36px;
-      border-radius: 14px;
+      font-size: 16px;
+      padding: 18px 38px;
+      border-radius: 16px;
       text-decoration: none;
       border: 2px solid var(--outline);
-      transition: all 0.2s;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .btn-secondary:hover { border-color: var(--primary); }
+    .btn-secondary:hover { 
+      border-color: var(--primary); 
+      background: var(--primary-container);
+    }
 
-    /* ─── Dashboard Mockup ─── */
-    .hero-mockup {
-      margin-top: 60px;
+    /* ─── Mockup Animado ─── */
+    .hero-mockup-wrapper {
+      position: relative;
       width: 100%;
-      max-width: 960px;
-      border-radius: 20px;
-      box-shadow: 0 30px 80px rgba(53,37,205,0.12);
-      border: 1px solid var(--outline);
+      display: flex;
+      justify-content: center;
+    }
+    .hero-mockup {
+      width: 100%;
+      max-width: 480px;
+      border-radius: 28px;
+      box-shadow: 0 35px 80px rgba(124, 58, 237, 0.12);
+      border: 1px solid var(--outline-variant);
       background: #fff;
       overflow: hidden;
       position: relative;
+      transform: perspective(1000px) rotateY(-5deg) rotateX(2deg);
+      transition: transform 0.5s ease;
+      animation: float-mockup 6s ease-in-out infinite;
+    }
+    .hero-mockup:hover {
+      transform: perspective(1000px) rotateY(0deg) rotateX(0deg);
+    }
+    @keyframes float-mockup {
+      0%, 100% { transform: perspective(1000px) rotateY(-5deg) rotateX(2deg) translateY(0); }
+      50% { transform: perspective(1000px) rotateY(-5deg) rotateX(2deg) translateY(-12px); }
     }
     .mockup-header {
-      background: #f8faff;
-      padding: 14px 24px;
+      background: #fdfdfd;
+      padding: 16px 24px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid var(--outline);
     }
-    .mockup-tabs {
-      display: flex;
-      gap: 6px;
-    }
-    .mockup-tab {
+    .mockup-connection {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      background: transparent;
-      color: var(--on-surface-variant);
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--success);
+      letter-spacing: 0.05em;
     }
-    .mockup-tab.active {
-      background: var(--primary-container);
-      color: var(--primary);
+    .mockup-connection .status-pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse-success 1.5s infinite;
+    }
+    @keyframes pulse-success {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.4); opacity: 0.5; }
     }
     .mockup-time {
       font-family: var(--font-display);
-      font-weight: 700;
-      font-size: 18px;
-      color: var(--on-surface);
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--on-surface-variant);
     }
     .mockup-body {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0;
-      min-height: 260px;
+      display: flex;
+      flex-direction: column;
+      background: #fbfbfd;
     }
     .mockup-main {
-      padding: 36px;
+      padding: 40px 24px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(180deg, #f8faff 0%, #fff 100%);
+      background: radial-gradient(circle at center, #ffffff 0%, #fcfaff 100%);
+      text-align: center;
+      border-bottom: 1px solid var(--outline);
     }
     .mockup-label {
-      font-size: 13px;
+      font-family: var(--font-display);
+      font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.15em;
+      letter-spacing: 0.2em;
       color: var(--on-surface-variant);
-      margin-bottom: 8px;
+      margin-bottom: 12px;
     }
     .mockup-number {
       font-family: var(--font-display);
-      font-size: clamp(56px, 8vw, 96px);
+      font-size: 80px;
       font-weight: 800;
       color: var(--primary);
       line-height: 1;
-      letter-spacing: -0.03em;
-      background: #eef2ff;
-      padding: 16px 48px;
-      border-radius: 20px;
-      margin-bottom: 12px;
+      letter-spacing: -0.04em;
+      background: var(--primary-container);
+      padding: 12px 48px;
+      border-radius: 24px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(124, 58, 237, 0.1);
+      box-shadow: inset 0 2px 4px rgba(124, 58, 237, 0.05);
+      animation: call-pulse 4s infinite;
+    }
+    @keyframes call-pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(124, 58, 237, 0); }
+      50% { transform: scale(1.03); box-shadow: 0 0 20px rgba(124, 58, 237, 0.12); }
     }
     .mockup-status {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: #d1fae5;
-      color: #065f46;
+      background: var(--primary-container);
+      color: var(--primary);
       font-weight: 700;
       font-size: 14px;
-      padding: 6px 16px;
+      padding: 8px 20px;
       border-radius: 100px;
+      border: 1px solid rgba(124, 58, 237, 0.15);
     }
-    .mockup-side {
+    .mockup-list {
       padding: 24px;
-      border-left: 1px solid var(--outline);
-      background: #fcf8ff;
+      background: #ffffff;
     }
-    .mockup-side h4 {
+    .mockup-list h4 {
       font-family: var(--font-display);
       font-size: 13px;
       font-weight: 700;
@@ -293,275 +377,605 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 0;
-      border-bottom: 1px solid #e4e1ee;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--outline);
+      transition: background-color 0.2s ease;
     }
     .mockup-row:last-child { border-bottom: none; }
     .mockup-row-num {
       font-family: var(--font-display);
       font-weight: 700;
       font-size: 18px;
-      color: var(--primary);
+      color: var(--on-surface);
     }
     .mockup-row-info {
       font-size: 13px;
       color: var(--on-surface-variant);
+      font-weight: 500;
     }
     .mockup-row-badge {
       font-size: 11px;
       font-weight: 700;
-      background: var(--primary-container);
-      color: var(--primary);
-      padding: 2px 10px;
+      padding: 4px 12px;
       border-radius: 100px;
     }
-
-    /* ─── Sections ─── */
-    section { padding: 100px 5vw; }
-    .section-title {
-      font-family: var(--font-display);
-      font-size: clamp(32px, 4vw, 48px);
-      font-weight: 800;
-      text-align: center;
-      color: var(--on-surface);
-      margin-bottom: 16px;
-      letter-spacing: -0.02em;
+    .mockup-row-badge.normal {
+      background: #f1f5f9;
+      color: #475569;
     }
-    .section-sub {
+    .mockup-row-badge.pref {
+      background: #fef3c7;
+      color: #d97706;
+    }
+    .mockup-row-badge.fast {
+      background: #e0f2fe;
+      color: #0284c7;
+    }
+
+    /* ─── Seção "Nossos Parceiros" ─── */
+    .partners {
+      padding: 60px 5vw;
+      background: #ffffff;
+      border-top: 1px solid var(--outline);
+      border-bottom: 1px solid var(--outline);
       text-align: center;
-      font-size: 18px;
+    }
+    .partners-title {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
       color: var(--on-surface-variant);
-      max-width: 600px;
-      margin: 0 auto 60px;
-      line-height: 1.6;
+      margin-bottom: 32px;
     }
-    .section-sub a { color: var(--primary); text-decoration: underline; }
-
-    /* ─── Products / Screens ─── */
-    #products { background: var(--surface-dim); }
-    .products-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 24px;
-      max-width: 1100px;
+    .partners-grid {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 60px;
+      flex-wrap: wrap;
+      max-width: 1000px;
       margin: 0 auto;
     }
-    .product-card {
-      background: #fff;
-      border-radius: 20px;
-      padding: 36px 28px;
-      border: 1px solid var(--outline);
-      transition: all 0.3s;
-      text-align: center;
-      box-shadow: 0 4px 16px rgba(79,70,229,0.06);
-    }
-    .product-card:hover { transform: translateY(-4px); border-color: var(--primary); box-shadow: 0 16px 48px rgba(79,70,229,0.10); }
-    .product-icon {
-      width: 64px; height: 64px;
-      background: var(--primary-container);
-      border-radius: 18px;
+    .partner-logo-link {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 32px;
-      margin: 0 auto 18px;
+      text-decoration: none;
+      filter: grayscale(100%) opacity(60%);
+      transition: all 0.3s ease;
     }
-    .product-card h3 {
+    .partner-logo-link:hover {
+      filter: grayscale(0%) opacity(100%);
+      transform: scale(1.05);
+    }
+    .partner-logo {
+      height: 48px;
+      width: auto;
+      object-contain: fit;
+    }
+    .partner-logo-fictive {
       font-family: var(--font-display);
       font-size: 20px;
       font-weight: 700;
-      margin-bottom: 8px;
-    }
-    .product-card p {
-      font-size: 14px;
-      color: var(--on-surface-variant);
-      line-height: 1.6;
-      margin-bottom: 14px;
-    }
-    .product-tag {
-      display: inline-block;
-      background: var(--primary-container);
-      color: var(--primary);
-      font-size: 12px;
-      font-weight: 700;
-      padding: 3px 12px;
-      border-radius: 100px;
-      margin: 2px 3px;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
-    /* ─── Features ─── */
-    #features { background: #fff; }
+    /* ─── Sections General ─── */
+    section { 
+      padding: 100px 5vw; 
+    }
+    .section-header {
+      text-align: center;
+      max-width: 700px;
+      margin: 0 auto 64px;
+    }
+    .section-title {
+      font-size: clamp(30px, 3vw, 42px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+    }
+    .section-sub {
+      font-size: 17px;
+      color: var(--on-surface-variant);
+      line-height: 1.6;
+    }
+
+    /* ─── Bento Grid Features ─── */
+    #features {
+      background: var(--surface-dim);
+    }
     .features-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 28px;
-      max-width: 1100px;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 24px;
+      max-width: 1200px;
       margin: 0 auto;
     }
     .feature-card {
-      background: var(--surface-dim);
-      border-radius: 20px;
-      padding: 32px 28px;
-      border: 1px solid transparent;
-      transition: all 0.3s;
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 36px;
+      border: 1px solid var(--outline);
+      transition: all 0.3s ease;
+      box-shadow: 0 10px 30px rgba(124, 58, 237, 0.03);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
-    .feature-card:hover { border-color: var(--primary); }
-    .feature-icon {
-      width: 48px; height: 48px;
+    .feature-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--primary-light);
+      box-shadow: var(--shadow-primary);
+    }
+    .feature-card.col-4 { grid-column: span 4; }
+    .feature-card.col-2 { grid-column: span 2; }
+    .feature-card.col-3 { grid-column: span 3; }
+    
+    .feature-icon-wrapper {
+      width: 54px; height: 54px;
       background: var(--primary-container);
+      color: var(--primary);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    .feature-icon-wrapper svg {
+      width: 26px; height: 26px;
+      stroke-width: 2.2px;
+    }
+    .feature-card h3 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .feature-card p {
+      font-size: 15px;
+      color: var(--on-surface-variant);
+      line-height: 1.6;
+    }
+
+    /* ─── Como Funciona ─── */
+    #how-it-works {
+      background: #ffffff;
+    }
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .step-card {
+      position: relative;
+      background: var(--surface-dim);
+      border-radius: 24px;
+      padding: 36px 30px;
+      border: 1px solid var(--outline);
+    }
+    .step-num {
+      position: absolute;
+      top: -20px; left: 30px;
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff;
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 800;
       border-radius: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 24px;
-      margin-bottom: 16px;
+      box-shadow: 0 8px 20px rgba(124, 58, 237, 0.25);
     }
-    .feature-card h3 {
+    .step-card h3 {
       font-size: 18px;
       font-weight: 700;
-      margin-bottom: 8px;
+      margin: 10px 0 12px;
     }
-    .feature-card p {
+    .step-card p {
       font-size: 14px;
       color: var(--on-surface-variant);
       line-height: 1.6;
     }
 
-    /* ─── How it works ─── */
-    #how-it-works { background: var(--surface-dim); }
-    .steps {
+    /* ─── FAQ Interativo ─── */
+    #faq {
+      background: var(--surface-dim);
+    }
+    .faq-container {
       max-width: 800px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 28px;
+      gap: 16px;
     }
-    .step {
-      display: flex;
-      gap: 24px;
-      align-items: flex-start;
-      background: #fff;
-      border-radius: 20px;
-      padding: 28px 32px;
+    .faq-item {
+      background: #ffffff;
       border: 1px solid var(--outline);
-      box-shadow: 0 4px 16px rgba(79,70,229,0.04);
+      border-radius: 18px;
+      overflow: hidden;
+      transition: all 0.3s ease;
     }
-    .step-num {
-      min-width: 52px; height: 52px;
-      background: linear-gradient(135deg, var(--primary), #7c3aed);
-      color: #fff;
-      border-radius: 14px;
+    .faq-item:hover {
+      border-color: var(--primary-light);
+    }
+    .faq-question {
+      padding: 24px;
+      width: 100%;
+      background: none;
+      border: none;
+      text-align: left;
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--on-surface);
       display: flex;
       align-items: center;
-      justify-content: center;
-      font-family: var(--font-display);
-      font-size: 22px;
-      font-weight: 800;
+      justify-content: space-between;
+      cursor: pointer;
     }
-    .step-content h3 {
-      font-family: var(--font-display);
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 6px;
+    .faq-question svg {
+      width: 20px; height: 20px;
+      stroke: var(--on-surface-variant);
+      transition: transform 0.3s ease;
+      stroke-width: 2.2px;
     }
-    .step-content p {
+    .faq-item.active {
+      border-color: var(--primary);
+      box-shadow: var(--shadow-primary);
+    }
+    .faq-item.active .faq-question svg {
+      transform: rotate(180deg);
+      stroke: var(--primary);
+    }
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .faq-answer-content {
+      padding: 0 24px 24px;
+      font-size: 15px;
       color: var(--on-surface-variant);
       line-height: 1.6;
-      font-size: 14px;
     }
 
-    /* ─── Tech Stack ─── */
-    #tech {
-      background: linear-gradient(135deg, var(--primary), #1e1b4b);
-      color: #fff;
-      text-align: center;
-    }
-    #tech .section-title { color: #fff; }
-    #tech .section-sub { color: rgba(255,255,255,0.6); }
-    .tech-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 20px;
-      max-width: 900px;
-      margin: 0 auto;
-    }
-    .tech-item {
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 16px;
-      padding: 24px 16px;
-      backdrop-filter: blur(8px);
-    }
-    .tech-item .name {
-      font-family: var(--font-display);
-      font-weight: 700;
-      font-size: 18px;
-    }
-    .tech-item .desc {
-      font-size: 13px;
-      color: rgba(255,255,255,0.5);
-      margin-top: 4px;
-    }
-    .tech-icon { font-size: 28px; margin-bottom: 8px; }
-
-    /* ─── CTA ─── */
-    .cta-section {
-      background: #fff;
+    /* ─── CTA Final ─── */
+    .cta-final {
+      background: radial-gradient(circle at 90% 10%, rgba(124, 58, 237, 0.06) 0%, rgba(255, 255, 255, 1) 70%), #ffffff;
+      border-top: 1px solid var(--outline);
       text-align: center;
       padding: 100px 5vw;
-      border-top: 1px solid var(--outline);
+      position: relative;
     }
-    .cta-section h2 {
-      font-family: var(--font-display);
-      font-size: clamp(32px, 4vw, 48px);
+    .cta-final-container {
+      max-width: 700px;
+      margin: 0 auto;
+      z-index: 5;
+      position: relative;
+    }
+    .cta-final h2 {
+      font-size: clamp(30px, 3.5vw, 44px);
       font-weight: 800;
-      color: var(--on-surface);
-      margin-bottom: 16px;
+      margin-bottom: 20px;
     }
-    .cta-section p {
+    .cta-final p {
       font-size: 18px;
       color: var(--on-surface-variant);
-      max-width: 520px;
-      margin: 0 auto 36px;
+      margin-bottom: 36px;
       line-height: 1.6;
     }
 
     /* ─── Footer ─── */
     footer {
-      background: var(--on-surface);
-      padding: 48px 5vw 32px;
-      text-align: center;
+      background: #0f172a; /* Dark Slate */
+      color: #94a3b8;
+      padding: 80px 5vw 40px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .footer-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 40px;
+      margin-bottom: 60px;
     }
     .footer-brand {
+      max-width: 300px;
+    }
+    .footer-logo {
       font-family: var(--font-display);
-      font-size: 22px;
+      font-size: 26px;
       font-weight: 800;
-      color: #fff;
+      color: #ffffff;
+      text-decoration: none;
       letter-spacing: -0.02em;
     }
-    .footer-version {
-      font-size: 12px;
-      color: rgba(255,255,255,0.3);
-      font-weight: 600;
-      margin-top: 2px;
-    }
-    .footer-text {
+    .footer-desc {
       font-size: 14px;
-      color: rgba(255,255,255,0.35);
+      margin-top: 16px;
       line-height: 1.6;
-      margin-top: 12px;
+    }
+    .footer-links {
+      display: flex;
+      gap: 80px;
+    }
+    .footer-group h4 {
+      color: #ffffff;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 20px;
+    }
+    .footer-group ul {
+      list-style: none;
+    }
+    .footer-group ul li {
+      margin-bottom: 12px;
+    }
+    .footer-group ul li a {
+      color: #94a3b8;
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.2s ease;
+    }
+    .footer-group ul li a:hover {
+      color: #ffffff;
+    }
+    .footer-bottom {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding-top: 40px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      font-size: 13px;
+    }
+    .footer-socials {
+      display: flex;
+      gap: 16px;
+    }
+    .footer-social-btn {
+      color: #94a3b8;
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .footer-social-btn:hover {
+      color: #ffffff;
     }
 
-    /* ─── Responsive ─── */
+    /* ─── Lead capture modal ─── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+    .modal-content {
+      background: #ffffff;
+      border-radius: 28px;
+      width: 90%;
+      max-width: 500px;
+      padding: 40px;
+      box-shadow: 0 25px 60px -10px rgba(15, 23, 42, 0.3);
+      border: 1px solid var(--outline);
+      position: relative;
+      transform: scale(0.92);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .modal-overlay.active .modal-content {
+      transform: scale(1);
+    }
+    .modal-close {
+      position: absolute;
+      top: 24px; right: 24px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--on-surface-variant);
+      transition: color 0.2s;
+    }
+    .modal-close:hover {
+      color: var(--on-surface);
+    }
+    .modal-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .modal-header h3 {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .modal-header p {
+      font-size: 14px;
+      color: var(--on-surface-variant);
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--on-surface);
+      margin-bottom: 8px;
+    }
+    .form-control {
+      width: 100%;
+      background: var(--surface-dim);
+      border: 1px solid var(--outline);
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--on-surface);
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    .form-control:focus {
+      border-color: var(--primary);
+      background: #ffffff;
+      box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1);
+    }
+    .btn-submit {
+      width: 100%;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      padding: 16px;
+      font-family: var(--font-body);
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-submit:hover {
+      background: var(--primary-dark);
+      box-shadow: 0 6px 16px rgba(124, 58, 237, 0.25);
+    }
+    .btn-submit:disabled {
+      background: #94a3b8;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    /* Submitting & Success Screens */
+    .modal-state-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px 0;
+    }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 4px solid var(--primary-container);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s infinite linear;
+      margin-bottom: 20px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Checkmark Animation */
+    .success-checkmark {
+      width: 72px;
+      height: 72px;
+      margin-bottom: 24px;
+    }
+    .checkmark {
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      display: block;
+      stroke-width: 4;
+      stroke: #fff;
+      stroke-miterlimit: 10;
+      box-shadow: inset 0px 0px 0px var(--success);
+      animation: fill-checkmark .4s ease-in-out .4s forwards, scale-checkmark .3s ease-in-out .9s forwards;
+    }
+    .checkmark__circle {
+      stroke-dasharray: 166;
+      stroke-dashoffset: 166;
+      stroke-width: 4;
+      stroke-miterlimit: 10;
+      stroke: var(--success);
+      fill: none;
+      animation: stroke-checkmark 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+    .checkmark__check {
+      transform-origin: 50% 50%;
+      stroke-dasharray: 48;
+      stroke-dashoffset: 48;
+      animation: stroke-checkmark 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+    }
+    @keyframes stroke-checkmark {
+      100% { stroke-dashoffset: 0; }
+    }
+    @keyframes scale-checkmark {
+      0%, 100% { transform: none; }
+      50% { transform: scale3d(1.1, 1.1, 1); }
+    }
+    @keyframes fill-checkmark {
+      100% { box-shadow: inset 0px 0px 0px 40px var(--success); }
+    }
+
+    /* ─── Responsive Styles ─── */
+    @media (max-width: 1024px) {
+      .hero-container {
+        grid-template-columns: 1fr;
+        gap: 40px;
+        text-align: center;
+      }
+      .hero-text {
+        align-items: center;
+      }
+      .hero-buttons {
+        justify-content: center;
+      }
+      .features-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+      .feature-card.col-4, .feature-card.col-2, .feature-card.col-3 {
+        grid-column: span 2;
+      }
+    }
     @media (max-width: 640px) {
-      nav { padding: 0 4vw; }
+      nav { padding: 0 6vw; }
       .nav-links a:not(.nav-cta) { display: none; }
-      .hero { padding: 100px 4vw 60px; }
-      section { padding: 60px 4vw; }
-      .mockup-body { grid-template-columns: 1fr; }
-      .mockup-side { border-left: none; border-top: 1px solid var(--outline); }
-      .step { flex-direction: column; padding: 20px 24px; }
-      .step-num { min-width: 44px; height: 44px; font-size: 18px; }
+      .hero { padding: 120px 6vw 60px; }
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+      .feature-card.col-4, .feature-card.col-2, .feature-card.col-3 {
+        grid-column: span 1;
+      }
+      .partners-grid {
+        gap: 30px;
+      }
+      section { padding: 60px 6vw; }
+      .footer-links {
+        flex-direction: column;
+        gap: 40px;
+      }
+      .modal-content {
+        padding: 30px 20px;
+      }
     }
   </style>
 </head>
@@ -569,13 +983,15 @@
 
   <!-- Nav -->
   <nav>
-    <a href="#" class="nav-logo">ChamaAí<small>SISTEMA DE FILAS</small></a>
+    <a href="#" class="nav-logo">
+      <span class="nav-logo-text">ChamaAí</span>
+      <span class="nav-logo-sub">Controle de Filas</span>
+    </a>
     <div class="nav-links">
-      <a href="#products">Telas</a>
       <a href="#features">Recursos</a>
       <a href="#how-it-works">Como Funciona</a>
-      <a href="#tech">Tecnologia</a>
-      <a href="#cta" class="nav-cta">Solicitar Demonstração</a>
+      <a href="#faq">Dúvidas</a>
+      <a href="#" class="nav-cta btn-open-modal">Solicitar Demonstração</a>
     </div>
   </nav>
 
@@ -583,55 +999,67 @@
   <section class="hero" id="hero">
     <div class="hero-glow g1"></div>
     <div class="hero-glow g2"></div>
-    <div class="hero-content">
-      <div class="hero-badge"><span class="dot"></span> Sistema em Produção — v1.0.122</div>
-      <h1>Gestão inteligente de <span>filas & senhas</span></h1>
-      <p>
-        Um ecossistema completo para supermercados, comércios e varejo: totem de senhas, 
-        painel TV, terminal do operador e admin — tudo integrado em tempo real.
-      </p>
-      <div class="hero-buttons">
-        <a href="#cta" class="btn-primary">Solicitar Demonstração</a>
-        <a href="#products" class="btn-secondary">Conheça as Telas</a>
+    
+    <div class="hero-container">
+      <div class="hero-text">
+        <div class="hero-badge">
+          <span class="dot"></span> 
+          <span>Sistema em Produção — v1.0.145</span>
+        </div>
+        <h1>Gestão inteligente de <span>filas & senhas</span></h1>
+        <p>
+          Reduza a ansiedade do seu cliente e otimize a produtividade do seu atendimento. Um ecossistema de alta performance com painel TV, totem de autoatendimento, terminal do operador e relatórios administrativos completos — rodando até mesmo sem internet.
+        </p>
+        <div class="hero-buttons">
+          <a href="#" class="btn-primary btn-open-modal">
+            <span>📅 Agendar Demonstração</span>
+          </a>
+          <a href="#features" class="btn-secondary">
+            <span>Conhecer Recursos</span>
+          </a>
+        </div>
       </div>
 
       <!-- Mockup -->
-      <div class="hero-mockup">
-        <div class="mockup-header">
-          <div class="mockup-tabs">
-            <span class="mockup-tab active">📺 Telão</span>
-            <span class="mockup-tab">🖥️ Admin</span>
-            <span class="mockup-tab">📱 Totem</span>
+      <div class="hero-mockup-wrapper">
+        <div class="hero-mockup">
+          <div class="mockup-header">
+            <div class="mockup-connection">
+              <span class="status-pulse"></span>
+              <span>PAINEL AO VIVO</span>
+            </div>
+            <span class="mockup-time" id="mockup-clock">10:47</span>
           </div>
-          <span class="mockup-time">09:42</span>
-        </div>
-        <div class="mockup-body">
-          <div class="mockup-main">
-            <div class="mockup-label">SENHA CHAMADA</div>
-            <div class="mockup-number">A042</div>
-            <div class="mockup-status">● Caixa 03 — Prioritário</div>
-          </div>
-          <div class="mockup-side">
-            <h4>Senhas Aguardando</h4>
-            <div class="mockup-row">
-              <span class="mockup-row-num">A043</span>
-              <span class="mockup-row-info">Caixa 01</span>
-              <span class="mockup-row-badge">Normal</span>
+          <div class="mockup-body">
+            <div class="mockup-main">
+              <span class="mockup-label">Senha Chamada</span>
+              <span class="mockup-number">A204</span>
+              <div class="mockup-status">
+                <span>Guichê 03 — Prioritário</span>
+              </div>
             </div>
-            <div class="mockup-row">
-              <span class="mockup-row-num">B012</span>
-              <span class="mockup-row-info">Caixa 05</span>
-              <span class="mockup-row-badge">Preferencial</span>
-            </div>
-            <div class="mockup-row">
-              <span class="mockup-row-num">A044</span>
-              <span class="mockup-row-info">Caixa 02</span>
-              <span class="mockup-row-badge">Normal</span>
-            </div>
-            <div class="mockup-row">
-              <span class="mockup-row-num">C007</span>
-              <span class="mockup-row-info">Caixa 04</span>
-              <span class="mockup-row-badge">Rápido</span>
+            <div class="mockup-list">
+              <h4>Próximos da Fila</h4>
+              <div class="mockup-row">
+                <span class="mockup-row-num">A205</span>
+                <span class="mockup-row-info">Caixa 01</span>
+                <span class="mockup-row-badge normal">Normal</span>
+              </div>
+              <div class="mockup-row">
+                <span class="mockup-row-num">B012</span>
+                <span class="mockup-row-info">Caixa 05</span>
+                <span class="mockup-row-badge pref">Preferencial</span>
+              </div>
+              <div class="mockup-row">
+                <span class="mockup-row-num">A206</span>
+                <span class="mockup-row-info">Caixa 02</span>
+                <span class="mockup-row-badge normal">Normal</span>
+              </div>
+              <div class="mockup-row">
+                <span class="mockup-row-num">C007</span>
+                <span class="mockup-row-info">Caixa 04</span>
+                <span class="mockup-row-badge fast">Rápido</span>
+              </div>
             </div>
           </div>
         </div>
@@ -639,181 +1067,478 @@
     </div>
   </section>
 
-  <!-- Products / Screens -->
-  <section id="products">
-    <h2 class="section-title">Telas do Sistema</h2>
-    <p class="section-sub">Quatro interfaces especializadas para cada ponto do atendimento.</p>
-    <div class="products-grid">
-      <div class="product-card">
-        <div class="product-icon">📺</div>
-        <h3>Telão</h3>
-        <p>Painel de visualização de chamadas com animações, áudio customizado e mídia programática para TVs.</p>
-        <span class="product-tag">React</span>
-        <span class="product-tag">SSE</span>
-        <span class="product-tag">Vite</span>
+  <!-- Nossos Parceiros (Social Proof) -->
+  <div class="partners">
+    <div class="partners-title">Nossos Parceiros & Clientes em Produção</div>
+    <div class="partners-grid">
+      <!-- Mercantil Santa Paula (Canonical and Exact Link Required) -->
+      <a href="https://www.mercantilsantapaula.com.br/" rel="canonical" target="_blank" class="partner-logo-link" title="Visitar Mercantil Santa Paula">
+        <img src="https://i.imgur.com/D5rpk7D.png" alt="Mercantil Santa Paula Logo" class="partner-logo" />
+      </a>
+      
+      <!-- Fictive Partners for Professional Look -->
+      <div class="partner-logo-link">
+        <div class="partner-logo-fictive">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Vida Hospitalar</span>
+        </div>
       </div>
-      <div class="product-card">
-        <div class="product-icon">📱</div>
-        <h3>Totem</h3>
-        <p>Emissor de senhas interativo com suporte a tela touch, voz e impressão térmica de tickets.</p>
-        <span class="product-tag">Kiosk</span>
-        <span class="product-tag">Touch</span>
-        <span class="product-tag">ESC/POS</span>
+      <div class="partner-logo-link">
+        <div class="partner-logo-fictive">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <span>Banco Sul</span>
+        </div>
       </div>
-      <div class="product-card">
-        <div class="product-icon">🖥️</div>
-        <h3>Operador</h3>
-        <p>Terminal para guichês chamarem a próxima senha, gerenciarem fila ou reimprimirem tickets.</p>
-        <span class="product-tag">Touch</span>
-        <span class="product-tag">Teclado</span>
-      </div>
-      <div class="product-card">
-        <div class="product-icon">⚙️</div>
-        <h3>Admin</h3>
-        <p>Dashboard de estatísticas, configurações de operadores, impressoras e monitoramento em tempo real.</p>
-        <span class="product-tag">Relatórios</span>
-        <span class="product-tag">Gestão</span>
+      <div class="partner-logo-link">
+        <div class="partner-logo-fictive">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span>1º Cartório Civil</span>
+        </div>
       </div>
     </div>
-  </section>
+  </div>
 
-  <!-- Features -->
+  <!-- Features (Bento Grid) -->
   <section id="features">
-    <h2 class="section-title">Recursos que fazem a diferença</h2>
-    <p class="section-sub">Engenharia robusta para ambientes críticos com tolerância a falhas.</p>
+    <div class="section-header">
+      <h2 class="section-title">Infraestrutura e Recursos de Ponta</h2>
+      <p class="section-sub">Uma engenharia pensada para tolerância a falhas em ambientes críticos e de alto fluxo de atendimento.</p>
+    </div>
+    
     <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon">⚡</div>
-        <h3>Tempo Real via SSE</h3>
-        <p>Server-Sent Events de altíssima velocidade para alteração instantânea de senhas entre guichês, telões e operadores.</p>
+      <!-- Item 1 -->
+      <div class="feature-card col-3">
+        <div class="feature-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <div>
+          <h3>Tempo Real via SSE</h3>
+          <p>Server-Sent Events de altíssima velocidade para chamadas instantâneas sem delay. O telão e os guichês conversam de forma reativa.</p>
+        </div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">🖨️</div>
-        <h3>Impressão Térmica Nativa</h3>
-        <p>Comunicação direta via USB, serial ou rede com impressoras Epson/ESC-POS. Impressão automática de tickets.</p>
+
+      <!-- Item 2 -->
+      <div class="feature-card col-3">
+        <div class="feature-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+        </div>
+        <div>
+          <h3>SQLite + Supabase</h3>
+          <p>Estrutura híbrida com banco de dados SQLite local robusto e sincronização automática com a nuvem via Supabase. Zero risco de perda de dados.</p>
+        </div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">🔒</div>
-        <h3>Modo Kiosk Blindado</h3>
-        <p>Totens com bloqueio estrito de atalhos do Windows (Alt+F4, Ctrl+W). Ideal para autoatendimento público.</p>
+
+      <!-- Item 3 -->
+      <div class="feature-card col-2">
+        <div class="feature-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+        </div>
+        <div>
+          <h3>Funcionamento Offline</h3>
+          <p>Se a internet cair, o sistema local continua funcionando de forma independente. As senhas são emitidas e chamadas normalmente.</p>
+        </div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">☁️</div>
-        <h3>SQLite + Supabase</h3>
-        <p>Banco local com sincronização assíncrona para nuvem. Funciona 100% offline com backup automático.</p>
+
+      <!-- Item 4 -->
+      <div class="feature-card col-4">
+        <div class="feature-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34"/></svg>
+        </div>
+        <div>
+          <h3>Totens e Kiosks Blindados</h3>
+          <p>Configuração robusta com bloqueio absoluto de atalhos e janelas indesejadas do sistema operacional (Modo Kiosk nativo para totens públicos de autoatendimento).</p>
+        </div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">📦</div>
-        <h3>Auto-Update Offline</h3>
-        <p>Sistema de atualização automática via rede local sem dependência de internet externa. Ideal para redes corporativas.</p>
+
+      <!-- Item 5 -->
+      <div class="feature-card col-3">
+        <div class="feature-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/><path d="M6 9V2h12v7"/></svg>
+        </div>
+        <div>
+          <h3>Impressão Térmica ESC/POS</h3>
+          <p>Comunicação direta USB, serial ou Ethernet com impressoras térmicas (Elgin, Epson, Bematech) para emissão de tickets ágil e automática.</p>
+        </div>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">⚖️</div>
-        <h3>Integração Toledo</h3>
-        <p>Monitor inteligente de arquivos de balanças Toledo para sincronização rápida de preços e encartes.</p>
+
+      <!-- Item 6 -->
+      <div class="feature-card col-3">
+        <div class="feature-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M23 12a11.05 11.05 0 0 0-22 0zm-5 7a3 3 0 1 1-6 0v-7h6z"/></svg>
+        </div>
+        <div>
+          <h3>Guichês & Telões Ilimitados</h3>
+          <p>Conecte quantos computadores, televisores, tablets ou operadores precisar. Sem custos adicionais por licença de terminal extra.</p>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- How it works -->
+  <!-- Como Funciona -->
   <section id="how-it-works">
-    <h2 class="section-title">Fluxo Completo</h2>
-    <p class="section-sub">Do totem ao atendimento, tudo integrado em segundos.</p>
-    <div class="steps">
-      <div class="step">
+    <div class="section-header">
+      <h2 class="section-title">Como Funciona o Fluxo do Atendimento</h2>
+      <p class="section-sub">Do totem à mesa do guichê, veja como o sistema garante um processo transparente.</p>
+    </div>
+    
+    <div class="steps-grid">
+      <div class="step-card">
         <div class="step-num">1</div>
-        <div class="step-content">
-          <h3>Cliente retira a senha no Totem</h3>
-          <p>O totem emite uma senha com código único, imprime o ticket térmico e exibe as instruções na tela touch.</p>
-        </div>
+        <h3>Retirada da Senha</h3>
+        <p>O cliente seleciona o tipo de atendimento no totem touch. Um ticket térmico personalizado com código é impresso.</p>
       </div>
-      <div class="step">
+      <div class="step-card">
         <div class="step-num">2</div>
-        <div class="step-content">
-          <h3>Operador chama a próxima senha</h3>
-          <p>No terminal do operador (touch ou teclado), o atendente chama a senha. O sistema envia via SSE para todos os painéis.</p>
-        </div>
+        <h3>Fila Monitorada</h3>
+        <p>A senha entra para o banco local. O cliente pode acompanhar sua posição de forma simples, reduzindo o estresse de espera.</p>
       </div>
-      <div class="step">
+      <div class="step-card">
         <div class="step-num">3</div>
-        <div class="step-content">
-          <h3>Telão exibe e anuncia em voz</h3>
-          <p>O painel TV mostra o número com animação em destaque, toca som customizado e faz a chamada por voz.</p>
-        </div>
+        <h3>Chamada & Alerta</h3>
+        <p>O atendente clica em "Chamar Próximo". O telão de TV atualiza instantaneamente com animação visual e aviso por voz.</p>
       </div>
-      <div class="step">
+      <div class="step-card">
         <div class="step-num">4</div>
-        <div class="step-content">
-          <h3>Cliente é atendido</h3>
-          <p>O cliente se dirige ao guichê indicado. O admin registra tudo: tempo de espera, histórico e estatísticas.</p>
+        <h3>Registro Completo</h3>
+        <p>O atendimento é finalizado. O admin consolida dados como tempo de espera, tempo de atendimento e produtividade do operador.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Interativo -->
+  <section id="faq">
+    <div class="section-header">
+      <h2 class="section-title">Perguntas Frequentes</h2>
+      <p class="section-sub">Tire suas principais dúvidas sobre o funcionamento técnico e prático do ChamaAí.</p>
+    </div>
+    
+    <div class="faq-container">
+      <div class="faq-item">
+        <button class="faq-question">
+          <span>O sistema funciona mesmo sem conexão com a internet?</span>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-content">
+            Sim! O ChamaAí foi arquitetado para ser resiliente e tolerante a falhas na rede. Ele roda um servidor local em Node/Express e um banco local em SQLite. Se a internet cair, o totem emite senhas, os guichês chamam e o telão exibe normalmente. Assim que a internet retornar, o Supabase sincroniza os dados dos relatórios de atendimento na nuvem de forma assíncrona.
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">
+          <span>Quais impressoras térmicas são homologadas e suportadas?</span>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-content">
+            O sistema é compatível com qualquer impressora térmica que utilize o padrão de comandos ESC/POS. Isso abrange modelos populares de marcas como Epson (TM-T20, TM-T20X), Elgin (i7, i9), Bematech (MP-4200 TH), Daruma, etc. A comunicação pode ser feita diretamente por conexões USB locais, portas Seriais ou pela rede local de forma nativa.
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">
+          <span>Existe alguma taxa adicional por guichês ou atendentes extras?</span>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-content">
+            Não. O ecossistema foi projetado para rodar ilimitadamente em rede local. Você pode abrir a tela de chamadas de operadores e painéis de TV em quantos dispositivos quiser dentro do estabelecimento (computadores, celulares, smart TVs ou tablets) sem custos adicionais de licenciamento por máquina ativa.
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">
+          <span>Como é feita a chamada de voz no painel da TV?</span>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-content">
+            Utilizamos a Web Audio API diretamente no navegador do painel, garantindo suporte nativo a toques de chamada personalizados e vozes geradas por síntese de fala local ou externa de altíssima fidelidade. Não é preciso instalar reprodutores de áudio adicionais na TV ou dongle.
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Tech Stack -->
-  <section id="tech">
-    <h2 class="section-title">Tecnologia de Ponta</h2>
-    <p class="section-sub">Construído com as melhores ferramentas para performance e confiabilidade.</p>
-    <div class="tech-grid">
-      <div class="tech-item">
-        <div class="tech-icon">⚛️</div>
-        <div class="name">React 19</div>
-        <div class="desc">Interface reativa</div>
-      </div>
-      <div class="tech-item">
-        <div class="tech-icon">⚡</div>
-        <div class="name">Vite 8</div>
-        <div class="desc">Build ultrarrápido</div>
-      </div>
-      <div class="tech-item">
-        <div class="tech-icon">🖥️</div>
-        <div class="name">Electron 30</div>
-        <div class="desc">Desktop nativo</div>
-      </div>
-      <div class="tech-item">
-        <div class="tech-icon">🗄️</div>
-        <div class="name">SQLite</div>
-        <div class="desc">Dados locais</div>
-      </div>
-      <div class="tech-item">
-        <div class="tech-icon">☁️</div>
-        <div class="name">Supabase</div>
-        <div class="desc">Cloud sync</div>
-      </div>
-      <div class="tech-item">
-        <div class="tech-icon">🌐</div>
-        <div class="name">Express</div>
-        <div class="desc">Servidor local</div>
-      </div>
-      <div class="tech-item">
-        <div class="tech-icon">📱</div>
-        <div class="name">Capacitor</div>
-        <div class="desc">Android nativo</div>
-      </div>
-      <div class="tech-item">
-        <div class="tech-icon">🎨</div>
-        <div class="name">Tailwind CSS</div>
-        <div class="desc">Design system</div>
+  <!-- CTA Final -->
+  <section class="cta-final" id="cta">
+    <div class="cta-final-container">
+      <h2>Pronto para otimizar suas filas?</h2>
+      <p>Fale agora com um especialista, agende uma demonstração ao vivo e descubra como o ChamaAí pode simplificar seu atendimento.</p>
+      <div class="hero-buttons" style="justify-content: center;">
+        <a href="#" class="btn-primary btn-open-modal">
+          <span>📅 Agendar Demonstração</span>
+        </a>
+        <!-- WhatsApp Link Placeholder linked to WHATSAPP_LINK constant -->
+        <a href="#" class="btn-secondary whatsapp-button" target="_blank">
+          <span style="display: inline-flex; align-items: center; gap: 8px;">
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.248 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.725 1.45 5.556 0 10.086-4.524 10.089-10.076.002-2.69-1.041-5.216-2.937-7.114C16.53 1.517 14.01 .472 11.33.473c-5.561 0-10.09 4.526-10.093 10.08-.001 1.93.486 3.81 1.41 5.485L1.58 20.358l4.492-1.17c1.6.873 3.01 1.353 4.575 1.366zM20.52 17.88a7.255 7.255 0 0 1-.36 1.15c-.24.51-.57.97-.99 1.36-.61.57-1.12.72-1.87.42-.51-.21-1.02-.45-1.5-.72-1.89-1.07-3.48-2.61-4.59-4.53-.28-.48-.52-1-.71-1.52-.36-.92.05-1.59.51-2.06.27-.27.56-.56.84-.84.28-.28.37-.47.56-.75.09-.19.05-.38 0-.57-.05-.19-.52-1.26-.71-1.74-.19-.48-.38-.48-.57-.48-.19 0-.38 0-.57 0-.57 0-1.11.23-1.47.67-.65.75-.98 1.7-.98 2.67 0 1.25.44 2.45.98 3.48.96 1.76 2.23 3.32 3.73 4.59.88.75 1.87 1.37 2.94 1.83.69.3 1.38.48 2.05.42.75-.06 1.47-.48 1.89-1 .42-.51.42-1.02.38-1.5-.04-.15-.19-.24-.38-.34-.38-.19-2.22-1.09-2.56-1.22-.34-.13-.58-.09-.82.25-.24.34-.84 1.05-.98 1.22-.14.17-.38.19-.57.09-.34-.19-1.15-.46-1.92-1.15-.6-.54-.99-1.19-1.11-1.39-.12-.2 0-.31.09-.4.09-.08.2-.23.3-.35.1-.12.14-.2.23-.34.09-.14.05-.28 0-.38-.05-.1-.47-1.13-.64-1.55-.17-.42-.34-.34-.47-.34h-.38z"/></svg>
+            Chame no WhatsApp
+          </span>
+        </a>
       </div>
     </div>
-  </section>
-
-  <!-- CTA -->
-  <section class="cta-section" id="cta">
-    <h2>Pronto para simplificar suas filas?</h2>
-    <p>Solicite uma demonstração gratuita e descubra como o ChamaAí transforma a experiência dos seus clientes.</p>
-    <a href="#" class="btn-primary">📅 Agendar Demonstração</a>
   </section>
 
   <!-- Footer -->
   <footer>
-    <div class="footer-brand">ChamaAí</div>
-    <div class="footer-version">v1.0.122 — Sistema de Gestão de Filas e Totem de Senhas</div>
-    <p class="footer-text">
-      ChamaAí Tecnologia Ltda. &copy; 2026. Todos os direitos reservados.
-    </p>
+    <div class="footer-container">
+      <div class="footer-brand">
+        <a href="#" class="footer-logo">ChamaAí</a>
+        <p class="footer-desc">Soluções inteligentes de hardware e software para controle de fluxo e atendimento de alto impacto visual.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-group">
+          <h4>Produto</h4>
+          <ul>
+            <li><a href="#features">Recursos</a></li>
+            <li><a href="#how-it-works">Como funciona</a></li>
+            <li><a href="#faq">Dúvidas</a></li>
+          </ul>
+        </div>
+        <div class="footer-group">
+          <h4>Contato</h4>
+          <ul>
+            <li><a href="#" class="whatsapp-button" target="_blank">Fale Conosco</a></li>
+            <li><a href="#" class="btn-open-modal">Demonstração</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 ChamaAí Tecnologia Ltda. Todos os direitos reservados.</p>
+      <div class="footer-socials">
+        <a href="#" class="footer-social-btn whatsapp-button" target="_blank">WhatsApp</a>
+      </div>
+    </div>
   </footer>
 
+  <!-- Lead Modal -->
+  <div id="leadModal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="modal-close" id="closeModal" title="Fechar">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      
+      <!-- Form state -->
+      <div id="formFields">
+        <div class="modal-header">
+          <h3>Solicitar Demonstração</h3>
+          <p>Preencha os campos abaixo para que nosso time entre em contato e monte um ambiente de testes para você.</p>
+        </div>
+        <form id="leadForm">
+          <div class="form-group">
+            <label for="name">Nome Completo</label>
+            <input type="text" id="name" required placeholder="Ex: João Silva" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label for="email">E-mail Corporativo</label>
+            <input type="email" id="email" required placeholder="Ex: joao@empresa.com" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label for="phone">Celular / WhatsApp</label>
+            <input type="text" id="phone" required placeholder="Ex: (11) 99999-9999" class="form-control" />
+          </div>
+          <button type="submit" class="btn-submit" id="btnSubmit">
+            <span>Enviar Solicitação</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Loading state (isSubmitting) -->
+      <div id="submittingState" class="modal-state-screen" style="display: none;">
+        <div class="spinner"></div>
+        <h4>Enviando...</h4>
+        <p style="font-size: 14px; color: var(--on-surface-variant); margin-top: 8px;">Aguarde enquanto registramos seus dados de demonstração.</p>
+      </div>
+
+      <!-- Success state (isSuccess) -->
+      <div id="successState" class="modal-state-screen" style="display: none;">
+        <div class="success-checkmark">
+          <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+            <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none"/>
+            <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+          </svg>
+        </div>
+        <h4>Solicitação Enviada!</h4>
+        <p style="font-size: 14px; color: var(--on-surface-variant); margin-top: 8px;">Seu cadastro foi realizado com sucesso. Entraremos em contato em breve.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── Business Constants ───
+    const WHATSAPP_LINK = "https://wa.me/5511999999999";
+
+    // ─── Apply WhatsApp Links to Buttons ───
+    document.querySelectorAll(".whatsapp-button").forEach(btn => {
+      btn.setAttribute("href", WHATSAPP_LINK);
+    });
+
+    // ─── Live Clock in Mockup Panel ───
+    function updateClock() {
+      const clockEl = document.getElementById("mockup-clock");
+      if (clockEl) {
+        const now = new Date();
+        clockEl.textContent = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      }
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ─── Modal & States Elements ───
+    const modal = document.getElementById("leadModal");
+    const openModalButtons = document.querySelectorAll(".btn-open-modal");
+    const closeModalButton = document.getElementById("closeModal");
+    const leadForm = document.getElementById("leadForm");
+    const phoneInput = document.getElementById("phone");
+
+    const formFields = document.getElementById("formFields");
+    const submittingState = document.getElementById("submittingState");
+    const successState = document.getElementById("successState");
+
+    // ─── Phone Mask (formatPhone) ───
+    function formatPhone(value) {
+      if (!value) return "";
+      // Remove all non-digits
+      value = value.replace(/\D/g, "");
+      
+      // Limit to 11 digits
+      if (value.length > 11) {
+        value = value.slice(0, 11);
+      }
+      
+      if (value.length > 10) {
+        // (XX) XXXXX-XXXX
+        return `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
+      } else if (value.length > 5) {
+        // (XX) XXXX-XXXX
+        return `(${value.slice(0, 2)}) ${value.slice(2, 6)}-${value.slice(6)}`;
+      } else if (value.length > 2) {
+        // (XX) XXX...
+        return `(${value.slice(0, 2)}) ${value.slice(2)}`;
+      } else if (value.length > 0) {
+        // (XX...
+        return `(${value.slice(0, 2)}`;
+      }
+      return value;
+    }
+
+    if (phoneInput) {
+      phoneInput.addEventListener("input", (e) => {
+        e.target.value = formatPhone(e.target.value);
+      });
+    }
+
+    // ─── Modal Open & Close Actions ───
+    openModalButtons.forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        modal.classList.add("active");
+        
+        // Reset states
+        formFields.style.display = "block";
+        submittingState.style.display = "none";
+        successState.style.display = "none";
+        if (leadForm) leadForm.reset();
+      });
+    });
+
+    if (closeModalButton) {
+      closeModalButton.addEventListener("click", () => {
+        modal.classList.remove("active");
+      });
+    }
+
+    // Close on clicking backdrop
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) {
+        modal.classList.remove("active");
+      }
+    });
+
+    // ─── Lead Form Submission (n8n Webhook) ───
+    if (leadForm) {
+      leadForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        
+        const name = document.getElementById("name").value.trim();
+        const email = document.getElementById("email").value.trim();
+        const phone = phoneInput.value.trim();
+        
+        if (!name || !email || !phone) {
+          alert("Por favor, preencha todos os campos obrigatórios.");
+          return;
+        }
+
+        // Validate minimum required digits for phone (minimum 14 characters formatted: (XX) XXXX-XXXX)
+        if (phone.length < 14) {
+          alert("Por favor, insira um celular/telefone completo com DDD.");
+          return;
+        }
+
+        // isSubmitting state
+        formFields.style.display = "none";
+        submittingState.style.display = "flex";
+        
+        try {
+          // n8n webhook asynchronous post
+          const response = await fetch("https://n8n-n8n.hijn5u.easypanel.host/webhook/chamaai-lead", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              name,
+              email,
+              phone,
+              source: 'Landing Page ChamaAí'
+            })
+          });
+
+          // isSuccess state
+          submittingState.style.display = "none";
+          successState.style.display = "flex";
+          
+          // Auto close the modal after 2 seconds on success
+          setTimeout(() => {
+            modal.classList.remove("active");
+          }, 2000);
+
+        } catch (err) {
+          console.error("Falha ao registrar lead no webhook:", err);
+          alert("Ops! Houve uma falha de conexão. Por favor, tente novamente.");
+          
+          // Restore form view
+          formFields.style.display = "block";
+          submittingState.style.display = "none";
+        }
+      });
+    }
+
+    // ─── FAQ Accordion Interaction ───
+    const faqQuestions = document.querySelectorAll(".faq-question");
+    faqQuestions.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const item = btn.parentElement;
+        const answer = item.querySelector(".faq-answer");
+        const isActive = item.classList.contains("active");
+
+        // Collapse any other open FAQ items
+        document.querySelectorAll(".faq-item").forEach(otherItem => {
+          otherItem.classList.remove("active");
+          otherItem.querySelector(".faq-answer").style.maxHeight = null;
+        });
+
+        if (!isActive) {
+          item.classList.add("active");
+          answer.style.maxHeight = answer.scrollHeight + "px";
+        }
+      });
+    });
+  </script>
 </body>
 </html>

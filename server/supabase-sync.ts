@@ -144,6 +144,82 @@ export function syncConfiguracaoPublica(chave: string, valor: string) {
   });
 }
 
+/**
+ * Sincroniza a tabela inteira de categorias com o Supabase.
+ */
+export function syncCatalogoCategorias() {
+  try {
+    const { getDb } = require('../electron/services/database');
+    const db = getDb();
+    const categorias = db.prepare(
+      "SELECT id, nome, slug, emoji, ordem, ativo FROM categorias WHERE deleted_at IS NULL"
+    ).all() as any[];
+
+    enqueueSyncOp('categorias_publicas', 'delete_all', {});
+
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < categorias.length; i += BATCH_SIZE) {
+      const batch = categorias.slice(i, i + BATCH_SIZE).map(c => ({
+        id: c.id,
+        nome: c.nome,
+        slug: c.slug,
+        emoji: c.emoji || '',
+        ordem: c.ordem || 0,
+        ativo: c.ativo ? 1 : 0,
+        updated_at: new Date().toISOString()
+      }));
+      enqueueSyncOp('categorias_publicas', 'upsert', batch);
+    }
+    console.log(`[SYNC QUEUE] 📥 ${categorias.length} categorias enfileiradas para sync`);
+  } catch (err) {
+    console.error('[SYNC QUEUE] Erro ao sincronizar categorias:', err);
+  }
+}
+
+/**
+ * Sincroniza a tabela inteira de produtos com o Supabase.
+ */
+export function syncCatalogoProdutos() {
+  try {
+    const { getDb } = require('../electron/services/database');
+    const db = getDb();
+    const produtos = db.prepare(
+      "SELECT id, plu, nome, slug, preco, unidade, categoria_id, status, ordem, tags FROM produtos WHERE deleted_at IS NULL"
+    ).all() as any[];
+
+    enqueueSyncOp('produtos_publicos', 'delete_all', {});
+
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < produtos.length; i += BATCH_SIZE) {
+      const batch = produtos.slice(i, i + BATCH_SIZE).map(p => ({
+        id: p.id,
+        plu: p.plu || null,
+        nome: p.nome,
+        slug: p.slug || null,
+        preco: p.preco || 0,
+        unidade: p.unidade || 'kg',
+        categoria_id: p.categoria_id || null,
+        status: p.status ? 1 : 0,
+        ordem: p.ordem || 0,
+        tags: p.tags || null,
+        updated_at: new Date().toISOString()
+      }));
+      enqueueSyncOp('produtos_publicos', 'upsert', batch);
+    }
+    console.log(`[SYNC QUEUE] 📥 ${produtos.length} produtos enfileirados para sync`);
+  } catch (err) {
+    console.error('[SYNC QUEUE] Erro ao sincronizar produtos:', err);
+  }
+}
+
+/**
+ * Enfileira a exclusão de um produto ou categoria na nuvem.
+ */
+export function syncDeleteCatalogoItem(tabela: 'produtos_publicos' | 'categorias_publicas', id: number) {
+  enqueueSyncOp(tabela, 'delete', { id });
+  console.log(`[SYNC QUEUE] 📥 Item ${id} da tabela ${tabela} enfileirado para exclusão`);
+}
+
 // ── Sync Worker (consome a fila e envia para o Supabase) ────────────────────────
 
 let syncWorkerTimer: NodeJS.Timeout | null = null;
@@ -183,6 +259,10 @@ async function processSyncQueue() {
           // Para updates, extraímos o id do payload e atualizamos
           const { id, ...updateData } = payload;
           const result = await supabase.from(item.tabela).update(updateData).eq('id', id);
+          error = result.error;
+        } else if (item.acao === 'delete') {
+          const { id } = payload;
+          const result = await supabase.from(item.tabela).delete().eq('id', id);
           error = result.error;
         } else if (item.acao === 'delete_all') {
           let result;

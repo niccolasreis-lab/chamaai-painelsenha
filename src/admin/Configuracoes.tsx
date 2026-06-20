@@ -1827,7 +1827,10 @@ export default function Configuracoes() {
 
       {showUpdateLogin && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-surface rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-outline-variant/20">
+          <div 
+            className="bg-surface rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-outline-variant/20 relative pointer-events-auto"
+            onClick={e => e.stopPropagation()}
+          >
             <h3 className="text-xl font-bold text-ink mb-2">Autenticação Necessária</h3>
             <p className="text-sm text-ink-secondary mb-6">
               Insira a Senha Master Remota para buscar atualizações do sistema.

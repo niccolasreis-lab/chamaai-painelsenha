@@ -22,7 +22,9 @@ module.exports = {
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
-        inter: ['Inter', 'sans-serif']
+        inter: ['Inter', 'sans-serif'],
+        syne: ['Syne', 'sans-serif'],
+        dmsans: ['DM Sans', 'sans-serif']
       },
       animation: {
         'pulse-call': 'pulse-call 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',

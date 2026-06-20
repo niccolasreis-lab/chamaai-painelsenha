@@ -176,7 +176,7 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
         <video 
           ref={videoRef}
           src={`${API_URL}${currentMedia.local_path}`} 
-          className="w-full h-full object-contain"
+          className="w-full h-full object-cover"
           autoPlay
           muted
           onEnded={handleNext}
@@ -191,7 +191,7 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
         <img 
           src={`${API_URL}${currentMedia.local_path}`} 
           alt={currentMedia.title}
-          className="w-full h-full object-contain"
+          className="w-full h-full object-cover"
           onError={handleNext}
         />
       );

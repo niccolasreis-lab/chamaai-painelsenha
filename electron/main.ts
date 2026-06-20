@@ -165,28 +165,7 @@ function loadPrinterConfig(): Partial<PrinterConfig> {
   }
 }
 
-/** Busca caminho personalizado para atualizações locais/offline */
-function getCustomUpdatePath(): string | null {
-  try {
-    const db = getDb();
-    const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'update_path'").get() as any;
-    if (row && row.valor) {
-      // Verifica se o path personalizado contém latest.yml
-      const customYml = path.join(row.valor, 'latest.yml');
-      if (fs.existsSync(customYml)) {
-        return row.valor;
-      }
-    }
-  } catch (e) {}
 
-  // Fallback: pasta padrão local — só ativa se latest.yml existir dentro dela
-  const defaultLocalPath = 'C:\\ChamaAi_Atualizacoes';
-  const defaultYml = path.join(defaultLocalPath, 'latest.yml');
-  if (fs.existsSync(defaultYml)) {
-    return defaultLocalPath;
-  }
-  return null;
-}
 
 function sendToAllWindows(channel: string, ...args: any[]) {
   BrowserWindow.getAllWindows().forEach(win => {
@@ -721,17 +700,7 @@ if (!gotTheLock) {
           autoUpdater.forceDevUpdateConfig = true;
         }
 
-        // Configuração dinâmica de atualização local/offline
-        const localUpdatePath = getCustomUpdatePath();
-        if (localUpdatePath) {
-          autoUpdateLogger.info(`Atualizador local/offline ativado! Redirecionando para servidor HTTP local: http://localhost:3001/local-updates (lendo de ${localUpdatePath})`);
-          autoUpdater.setFeedURL({
-            provider: 'generic',
-            url: 'http://localhost:3001/local-updates'
-          });
-        } else {
-          autoUpdateLogger.info('Usando canal padrão de atualizações (GitHub Releases).');
-        }
+        autoUpdateLogger.info('Usando canal padrão de atualizações (GitHub Releases).');
         
         autoUpdater.on('checking-for-update', () => autoUpdateLogger.info('Verificando se há atualizações...'));
         autoUpdater.on('update-available', (info) => {

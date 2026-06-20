@@ -644,7 +644,7 @@ export default function MediaIndoor() {
                         <video 
                           ref={videoRef}
                           src={`${API_URL}${activeMidia.caminho}`} 
-                          className="w-full h-full object-contain"
+                          className="w-full h-full object-cover"
                           autoPlay
                           muted
                           loop={midias.length === 1 && !activeModules.includes('encarte')}
@@ -667,7 +667,7 @@ export default function MediaIndoor() {
                           key={activeMidia.id}
                           src={`${API_URL}${activeMidia.caminho}`} 
                           alt={activeMidia.nome}
-                          className="w-full h-full object-contain"
+                          className="w-full h-full object-cover"
                           onError={(e) => {
                             console.error('[MEDIA ERROR] Erro ao carregar imagem. Pulando...', e);
                             nextMedia();
@@ -800,7 +800,7 @@ export default function MediaIndoor() {
                       <video 
                         ref={videoRef}
                         src={`${API_URL}${activeMidia.caminho}`} 
-                        className="w-full h-full object-contain"
+                        className="w-full h-full object-cover"
                         autoPlay
                         muted
                         loop={midias.length === 1 && !activeModules.includes('encarte')}
@@ -823,7 +823,7 @@ export default function MediaIndoor() {
                         key={activeMidia.id}
                         src={`${API_URL}${activeMidia.caminho}`} 
                         alt={activeMidia.nome}
-                        className="w-full h-full object-contain"
+                        className="w-full h-full object-cover"
                         onError={(e) => {
                           console.error('[MEDIA ERROR] Erro ao carregar imagem. Pulando...', e);
                           nextMedia();

@@ -93,51 +93,86 @@ spacing:
   margin: 32px
 ---
 
-## Brand & Style
-The design system is engineered for high-visibility environments where clarity and reduced cognitive load are paramount. It evokes a sense of organized calm through a "clean tech" aesthetic, blending professional corporate reliability with a vibrant, modern energy. The interface prioritizes legibility at a distance, particularly for public-facing displays, while maintaining a sophisticated atmosphere for administrative users.
+# ChamaAí — Landing Page Design & Architecture System
 
-The style leverages a modern digital-first approach: heavy on whitespace, utilizing depth through soft indigo-tinted shadows, and employing high-contrast typography to guide users through the queueing process seamlessly.
+Este documento detalha o mapa da estrutura de design, tokens visuais, especificações de layout e integrações aplicadas na Landing Page (`landing.html`) de produção do **ChamaAí**.
 
-## Colors
-The palette is rooted in a deep "Principal Indigo" to establish authority and trust, complemented by an "Electric Cyan" for secondary accents and interactive highlights. The background utilizes a very subtle blue tint to reduce the harshness of pure white, which is reserved for card surfaces to create distinct visual layers. 
+---
 
-Status colors are strictly functional: Emerald Green for successful actions and ticket completions, and a crisp Alert Red for cancellations or urgent notifications. Gradients are used sparingly to add depth to primary touchpoints and environmental screens (Totems/Displays), moving from the primary indigo to a deeper violet.
+## Page Structure Map (Mapa de Estrutura)
 
-## Typography
-This design system employs a dual-font strategy to balance character with utility. **Syne** is utilized for all high-impact numerical and display elements; its geometric and slightly eccentric letterforms ensure that ticket numbers are unmistakable even from a distance. **DM Sans** provides a neutral, highly readable counterpoint for all functional UI text, descriptions, and administrative data.
+```text
+ChamaAí — Landing Page
+├── Solicitar Demonstração (Lead Capture Modal)
+│   ├── Campo Nome Completo
+│   ├── Campo E-mail Corporativo
+│   └── Campo Celular / WhatsApp (formatPhone Mask)
+├── Seção Hero & Painel TV Mockup
+│   ├── Badges de Status (v1.0.145)
+│   └── Painel Interativo ("Senha Atual A204" no "Guichê 03")
+├── Seção Nossos Parceiros (Social Proof)
+│   └── Mercantil Santa Paula (Logo & Link Canonical)
+├── Recursos de Ponta (Bento Grid)
+│   ├── Tempo Real via SSE
+│   ├── SQLite + Supabase Sync
+│   ├── Funcionamento Offline
+│   ├── Totens e Kiosks Blindados
+│   ├── Impressão Térmica ESC/POS
+│   └── Guichês & Telões Ilimitados
+├── Como Funciona o Atendimento (Fluxo 1-4)
+└── FAQ Interativo (Acordeão em Vanilla JS)
+```
 
-Hierarchy is enforced through extreme scale contrast—particularly the 120px ticket display—ensuring the most critical information is never missed.
+---
 
-## Layout & Spacing
-The layout philosophy is built on "Generous Breathing Room." A 12-column fluid grid is used for administrative dashboards, while public-facing Totem and Telão (Big Screen) views utilize a centered, fixed-layout approach to maintain focus. 
+## Brand & Visual System (Identidade Visual)
 
-Spacing follows a 4px/8px baseline rhythm. Generous internal padding within cards (minimum 32px) ensures that information does not feel crowded. Components are grouped using proximity logic, with larger gaps (40px+) used to separate distinct functional areas like "Current Ticket" and "Waiting List."
+### 1. Paleta de Cores (Soft Slate & Royal Purple)
+A landing page utiliza tons harmônicos projetados para transmitir estabilidade e facilidade de uso:
+- **Cor Primária (Royal Purple):** `#7c3aed` (purple-600) para botões principais, focos de inputs e links ativos.
+- **Cor Secundária (Teal):** `#0d9488` (teal-600) para contrastes finos e chamadas complementares.
+- **Cor de Sucesso (Emerald):** `#10b981` (emerald-500) para status de rede conectados e ícone `<Check />` do Modal.
+- **Cor de Fundo (Soft Slate):** `#f8fafc` (slate-50) como plano de fundo limpo e leve.
+- **Cards e Superfícies:** `#ffffff` (branco puro) com bordas arredondadas de `24px` / `28px` e sombras sutis indigo-tintadas (`box-shadow: 0 20px 40px -10px rgba(124, 58, 237, 0.12)`).
 
-## Elevation & Depth
-Depth in the design system is achieved through soft, tinted ambient shadows rather than traditional gray-scale blurs. Surfaces sit on the background with a 16px blur shadow that carries an 8% opacity tint of the primary Indigo (#4F46E5). This creates a "submerged" feeling where elements appear to float slightly above the bluish-white base.
+### 2. Tipografia
+Implementação de fontes elegantes do Google Fonts:
+- **Títulos (h1, h2, h3):** Família **Outfit**, proporcionando um tom corporativo contemporâneo e moderno.
+- **Corpo do texto:** Família **Inter**, otimizada para máxima legibilidade nos cards de funcionalidades e respostas do FAQ.
+- **Números de Senha:** Família **Syne** com fonte Bold expressiva.
 
-- **Level 0 (Background):** #F8FAFF or Ambient Gradient.
-- **Level 1 (Cards/Containers):** #FFFFFF with the signature indigo shadow.
-- **Level 2 (Modals/Popovers):** #FFFFFF with a slightly more pronounced shadow (0 8px 24px rgba(79,70,229,0.12)).
+---
 
-## Shapes
-The shape language is defined by large, friendly radii. A standard 20px corner radius is applied to all primary cards and containers, softening the overall aesthetic. Interactive elements like buttons and input fields use a slightly tighter radius (10px-12px) to signify they are clickable components within the larger card structures. Icons must always be "Outline" style with a consistent 2px stroke weight and rounded terminals to match the container geometry.
+## Detalhamento das Diretrizes de Design por Seção
 
-## Components
+### 1. Seção Hero & Mockup Interativo
+- **Copywriting Persuasivo:** Focado na redução da ansiedade do cliente durante a espera, e em como o ChamaAí organiza o atendimento em clínicas, cartórios, bancos e varejo.
+- **Painel Mockup (Direita):**
+  - Simula uma tela de chamadas de TV de forma realista.
+  - Exibe a senha ativa **A204** no **Guichê 03** com efeitos sutis de animação e pulso de rede.
+  - Indicador de status "PAINEL AO VIVO" com respiração verde pulsante.
+  - Exibição de fila de espera lateral (`A205`, `B012`, `A206`, `C007`) e relógio atualizado dinamicamente via Javascript.
 
-### Buttons
-- **Primary:** Features the Indigo-to-Violet gradient. Text is white, bold. 12px border radius.
-- **Secondary:** Outline style using the primary Indigo for both border and text.
-- **Action (Success):** Solid Emerald Green (#10B981) for specific queue-call actions.
+### 2. Autoridade (Nossos Parceiros)
+- Grade horizontal com logotipos de clientes de forma limpa.
+- **Mercantil Santa Paula:** Destaque obrigatório utilizando o logotipo oficial de alta resolução (`https://i.imgur.com/D5rpk7D.png`) e apontamento canônico exato (`https://www.mercantilsantapaula.com.br/`) com atributos `rel="canonical"` e `target="_blank"`.
 
-### Cards
-All cards must be #FFFFFF with the 20px border radius and signature indigo shadow. Padding should be 32px for top-level containers.
+### 3. Bento Grid (Funcionalidades)
+Layout assimétrico e responsivo (`grid-template-columns: repeat(6, 1fr)`) com cards expandindo-se dinamicamente (`col-4`, `col-3`, `col-2`):
+- **Tempo Real SSE:** Explicita a latência sub-100ms de eventos locais.
+- **SQLite + Supabase Sync:** Explica a tolerância a falhas (resiliência offline total).
+- **ESC/POS Native Printer:** Conexão direta com Elgin, Epson e Bematech.
+- **Modo Kiosk Blindado:** Segurança estrita de atalhos e foco de janela em totens.
 
-### Inputs & Selection
-Input fields use a subtle #EEF2FF background and a 1px #E0E7FF border. On focus, the border transitions to Primary Indigo with a soft outer glow. Labels always use the 11px uppercase "Label Caps" style.
+### 4. FAQ Interativo
+- Acordeão sanfona fluida construído em Javascript e CSS Vanilla.
+- Transições de expansão e colapso dinâmicas controladas pela propriedade `max-height` baseada no `scrollHeight` de cada bloco.
+- Responde objetivamente sobre funcionamento offline, compatibilidade ESC/POS e suporte a guichês ilimitados.
 
-### Ticket Display (Telão)
-The focal point of the system. The current ticket number is rendered in Syne Bold, 120px, Primary Indigo. It is usually housed within a secondary surface container (#EEF2FF) to differentiate it from the sidebar waiting lists.
-
-### Chips/Badges
-Small, pill-shaped indicators for status (e.g., "Priority", "Canceled"). Use 8px padding-x and the secondary surface color as a base, with text in Text Secondary.
+### 5. Modal de Captura de Leads (Contrato Técnico)
+- **Máscara de Telefone (`formatPhone`):** Formatação em tempo real como `(XX) XXXXX-XXXX` ou `(XX) XXXX-XXXX`, com validação mínima de 14 caracteres formatted para prosseguir.
+- **Webhook n8n:** Chamada POST assíncrona via `fetch` para `https://n8n-n8n.hijn5u.easypanel.host/webhook/chamaai-lead` enviando o payload `{ name, email, phone, source: 'Landing Page ChamaAí' }`.
+- **Estados Visuais de Submissão:**
+  - **isSubmitting:** Alterna para a tela com Spinner circular e texto "Enviando...", bloqueando interações.
+  - **isSuccess:** Dispara o círculo verde de sucesso contendo o ícone `<Check />` animado (com propriedades de stroke dasharray/dashoffset do SVG) e fecha o modal automaticamente após 2 segundos.
+- **WhatsApp Direct Link:** Constante `WHATSAPP_LINK` centralizada apontando para o número de atendimento celular.

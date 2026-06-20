@@ -606,6 +606,101 @@ export async function initDatabase({ appVersion }: { appVersion: string }): Prom
       console.error('[DATABASE] Erro ao realizar seed de categorias:', seedErr);
     }
 
+    // ---------------------------------------------------------
+    // FASE 2: MIGRAÇÃO CATEGORIAS PARA 12 SETORES
+    // ---------------------------------------------------------
+    try {
+      const migracaoJaFeita = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'MIGRACAO_CATEGORIAS_12_SETOR'").get() as any;
+      
+      if (!migracaoJaFeita) {
+        console.log('[FASE 2] Executando migração de categorias — 17 → 12 setores...');
+        
+        const migrar = db.transaction(() => {
+          const categoriasNovas = [
+            { nome: "Azeitonas e Conservas", emoji: "🫒", setor: "mercearia", ordem: 1 },
+            { nome: "Grãos, Cereais e Farinhas", emoji: "🌾", setor: "mercearia", ordem: 2 },
+            { nome: "Queijos", emoji: "🧀", setor: "frios", ordem: 3 },
+            { nome: "Frios e Embutidos", emoji: "🥩", setor: "frios", ordem: 4 },
+            { nome: "Castanhas e Oleaginosas", emoji: "🌰", setor: "granel", ordem: 5 },
+            { nome: "Frutas Secas e Desidratadas", emoji: "🫐", setor: "granel", ordem: 6 },
+            { nome: "Bacalhau e Peixes", emoji: "🐟", setor: "peixaria", ordem: 7 },
+            { nome: "Temperos e Ervas", emoji: "🌿", setor: "mercearia", ordem: 8 },
+            { nome: "Cereais e Granola", emoji: "🥣", setor: "mercearia", ordem: 9 },
+            { nome: "Suplementos e Funcionais", emoji: "💊", setor: "saude", ordem: 10 },
+            { nome: "Laticínios Granel", emoji: "🧈", setor: "laticinios", ordem: 11 },
+            { nome: "Cárneos e Salgados", emoji: "🐷", setor: "acougue", ordem: 12 }
+          ];
+
+          const insertCat = db.prepare(`
+            INSERT OR IGNORE INTO categorias (nome, emoji, setor, ordem, ativo, slug, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, 1, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
+          `);
+
+          for (const cat of categoriasNovas) {
+            const slug = cat.nome.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+            insertCat.run(cat.nome, cat.emoji, cat.setor, cat.ordem, slug);
+          }
+
+          const catIdMap: Record<string, number> = {};
+          const categoriasFromDb = db.prepare("SELECT id, nome FROM categorias").all() as any[];
+          categoriasFromDb.forEach(c => { catIdMap[c.nome] = c.id; });
+
+          const mapeamentos = [
+            { palavras: ["BACALHAU", "SALMAO", "PEIXE"], novaCategoria: "Bacalhau e Peixes" },
+            { palavras: ["BRIE", "GORGONZOLA", "PARMESAO", "MUSSARELA", "PROVOLONE", "GOUDA", "COALHO", "ESTEPE", "EMENTAL", "MASDAMER", "GRUYERE", "SUICO", "RICOTA", "MINAS", "PECORINO", "CABLANCA", "PRIMA DONA", "KROON", "VINCENT", "CHEDAR", "PRATO LANCHE", "QUEIJO"], novaCategoria: "Queijos" },
+            { palavras: ["AZEITONA", "ALCAPARRA", "ALCAPARRON", "CONSERVA MIX"], novaCategoria: "Azeitonas e Conservas" },
+            { palavras: ["LINGUICA", "SALAME", "PRESUNTO", "BACON", "MORTADELA", "SALSICHA", "PAIO", "ROSBIFE", "APRESUNTADO", "PEITO DE PERU"], novaCategoria: "Frios e Embutidos" },
+            { palavras: ["CASTANHA", "AMENDOIM", "AMENDOA", "NOZES", "AVELA", "PISTACHE", "PINHOLES", "MACADAMIA", "SEMENTE ABOBORA", "GIRASSOL SEMENTE", "CASTANHA DE BARU"], novaCategoria: "Castanhas e Oleaginosas" },
+            { palavras: ["UVA PASSA", "AMEIXA", "TAMARA", "DAMASCO", "FIGO TURCO", "BANANA PASSA", "FRUTA CRISTALIZADA", "FRUTA GLACEADA", "FRUTA DESIDRATADA", "FRUTA SECA", "CEREJA MARRASQUINO", "TOMATE SECO"], novaCategoria: "Frutas Secas e Desidratadas" },
+            { palavras: ["TEMPERO", "PIMENTA", "CANELA", "LOURO", "OREGANO", "TOMILHO", "ACAFRAO", "CURCUMA", "CARDAMOMO", "CAMOMILA", "HORTELA", "CHA VERDE", "HIBISCO", "CIDREIRA", "ERVA DOCE", "FUNCHO", "MOSTARDA GRAO", "ALHO DESIDRATADO", "ALHO FRITO", "CEBOLA GRANEL", "COLORAU", "CALDO GRANEL", "FUMACA PO", "GENGIBRE MOIDO", "ERVAS FINAS", "ALECRIM", "CEBOLINHA GRANEL"], novaCategoria: "Temperos e Ervas" },
+            { palavras: ["SUCRILHOS", "AVEIA", "GRANOLA", "AMARANTO FLOCOS", "BISCOITO DE ARROZ", "FRISPY", "MICRO RICE"], novaCategoria: "Cereais e Granola" },
+            { palavras: ["WHEY", "PROTEINA", "CREATINA", "COLAGENO", "GLUTAMINA", "ALBUMINA", "SPIRULINA", "PSYLLIUM", "PISILIUM", "LEVEDURA", "POLEN", "TRIBULUS", "GUARANA", "MARAPUAMA", "CATUABA", "GINSENG", "MORINGA", "ORA PRO NOBIS", "CHIA", "LINHACA", "GERGELIM", "CACAU", "ERITRITOL", "XILITOL", "ACUCAR DE COCO", "AGAR AGAR", "GELATINA NEUTRA", "GOMA XANTANA", "FIBRA", "BIOMASSA"], novaCategoria: "Suplementos e Funcionais" },
+            { palavras: ["MANTEIGA", "REQUEIJAO", "DOCE DE LEITE", "DOCE PE DE MOCA", "DOCE PREDILETA", "LEITE DE COCO PO", "LEITE PO"], novaCategoria: "Laticínios Granel" },
+            { palavras: ["SALMORADO", "CHARQUE", "JOELHO", "COSTELA DICALANI", "PALETA DICALANI", "LOMBO DICALANI", "PERNIL", "FRANGO CONGELADO", "PERTENCES"], novaCategoria: "Cárneos e Salgados" },
+            { palavras: ["QUINOA", "ARROZ GRANEL", "LENTILHA", "GRAO DE BICO", "FEIJAO", "TRIGO", "FARINHA", "POLVILHO", "TAPIOCA", "MILHO PIPOCA", "CANJICA", "SAGU", "AMIDO", "CEVADA", "PAINCO", "COUSCOUS", "ERVILHA PARTIDA", "SOJA GRAO"], novaCategoria: "Grãos, Cereais e Farinhas" },
+          ];
+
+          const produtos = db.prepare("SELECT id, nome FROM produtos").all() as any[];
+          const updateProd = db.prepare("UPDATE produtos SET categoria_id = ?, updated_at = datetime('now', 'localtime') WHERE id = ?");
+
+          for (const prod of produtos) {
+            const nomeUpper = (prod.nome || '').toUpperCase();
+            let novaCatNome = "Grãos, Cereais e Farinhas";
+            outerLoop: for (const map of mapeamentos) {
+              for (const palavra of map.palavras) {
+                if (nomeUpper.includes(palavra)) {
+                  novaCatNome = map.novaCategoria;
+                  break outerLoop;
+                }
+              }
+            }
+            const novaCatId = catIdMap[novaCatNome];
+            if (novaCatId) {
+              updateProd.run(novaCatId, prod.id);
+            }
+          }
+
+          db.prepare(`
+            UPDATE categorias SET ativo = 0, updated_at = datetime('now', 'localtime') 
+            WHERE nome NOT IN (
+              'Azeitonas e Conservas', 'Grãos, Cereais e Farinhas', 'Queijos', 'Frios e Embutidos',
+              'Castanhas e Oleaginosas', 'Frutas Secas e Desidratadas', 'Bacalhau e Peixes',
+              'Temperos e Ervas', 'Cereais e Granola', 'Suplementos e Funcionais',
+              'Laticínios Granel', 'Cárneos e Salgados'
+            )
+          `).run();
+
+          db.prepare(`INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('MIGRACAO_CATEGORIAS_12_SETOR', '1', datetime('now', 'localtime'))`).run();
+        });
+
+        migrar();
+        console.log('[FASE 2] Migração de categorias concluída.');
+      }
+    } catch (err: any) {
+      console.error('[FASE 2] Erro na migração de categorias:', err.message);
+    }
+    // ---------------------------------------------------------
+
     // Toledo — Log de processamento
     db.exec(`
       CREATE TABLE IF NOT EXISTS toledo_log (

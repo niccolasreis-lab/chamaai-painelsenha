@@ -540,8 +540,8 @@ export function syncToCatalogoProduto(db: any, item: ToledoItem) {
       const newProd = db.prepare("SELECT last_insert_rowid() as id").get();
 
       db.prepare(`
-        INSERT INTO audit_logs (entidade, entidade_id, acao, usuario_id, detalhes_json)
-        VALUES ('produtos', ?, 'SYNC_TOLEDO_INSERT', 'sistema', ?)
+        INSERT INTO audit_logs (entidade, entidade_id, acao, detalhes_json)
+        VALUES ('produtos', ?, 'SYNC_TOLEDO_INSERT', ?)
       `).run(newProd.id, JSON.stringify({
         plu: item.plu,
         nome: item.descricao,
@@ -590,8 +590,8 @@ export function syncToCatalogoProduto(db: any, item: ToledoItem) {
 
         if (Object.keys(diff).length > 0) {
           db.prepare(`
-            INSERT INTO audit_logs (entidade, entidade_id, acao, usuario_id, detalhes_json)
-            VALUES ('produtos', ?, 'SYNC_TOLEDO_UPDATE', 'sistema', ?)
+            INSERT INTO audit_logs (entidade, entidade_id, acao, detalhes_json)
+            VALUES ('produtos', ?, 'SYNC_TOLEDO_UPDATE', ?)
           `).run(existing.id, JSON.stringify({ diff }));
         }
       }

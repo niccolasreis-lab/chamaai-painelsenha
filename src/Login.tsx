@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getApiUrl } from './shared/apiConfig';
+import Logo from './shared/Logo';
 
 export default function Login() {
   const [login, setLogin] = useState('');
@@ -183,11 +184,8 @@ export default function Login() {
 
       <div className="w-full max-w-md bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-[2rem] p-10 shadow-2xl relative z-10">
         <div className="flex flex-col items-center mb-10">
-          <div className="w-20 h-20 bg-blue-600/20 rounded-2xl flex items-center justify-center mb-6">
-            <span className="material-symbols-outlined text-blue-500 text-4xl">admin_panel_settings</span>
-          </div>
-          <h1 className="font-sans text-4xl font-bold text-white uppercase tracking-widest text-center">ChamaAí</h1>
-          <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-xs mt-2 text-center">Controle de Acesso</p>
+          <Logo variant="vertical" darkMode={true} size={80} />
+          <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-[10px] mt-3 text-center">Controle de Acesso</p>
         </div>
 
         <form onSubmit={handleLogin} className="flex flex-col gap-6">
