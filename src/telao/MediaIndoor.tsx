@@ -549,6 +549,9 @@ export default function MediaIndoor() {
 
   const activeMidia = midias[activeMidiaIndex];
   const showingPriceEncarte = activeModules.includes('encarte') && showingEncarte;
+  
+  const isSmartMediaFull = smartMediaSettings.midia_indoor_ativa && smartMediaSettings.midia_indoor_layout === 'full';
+  const shouldShowNativeContent = !isSmartMediaFull;
 
   // Resolvendo layout com suporte a query params (?template=)
   const query = new URLSearchParams(window.location.search);
@@ -618,7 +621,7 @@ export default function MediaIndoor() {
               {/* Media Area (Centralizada) */}
               <div className="flex-[72] relative bg-[#041a14] overflow-hidden flex items-center justify-center border-r border-outline-variant/10">
                 <div className="h-full w-full">
-                  {!smartMediaSettings.midia_indoor_ativa && showingPriceEncarte ? (
+                  {shouldShowNativeContent && showingPriceEncarte ? (
                     config.toledo_encarte_estilo === 'granel' ? (
                       <EncarteGranel
                         key={`encarte-granel-${encarteRefreshKey}`}
@@ -638,7 +641,7 @@ export default function MediaIndoor() {
                         categoriasFiltro={parsedCategories}
                       />
                     )
-                  ) : !smartMediaSettings.midia_indoor_ativa && activeModules.includes('midia') && activeMidia ? (
+                  ) : shouldShowNativeContent && activeModules.includes('midia') && activeMidia ? (
                     <div className="h-full w-full animate-fade-in relative">
                       {activeMidia.tipo === 'video' ? (
                         <video 
@@ -774,7 +777,7 @@ export default function MediaIndoor() {
             {/* Media / Call Focus Area */}
             <div className={`${layout === 'classic' ? 'flex-1' : 'flex-[78]'} relative bg-[#041a14] overflow-hidden border-r border-outline-variant/20`}>
               <div className="h-full w-full">
-                {!smartMediaSettings.midia_indoor_ativa && showingPriceEncarte ? (
+                {shouldShowNativeContent && showingPriceEncarte ? (
                   config.toledo_encarte_estilo === 'granel' ? (
                     <EncarteGranel
                       key={`encarte-granel-${encarteRefreshKey}`}
@@ -794,7 +797,7 @@ export default function MediaIndoor() {
                       categoriasFiltro={parsedCategories}
                     />
                   )
-                ) : !smartMediaSettings.midia_indoor_ativa && activeModules.includes('midia') && activeMidia ? (
+                ) : shouldShowNativeContent && activeModules.includes('midia') && activeMidia ? (
                   <div className="h-full w-full animate-fade-in relative">
                     {activeMidia.tipo === 'video' ? (
                       <video 

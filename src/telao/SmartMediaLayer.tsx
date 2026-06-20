@@ -26,7 +26,12 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
       if (res.ok) {
         const data = await res.json();
         if (data.active) {
-          setPlaylist(data.items || []);
+          let items = data.items || [];
+          // Remove encartes e tabelas se o layout for lateral ou rodape
+          if (layout === 'lateral' || layout === 'rodape') {
+             items = items.filter((item: any) => item.type !== 'encarte' && item.type !== 'tabela');
+          }
+          setPlaylist(items);
           setTheme(data.theme);
         } else {
           setPlaylist([]);
