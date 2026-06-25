@@ -108,6 +108,7 @@ export default function MediaIndoor() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const isMountedRef = useRef(true);
+  const autoRecoverAttemptsRef = useRef(0);
 
   const refreshEncarteData = useCallback(async (reason: string) => {
     if (activeModules.length > 0 && !activeModules.includes('encarte')) {
@@ -176,8 +177,9 @@ export default function MediaIndoor() {
     if (modulo_encarte && !encarteCache.loading) {
       if (!encarteCache.loadedAt) {
         refreshEncarteData('Módulo encarte ativado no telão');
-      } else if (!encarteCache.produtos?.length) {
-        console.warn("[TELAO] Encarte vazio no WebView — forçando refresh");
+      } else if (!encarteCache.produtos?.length && autoRecoverAttemptsRef.current < 2) {
+        autoRecoverAttemptsRef.current += 1;
+        console.warn(`[TELAO] Encarte vazio no WebView — forçando refresh (tentativa ${autoRecoverAttemptsRef.current})`);
         refreshEncarteData("webview-auto-recover");
       }
     }
@@ -523,16 +525,20 @@ export default function MediaIndoor() {
       const { geral, preferencial } = telaoSseEvent.data || {};
       setPessoasAguardando((geral || 0) + (preferencial || 0));
     } else if (telaoSseEvent.event === 'CONFIG_ATUALIZADA') {
+      autoRecoverAttemptsRef.current = 0;
       fetchConfig();
       refreshEncarteData('SSE: CONFIG_ATUALIZADA');
     } else if (telaoSseEvent.event === 'MEDIA_SETTINGS_UPDATED') {
+      autoRecoverAttemptsRef.current = 0;
       fetchSmartMediaSettings();
       refreshEncarteData('SSE: MEDIA_SETTINGS_UPDATED');
     } else if (telaoSseEvent.event === 'MEDIA_THEME_UPDATED') {
+      autoRecoverAttemptsRef.current = 0;
       refreshEncarteData('SSE: MEDIA_THEME_UPDATED');
     } else if (telaoSseEvent.event === 'MIDIAS_ATUALIZADAS') {
       fetchMidias();
     } else if (telaoSseEvent.event === 'TOLEDO_PRECOS_ATUALIZADOS') {
+      autoRecoverAttemptsRef.current = 0;
       setEncarteRefreshKey(prev => prev + 1);
       refreshEncarteData('SSE: TOLEDO_PRECOS_ATUALIZADOS');
     } else if (telaoSseEvent.event === 'SISTEMA_RESETADO') {
