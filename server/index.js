@@ -1012,7 +1012,12 @@ function startServer() {
             const db = (0, database_1.getDb)();
             const recent = db.prepare(`
         SELECT s.id, s.numero, s.preferencial, s.status, c.guiche, b.nome as balcao_nome, s.chamada_em
-        FROM chamadas c
+        FROM (
+          SELECT senha_id, MAX(id) as max_id
+          FROM chamadas
+          GROUP BY senha_id
+        ) latest
+        JOIN chamadas c ON c.id = latest.max_id
         JOIN senhas s ON c.senha_id = s.id
         JOIN balcoes b ON s.balcao_id = b.id
         ORDER BY c.id DESC

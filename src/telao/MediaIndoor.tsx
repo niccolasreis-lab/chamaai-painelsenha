@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import SenhaChamada from './SenhaChamada';
@@ -8,6 +9,7 @@ import SmartMediaLayer from './SmartMediaLayer';
 import { useSSE } from '../shared/useSSE';
 import { getApiUrl } from '../shared/apiConfig';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import type { ProdutoToledo, Categoria, TemaEncarte, EstablishmentConfig, PerfilTelao, MediaItem, RecentCall, SmartMediaSettings } from '../shared/types';
 
 async function falarSenha(texto: string, rate: number, pitch: number, vozGenero: string): Promise<boolean> {
   if (!('speechSynthesis' in window)) {
@@ -33,7 +35,7 @@ async function falarSenha(texto: string, rate: number, pitch: number, vozGenero:
 
   // Selecionar voz em pt-BR
   const ptVoices = vozes.filter(v => v.lang.toLowerCase().startsWith('pt'));
-  let selectedVoice = null;
+  let selectedVoice: SpeechSynthesisVoice | undefined;
   if (vozGenero === 'Masculina') {
     selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('masculino') || v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('daniel') || v.name.toLowerCase().includes('google de'));
   } else {
@@ -57,8 +59,13 @@ async function falarSenha(texto: string, rate: number, pitch: number, vozGenero:
 export default function MediaIndoor() {
   // Session / Pairing state
   const [telaoCode, setTelaoCode] = useState<string | null>(localStorage.getItem('telao_code'));
-  const [perfil, setPerfil] = useState<any>(null);
+  const [perfil, setPerfil] = useState<PerfilTelao | null>(null);
   const [perfilLoading, setPerfilLoading] = useState(true);
+
+  const isLowPerformanceMode = 
+    localStorage.getItem('telao_low_performance') === '1' || 
+    new URLSearchParams(window.location.search).get('low_perf') === '1' ||
+    new URLSearchParams(window.location.search).get('low_performance') === '1';
 
   // Active view state
   const [activeModules, setActiveModules] = useState<string[]>([]);
@@ -66,14 +73,14 @@ export default function MediaIndoor() {
   const [encarteRefreshKey, setEncarteRefreshKey] = useState(0);
 
   // Normal ticket and media state
-  const [historico, setHistorico] = useState<any[]>([]);
-  const [ultimaSenha, setUltimaSenha] = useState<any>(null);
+  const [historico, setHistorico] = useState<RecentCall[]>([]);
+  const [ultimaSenha, setUltimaSenha] = useState<RecentCall | null>(null);
   const [showMedia, setShowMedia] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [midias, setMidias] = useState<any[]>([]);
+  const [midias, setMidias] = useState<MediaItem[]>([]);
   const [activeMidiaIndex, setActiveMidiaIndex] = useState(0);
-  const [config, setConfig] = useState<any>({});
-  const [smartMediaSettings, setSmartMediaSettings] = useState<any>({ midia_indoor_ativa: false, midia_indoor_layout: 'lateral' });
+  const [config, setConfig] = useState<Partial<EstablishmentConfig>>({});
+  const [smartMediaSettings, setSmartMediaSettings] = useState<SmartMediaSettings>({ midia_indoor_ativa: false, midia_indoor_layout: 'lateral' });
   const [pessoasAguardando, setPessoasAguardando] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -81,6 +88,92 @@ export default function MediaIndoor() {
   const repeticaoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const API_URL = getApiUrl();
+
+  const [encarteCache, setEncarteCache] = useState<{
+    produtos: ProdutoToledo[];
+    categorias: Categoria[];
+    temaAtivo: TemaEncarte | null;
+    loading: boolean;
+    error: string | null;
+    loadedAt: number | null;
+  }>({
+    produtos: [],
+    categorias: [],
+    temaAtivo: null,
+    loading: false,
+    error: null,
+    loadedAt: null,
+  });
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const isMountedRef = useRef(true);
+
+  const refreshEncarteData = useCallback(async (reason: string) => {
+    if (activeModules.length > 0 && !activeModules.includes('encarte')) {
+      console.log(`[TELAO] Encarte desativado. Ignorando fetch (${reason}).`);
+      return;
+    }
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    console.log(`[TELAO] Buscando dados do Encarte. Motivo: ${reason}`);
+    setEncarteCache(prev => ({ ...prev, loading: true }));
+
+    try {
+      const [prodRes, catRes, temaRes] = await Promise.all([
+        fetch(`${API_URL}/api/toledo/produtos`, { signal: controller.signal }).then(r => {
+          if (!r.ok) throw new Error('Falha ao buscar produtos');
+          return r.json();
+        }),
+        fetch(`${API_URL}/api/categorias`, { signal: controller.signal }).then(r => {
+          if (!r.ok) throw new Error('Falha ao buscar categorias');
+          return r.json();
+        }),
+        fetch(`${API_URL}/api/telao/tema-atual`, { signal: controller.signal }).then(r => {
+          if (!r.ok) return null;
+          return r.json().catch(() => null);
+        })
+      ]);
+
+      if (!isMountedRef.current) return;
+
+      setEncarteCache({
+        produtos: prodRes,
+        categorias: catRes,
+        temaAtivo: temaRes,
+        loading: false,
+        error: null,
+        loadedAt: Date.now(),
+      });
+      console.log(`[TELAO] Dados do encarte carregados com sucesso: ${prodRes.length} produtos.`);
+    } catch (err: unknown) {
+      const errorObj = err as Error;
+      if (errorObj.name === 'AbortError') {
+        console.log('[TELAO] Fetch do encarte abortado por nova requisição.');
+        return;
+      }
+      console.error('[TELAO] Erro ao carregar dados do Encarte:', err);
+      if (!isMountedRef.current) return;
+      setEncarteCache(prev => ({
+        ...prev,
+        loading: false,
+        error: errorObj.message || 'Erro de rede',
+      }));
+    }
+  }, [API_URL, activeModules]);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (activeModules.includes('encarte') && !encarteCache.loadedAt && !encarteCache.loading) {
+      refreshEncarteData('Módulo encarte ativado no telão');
+    }
+  }, [activeModules, encarteCache.loadedAt, encarteCache.loading, refreshEncarteData]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const { initAudioContext, preloadAudio, preloadSystemSound, playAudio, isInitialized } = useAudioPlayer();
 
@@ -97,13 +190,15 @@ export default function MediaIndoor() {
     }
   }, [config.tipo_som, config.som_personalizado, API_URL]);
 
-  const isMountedRef = useRef(true);
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       if (repeticaoTimerRef.current) {
         clearTimeout(repeticaoTimerRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
     };
   }, []);
@@ -115,7 +210,7 @@ export default function MediaIndoor() {
     };
 
     // Auto-inicializa o áudio se estiver rodando no APK Kiosk
-    if ((window as any).AndroidKiosk) {
+    if ('AndroidKiosk' in window) {
       console.log('[TELAO] Kiosk Android detectado. Inicializando AudioContext automaticamente.');
       initAudioContext();
     }
@@ -191,7 +286,9 @@ export default function MediaIndoor() {
       if (res.ok) {
         setSmartMediaSettings(await res.json());
       }
-    } catch (err) {}
+    } catch (err) {
+      console.error('[MediaIndoor] Erro ao buscar settings de mídia', err);
+    }
   };
 
   const fetchMidias = async () => {
@@ -201,12 +298,12 @@ export default function MediaIndoor() {
         const data = await res.json();
         // Filtrar apenas mídias ativas e não expiradas para o Telão
         const midiasAtivas = Array.isArray(data) 
-          ? data.filter((m: any) => m.ativo === 1 && m.status === 'ativo')
+          ? (data as MediaItem[]).filter((m) => m.ativo === 1 && m.status === 'ativo')
           : [];
         
         setMidias(prev => {
           const prevIds = prev.map(m => m.id).join(',');
-          const newIds = midiasAtivas.map((m: any) => m.id).join(',');
+          const newIds = midiasAtivas.map((m: MediaItem) => m.id).join(',');
           
           // Se a lista mudou, resetar o índice para evitar apontar para mídia inexistente
           if (prevIds !== newIds) {
@@ -228,7 +325,9 @@ export default function MediaIndoor() {
                 videoRef.current.pause();
                 videoRef.current.removeAttribute('src');
                 videoRef.current.load();
-              } catch (e) { /* ignore */ }
+              } catch {
+                // ignore
+              }
             }
           }
           
@@ -247,7 +346,9 @@ export default function MediaIndoor() {
         const data = await res.json();
         setPessoasAguardando(Array.isArray(data) ? data.length : 0);
       }
-    } catch (err) {}
+    } catch (err) {
+      console.error('[MediaIndoor] Erro ao buscar fila', err);
+    }
   };
 
   const fetchRecentCalls = async () => {
@@ -256,9 +357,16 @@ export default function MediaIndoor() {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          setHistorico(data.slice(0, 5));
-          if (data.length > 0) {
-            setUltimaSenha(data[0]);
+          const seen = new Set<string>();
+          const unique = (data as RecentCall[]).filter((s) => {
+            const key = String(s.id);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          setHistorico(unique.slice(0, 5));
+          if (unique.length > 0) {
+            setUltimaSenha(unique[0]);
           }
         }
       }
@@ -267,6 +375,7 @@ export default function MediaIndoor() {
     }
   };
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const hoje = new Date().toDateString();
     const ultimaData = localStorage.getItem('chamaaai_ultima_data');
@@ -297,20 +406,24 @@ export default function MediaIndoor() {
       clearInterval(queueTimer);
     };
   }, [telaoCode]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Connect only to paired screen SSE channel (which receives all pairing + queue events)
   const sseUrl = telaoCode ? `${API_URL}/api/telao/sse/${telaoCode}` : null;
   const { data: telaoSseEvent, connected: sseConnected } = useSSE(sseUrl);
 
   // Buscar perfil atualizado sempre que o telão se reconectar
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (sseConnected && telaoCode) {
       console.log('[TELAO] SSE reconectado. Sincronizando perfil...');
       fetchPerfil(telaoCode);
     }
   }, [sseConnected, telaoCode]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Watch unified SSE events (pairing events + queue/calling events)
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!telaoSseEvent) return;
 
@@ -320,7 +433,7 @@ export default function MediaIndoor() {
       // PASSO 1: Atualizar o estado React imediatamente (agenda o re-render)
       setUltimaSenha(payload);
       setHistorico(prev => {
-        const filtered = prev.filter(s => s.id !== payload.id);
+        const filtered = prev.filter(s => String(s.id) !== String(payload.id));
         return [payload, ...filtered].slice(0, 5);
       });
       setShowMedia(false);
@@ -379,10 +492,10 @@ export default function MediaIndoor() {
 
       fetchAguardando();
       
-      const existingTimer = (window as any)._mediaTimer;
+      const existingTimer = (window as unknown as { _mediaTimer?: ReturnType<typeof setTimeout> })._mediaTimer;
       if (existingTimer) clearTimeout(existingTimer);
       
-      (window as any)._mediaTimer = setTimeout(() => {
+      (window as unknown as { _mediaTimer?: ReturnType<typeof setTimeout> })._mediaTimer = setTimeout(() => {
         setShowMedia(true);
       }, 6000);
 
@@ -402,12 +515,17 @@ export default function MediaIndoor() {
       setPessoasAguardando((geral || 0) + (preferencial || 0));
     } else if (telaoSseEvent.event === 'CONFIG_ATUALIZADA') {
       fetchConfig();
+      refreshEncarteData('SSE: CONFIG_ATUALIZADA');
     } else if (telaoSseEvent.event === 'MEDIA_SETTINGS_UPDATED') {
       fetchSmartMediaSettings();
+      refreshEncarteData('SSE: MEDIA_SETTINGS_UPDATED');
+    } else if (telaoSseEvent.event === 'MEDIA_THEME_UPDATED') {
+      refreshEncarteData('SSE: MEDIA_THEME_UPDATED');
     } else if (telaoSseEvent.event === 'MIDIAS_ATUALIZADAS') {
       fetchMidias();
     } else if (telaoSseEvent.event === 'TOLEDO_PRECOS_ATUALIZADOS') {
       setEncarteRefreshKey(prev => prev + 1);
+      refreshEncarteData('SSE: TOLEDO_PRECOS_ATUALIZADOS');
     } else if (telaoSseEvent.event === 'SISTEMA_RESETADO') {
       setUltimaSenha(null);
       setHistorico([]);
@@ -442,11 +560,13 @@ export default function MediaIndoor() {
       }
       fetchAguardando();
       fetchRecentCalls();
+      refreshEncarteData('SSE: DIA_RESETADO');
       console.log('[ChamaAí] Dia resetado — estado recarregado');
     } else if (telaoSseEvent.event === 'RECARREGAR_PAGINA') {
       window.location.reload();
     }
-  }, [telaoSseEvent]);
+  }, [telaoSseEvent, refreshEncarteData]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Rotate between media and active modules
   const nextMedia = useCallback(() => {
@@ -477,6 +597,7 @@ export default function MediaIndoor() {
   }, [midias.length, activeModules]);
 
   // Handle transition timers
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (smartMediaSettings.midia_indoor_ativa) return;
     if (midias.length > 0 && showMedia && !showingEncarte && activeModules.includes('midia')) {
@@ -502,6 +623,7 @@ export default function MediaIndoor() {
       return () => clearTimeout(timer);
     }
   }, [activeMidiaIndex, midias, showMedia, showingEncarte, activeModules, nextMedia]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Ensure video element reloads and plays when src changes or when recovering from senha overlay
   useEffect(() => {
@@ -509,7 +631,9 @@ export default function MediaIndoor() {
       if (videoRef.current) {
         try {
           videoRef.current.pause();
-        } catch (e) {}
+        } catch {
+          // ignore
+        }
       }
       return;
     }
@@ -522,11 +646,13 @@ export default function MediaIndoor() {
   }, [midias, activeMidiaIndex, showMedia, smartMediaSettings.midia_indoor_ativa]);
 
   // Apply real-time consolidated waiting count
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (telaoSseEvent?.data?.aguardando_count !== undefined) {
       setPessoasAguardando(telaoSseEvent.data.aguardando_count);
     }
   }, [telaoSseEvent]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (perfilLoading) {
     return (
@@ -609,7 +735,17 @@ export default function MediaIndoor() {
       <div className={`flex-1 flex overflow-hidden relative ${smartMediaSettings.midia_indoor_ativa && smartMediaSettings.midia_indoor_layout === 'rodape' ? 'flex-col' : 'flex-row'}`}>
       
         {smartMediaSettings.midia_indoor_ativa && (smartMediaSettings.midia_indoor_layout === 'background' || smartMediaSettings.midia_indoor_layout === 'full') && (
-          <SmartMediaLayer layout={smartMediaSettings.midia_indoor_layout} isCalling={!showMedia} onNext={nextMedia} />
+          <SmartMediaLayer 
+            layout={smartMediaSettings.midia_indoor_layout} 
+            isCalling={!showMedia} 
+            onNext={nextMedia} 
+            encarteProdutos={encarteCache.produtos}
+            encarteCategorias={encarteCache.categorias}
+            encarteTemaAtivo={encarteCache.temaAtivo}
+            encarteLoading={encarteCache.loading}
+            encarteError={encarteCache.error}
+            lowPerformanceMode={isLowPerformanceMode}
+          />
         )}
 
         <div className="flex-1 flex flex-col overflow-hidden relative z-10">
@@ -630,6 +766,12 @@ export default function MediaIndoor() {
                         onComplete={onEncarteComplete}
                         config={config}
                         categoriasFiltro={parsedCategories}
+                        produtos={encarteCache.produtos}
+                        categorias={encarteCache.categorias}
+                        temaAtivo={encarteCache.temaAtivo}
+                        loading={encarteCache.loading}
+                        error={encarteCache.error}
+                        lowPerformanceMode={isLowPerformanceMode}
                       />
                     ) : (
                       <EncartePrecos
@@ -639,6 +781,12 @@ export default function MediaIndoor() {
                         onComplete={onEncarteComplete}
                         config={config}
                         categoriasFiltro={parsedCategories}
+                        produtos={encarteCache.produtos}
+                        categorias={encarteCache.categorias}
+                        temaAtivo={encarteCache.temaAtivo}
+                        loading={encarteCache.loading}
+                        error={encarteCache.error}
+                        lowPerformanceMode={isLowPerformanceMode}
                       />
                     )
                   ) : shouldShowNativeContent && activeModules.includes('midia') && activeMidia ? (
@@ -786,6 +934,12 @@ export default function MediaIndoor() {
                       onComplete={onEncarteComplete}
                       config={config}
                       categoriasFiltro={parsedCategories}
+                      produtos={encarteCache.produtos}
+                      categorias={encarteCache.categorias}
+                      temaAtivo={encarteCache.temaAtivo}
+                      loading={encarteCache.loading}
+                      error={encarteCache.error}
+                      lowPerformanceMode={isLowPerformanceMode}
                     />
                   ) : (
                     <EncartePrecos
@@ -795,6 +949,12 @@ export default function MediaIndoor() {
                       onComplete={onEncarteComplete}
                       config={config}
                       categoriasFiltro={parsedCategories}
+                      produtos={encarteCache.produtos}
+                      categorias={encarteCache.categorias}
+                      temaAtivo={encarteCache.temaAtivo}
+                      loading={encarteCache.loading}
+                      error={encarteCache.error}
+                      lowPerformanceMode={isLowPerformanceMode}
                     />
                   )
                 ) : shouldShowNativeContent && activeModules.includes('midia') && activeMidia ? (
@@ -938,7 +1098,17 @@ export default function MediaIndoor() {
         </div>
         
         {smartMediaSettings.midia_indoor_ativa && (smartMediaSettings.midia_indoor_layout === 'lateral' || smartMediaSettings.midia_indoor_layout === 'rodape') && (
-          <SmartMediaLayer layout={smartMediaSettings.midia_indoor_layout} isCalling={!showMedia} onNext={nextMedia} />
+          <SmartMediaLayer 
+            layout={smartMediaSettings.midia_indoor_layout} 
+            isCalling={!showMedia} 
+            onNext={nextMedia} 
+            encarteProdutos={encarteCache.produtos}
+            encarteCategorias={encarteCache.categorias}
+            encarteTemaAtivo={encarteCache.temaAtivo}
+            encarteLoading={encarteCache.loading}
+            encarteError={encarteCache.error}
+            lowPerformanceMode={isLowPerformanceMode}
+          />
         )}
       </div>
       <style>{`

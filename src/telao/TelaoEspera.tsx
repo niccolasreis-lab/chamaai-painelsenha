@@ -1,17 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getApiUrl } from '../shared/apiConfig';
+import type { EstablishmentConfig } from '../shared/types';
 
 interface TelaoEsperaProps {
   code: string;
 }
 
 export default function TelaoEspera({ code }: TelaoEsperaProps) {
-  const [config, setConfig] = useState<any>({});
+  const [config, setConfig] = useState<Partial<EstablishmentConfig>>({});
   const [copied, setCopied] = useState(false);
   const [showIpModal, setShowIpModal] = useState(false);
   const [tempIp, setTempIp] = useState(localStorage.getItem('server_ip_override') || '');
   const API_URL = getApiUrl();
+  const isLowPerformanceMode = 
+    localStorage.getItem('telao_low_performance') === '1' || 
+    new URLSearchParams(window.location.search).get('low_perf') === '1' ||
+    new URLSearchParams(window.location.search).get('low_performance') === '1';
 
   const handleSaveIp = () => {
     if (tempIp.trim() === '') {
@@ -69,16 +74,20 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
 
   return (
     <div className="h-screen w-screen bg-[#041a14] text-white flex flex-col items-center justify-center p-8 relative overflow-hidden font-sans select-none">
-      {/* Dynamic Background Glows */}
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
-        <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-emerald-500/20 blur-[150px] animate-pulse" style={{ animationDuration: '8s' }}></div>
-        <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] rounded-full bg-teal-500/20 blur-[150px] animate-pulse" style={{ animationDuration: '12s' }}></div>
-      </div>
+      {/* Dynamic Background Glows using radial-gradients instead of expensive blur filters */}
+      {!isLowPerformanceMode && (
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
+          <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full" style={{ background: 'radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%)' }}></div>
+          <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] rounded-full" style={{ background: 'radial-gradient(circle, rgba(20, 184, 166, 0.15) 0%, transparent 70%)' }}></div>
+        </div>
+      )}
 
       {/* Glassmorphic Card Container */}
-      <div className="z-10 max-w-2xl w-full bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-[40px] p-12 shadow-2xl flex flex-col items-center text-center gap-8 relative">
+      <div className={`z-10 max-w-2xl w-full bg-white/[0.03] ${isLowPerformanceMode ? '' : 'backdrop-blur-xl'} border border-white/10 rounded-[40px] p-12 shadow-2xl flex flex-col items-center text-center gap-8 relative`}>
         {/* Subtle decorative glow around the box */}
-        <div className="absolute inset-0 -z-10 rounded-[40px] bg-gradient-to-br from-emerald-500/5 to-teal-500/5 blur-md"></div>
+        {!isLowPerformanceMode && (
+          <div className="absolute inset-0 -z-10 rounded-[40px] bg-gradient-to-br from-emerald-500/5 to-teal-500/5 blur-md"></div>
+        )}
 
         {/* Branding Area */}
         <div className="flex flex-col items-center gap-4">

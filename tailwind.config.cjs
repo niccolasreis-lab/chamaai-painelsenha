@@ -33,8 +33,8 @@ module.exports = {
       },
       keyframes: {
         'pulse-call': {
-          '0%, 100%': { opacity: '1', transform: 'scale(1)', textShadow: '0 0 20px rgba(37, 99, 235, 0.6)' },
-          '50%': { opacity: '.8', transform: 'scale(0.98)', textShadow: '0 0 40px rgba(37, 99, 235, 0.9)' },
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '.6' },
         },
         fadeIn: {
           '0%': { opacity: '0' },

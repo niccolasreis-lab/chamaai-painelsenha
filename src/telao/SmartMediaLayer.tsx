@@ -1,21 +1,48 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getApiUrl } from '../shared/apiConfig';
 import EncartePrecos from './EncartePrecos';
 import EncarteGranel from './EncarteGranel';
+import type { ProdutoToledo, Categoria, TemaEncarte, EstablishmentConfig, PerfilTelao, MediaItem } from '../shared/types';
 
 interface SmartMediaLayerProps {
   layout: 'lateral' | 'rodape' | 'background' | 'full';
   isCalling: boolean;
   onNext?: () => void;
+  // Caching props passed from parent MediaIndoor
+  encarteProdutos?: ProdutoToledo[];
+  encarteCategorias?: Categoria[];
+  encarteTemaAtivo?: TemaEncarte | null;
+  encarteLoading?: boolean;
+  encarteError?: string | null;
+  lowPerformanceMode?: boolean;
 }
 
-export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMediaLayerProps) {
-  const [playlist, setPlaylist] = useState<any[]>([]);
-  const [theme, setTheme] = useState<any>(null);
+type WeatherData = {
+  current_weather?: {
+    weathercode?: number;
+    temperature?: number;
+    windspeed?: number;
+  };
+};
+
+export default function SmartMediaLayer({ 
+  layout, 
+  isCalling, 
+  onNext,
+  encarteProdutos = [],
+  encarteCategorias = [],
+  encarteTemaAtivo = null,
+  encarteLoading = false,
+  encarteError = null,
+  lowPerformanceMode = false
+}: SmartMediaLayerProps) {
+  const [playlist, setPlaylist] = useState<MediaItem[]>([]);
+  const [theme, setTheme] = useState<TemaEncarte | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [weather, setWeather] = useState<any>(null);
-  const [config, setConfig] = useState<any>({});
-  const [perfil, setPerfil] = useState<any>(null);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [config, setConfig] = useState<Partial<EstablishmentConfig>>({});
+  const [perfil, setPerfil] = useState<PerfilTelao | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const API_URL = getApiUrl();
@@ -26,10 +53,10 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
       if (res.ok) {
         const data = await res.json();
         if (data.active) {
-          let items = data.items || [];
+          let items = (data.items || []) as MediaItem[];
           // Remove encartes e tabelas se o layout for lateral ou rodape
           if (layout === 'lateral' || layout === 'rodape') {
-             items = items.filter((item: any) => item.type !== 'encarte' && item.type !== 'tabela');
+             items = items.filter((item: MediaItem) => item.type !== 'encarte' && item.type !== 'tabela');
           }
           setPlaylist(items);
           setTheme(data.theme);
@@ -75,6 +102,7 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
     }
   }, [API_URL]);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     fetchActivePlaylist();
     fetchWeather();
@@ -94,9 +122,10 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
       fetchConfig();
     };
 
-    const handlePerfilUpdate = (e: any) => {
-      if (e.detail) {
-        setPerfil(e.detail);
+    const handlePerfilUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<PerfilTelao>;
+      if (customEvent.detail) {
+        setPerfil(customEvent.detail);
       } else if (telaoCode) {
         fetchPerfil(telaoCode);
       }
@@ -120,6 +149,7 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
       clearInterval(weatherInterval);
     };
   }, [fetchActivePlaylist, fetchWeather, fetchConfig, fetchPerfil]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleNext = useCallback(() => {
     if (playlist.length > 0) {
@@ -216,6 +246,12 @@ export default function SmartMediaLayer({ layout, isCalling, onNext }: SmartMedi
           onComplete={handleNext}
           config={config}
           categoriasFiltro={parsedCategories}
+          produtos={encarteProdutos}
+          categorias={encarteCategorias}
+          temaAtivo={encarteTemaAtivo}
+          loading={encarteLoading}
+          error={encarteError}
+          lowPerformanceMode={lowPerformanceMode}
         />
       );
     }
