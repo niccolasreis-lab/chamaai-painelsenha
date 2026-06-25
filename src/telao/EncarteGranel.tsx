@@ -88,7 +88,7 @@ export default function EncarteGranel({
   const progressRef = useRef<HTMLDivElement>(null);
 
   const API_URL = getApiUrl();
-  const colunas = parseInt(config?.toledo_encarte_colunas || '4', 10);
+  const colunas = parseInt(String(config?.toledo_encarte_colunas ?? '4'), 10);
   const itemsLimit = itensPorSlide || (colunas * 2); 
 
   const temaDinamico = temaAtivo;
@@ -311,7 +311,7 @@ export default function EncarteGranel({
                       WebkitLineClamp: 2, 
                       WebkitBoxOrient: 'vertical', 
                       overflow: 'hidden',
-                      ...getProductNameStyle(p.descricao, isAutoDesc, config?.toledo_fonte_descricao)
+                      ...getProductNameStyle(p.descricao, isAutoDesc, config?.toledo_fonte_descricao ?? undefined)
                     }}>
                       {cleanName}
                     </span>
@@ -344,7 +344,7 @@ export default function EncarteGranel({
                             fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, 
                             lineHeight: 1,
                             color: isOferta ? '#dc2626' : COLORS.amber,
-                            ...getPriceStyle(priceText, isAutoPrice, config?.toledo_fonte_preco)
+                            ...getPriceStyle(priceText, isAutoPrice, config?.toledo_fonte_preco ?? undefined)
                           }}>{priceText}</span>
                         </div>
                         <span style={{ fontSize: '9px', fontWeight: 600, letterSpacing: 2, color: COLORS.muted, textTransform: 'uppercase' as const, marginTop: 2 }}>por {p.unidade || 'kg'}</span>

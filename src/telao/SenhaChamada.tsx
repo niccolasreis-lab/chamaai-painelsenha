@@ -66,6 +66,8 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
   if (!ultimaSenha) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-950 via-slate-950 to-violet-950 p-12 relative overflow-hidden">
+        <div className="broadcast-scanlines" />
+        <div className="broadcast-vignette" />
         {/* Glows using radial-gradients instead of expensive blur filters */}
         {!isLowPerformanceMode && (
           <>
@@ -84,14 +86,17 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
   }
 
   const senhaFormatada = String(ultimaSenha.numero).padStart(3, '0');
-  const staticShadow = isLowPerformanceMode 
-    ? 'none' 
-    : (isRepeticao 
-      ? '0 2px 10px rgba(249, 115, 22, 0.4)' 
-      : '0 2px 10px rgba(79, 70, 229, 0.2)');
+  const staticShadow = `
+    0 2px 0 rgba(0,0,0,0.4),
+    0 10px 30px rgba(0,0,0,0.6),
+    0 0 60px rgba(0,0,0,0.3)
+  `.trim().replace(/\s+/g, ' ');
 
   return (
     <div className="h-full w-full flex flex-col items-center justify-center bg-gradient-to-br from-indigo-950 via-slate-950 to-violet-950 p-12 relative overflow-hidden animate-fade-in">
+      <div className="broadcast-scanlines" />
+      <div className="broadcast-vignette" />
+
       {/* Background decoration using radial-gradients instead of expensive blur filters */}
       {!isLowPerformanceMode && (
         <div className="absolute top-0 left-0 w-full h-full opacity-15 pointer-events-none">
@@ -101,7 +106,7 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
       )}
 
       {/* Top Client Logo */}
-      <div className="absolute top-10 left-10 opacity-90">
+      <div className="absolute top-10 left-10 opacity-90 z-10">
         {config.logo_cliente ? (
           <img src={`${API_URL}${config.logo_cliente}`} className="h-16 object-contain rounded-xl shadow-lg border border-slate-800" alt="Logo" />
         ) : (
@@ -109,7 +114,7 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
         )}
       </div>
 
-      <div className="text-center z-10">
+      <div className="text-center z-10 flex flex-col items-center justify-center">
         {isRepeticao && (
           <div className="badge-segunda-chamada flex items-center justify-center gap-2 mb-4">
             <span className="
@@ -122,44 +127,42 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
           </div>
         )}
 
-        <h2 className="font-syne text-[2.5rem] font-bold text-white/40 tracking-[0.3em] uppercase mb-4">
+        <h2 className="font-syne text-[2.5rem] font-bold text-white/40 tracking-[0.3em] uppercase mb-4" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
           Senha Atual
         </h2>
 
         <div 
           key={`call-${ultimaSenha.id}-${isRepeticao}`}
-          className={`font-syne text-[26rem] font-extrabold leading-none tracking-tighter ${
+          className={`font-syne text-[30rem] lg:text-[32rem] font-black leading-none tracking-wide transform scale-105 select-none ${
             isRepeticao
-              ? 'text-orange-500 animate-pulse-orange'
-              : 'text-white animate-pulse-call-once'
+              ? 'text-orange-500'
+              : 'text-white'
           }`}
           style={{
-            willChange: 'opacity',
-            textShadow: staticShadow
+            textShadow: staticShadow,
+            letterSpacing: '4px'
           }}
         >
           {senhaFormatada}
         </div>
 
         {ultimaSenha.nome_cliente && (
-          <div className="font-dmsans text-4xl font-medium text-white/80 mt-4 select-none">
+          <div className="font-dmsans text-4xl font-medium text-white/90 mt-4 select-none" style={{ textShadow: '0 2px 15px rgba(0,0,0,0.8)' }}>
             {ultimaSenha.nome_cliente}
           </div>
         )}
 
         {config.telao_ocultar_guiche !== '1' && (
-          <div className="mt-8 flex flex-col items-center justify-center gap-4">
-            <div className={`bg-slate-900/60 ${isLowPerformanceMode ? '' : 'backdrop-blur-xl'} px-16 py-6 rounded-[2.5rem] shadow-2xl flex flex-col items-center justify-center gap-2 border border-slate-800 shadow-indigo-500/10`}>
-              {ultimaSenha.balcao_nome && (
-                <span className="font-syne text-[2.5rem] font-bold text-cyan-400 uppercase tracking-widest leading-none mb-1">
-                  {ultimaSenha.balcao_nome}
-                </span>
-              )}
-              <span className="font-syne text-[5.5rem] font-extrabold text-white uppercase leading-none tracking-tighter text-center">
-                {config.rotulo_local ? `${config.rotulo_local} ` : 'Guichê '}
-                {(ultimaSenha.guiche || '').replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
+          <div className="mt-8 flex flex-col items-center justify-center text-center">
+            {ultimaSenha.balcao_nome && (
+              <span className="font-syne text-xl font-bold text-cyan-400 uppercase tracking-[0.25em] leading-none mb-2" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+                {ultimaSenha.balcao_nome}
               </span>
-            </div>
+            )}
+            <span className="font-syne text-5xl font-extrabold text-white/90 uppercase leading-none tracking-wider text-center" style={{ textShadow: '0 2px 15px rgba(0,0,0,0.6)' }}>
+              {config.rotulo_local ? `${config.rotulo_local} ` : 'Guichê '}
+              {(ultimaSenha.guiche || '').replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
+            </span>
           </div>
         )}
       </div>

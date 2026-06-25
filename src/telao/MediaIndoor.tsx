@@ -169,10 +169,19 @@ export default function MediaIndoor() {
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (activeModules.includes('encarte') && !encarteCache.loadedAt && !encarteCache.loading) {
-      refreshEncarteData('Módulo encarte ativado no telão');
+    const modulo_encarte = activeModules.includes('encarte');
+    console.log("MODULO ENCARTES:", modulo_encarte);
+    console.log("ENCARTE CACHE:", encarteCache?.produtos?.length);
+
+    if (modulo_encarte && !encarteCache.loading) {
+      if (!encarteCache.loadedAt) {
+        refreshEncarteData('Módulo encarte ativado no telão');
+      } else if (!encarteCache.produtos?.length) {
+        console.warn("[TELAO] Encarte vazio no WebView — forçando refresh");
+        refreshEncarteData("webview-auto-recover");
+      }
     }
-  }, [activeModules, encarteCache.loadedAt, encarteCache.loading, refreshEncarteData]);
+  }, [activeModules, encarteCache.loadedAt, encarteCache.loading, encarteCache.produtos, refreshEncarteData]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const { initAudioContext, preloadAudio, preloadSystemSound, playAudio, isInitialized } = useAudioPlayer();
@@ -572,7 +581,7 @@ export default function MediaIndoor() {
   const nextMedia = useCallback(() => {
     if (activeModules.includes('midia') && midias.length > 0) {
       const nextIndex = (activeMidiaIndex + 1) % midias.length;
-      const encartePos = Math.max(0, Math.min(parseInt(config.toledo_encarte_posicao || '0', 10) || 0, midias.length - 1));
+      const encartePos = Math.max(0, Math.min(parseInt(String(config.toledo_encarte_posicao ?? '0'), 10) || 0, midias.length - 1));
       
       if (activeModules.includes('encarte') && !showingEncarte && activeMidiaIndex === encartePos) {
         setShowingEncarte(true);
@@ -761,8 +770,8 @@ export default function MediaIndoor() {
                     config.toledo_encarte_estilo === 'granel' ? (
                       <EncarteGranel
                         key={`encarte-granel-${encarteRefreshKey}`}
-                        duracao={parseInt(config.toledo_encarte_duracao || '15', 10)}
-                        itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
+                        duracao={parseInt(String(config.toledo_encarte_duracao ?? '15'), 10)}
+                        itensPorSlide={parseInt(String(config.toledo_itens_por_slide ?? '12'), 10)}
                         onComplete={onEncarteComplete}
                         config={config}
                         categoriasFiltro={parsedCategories}
@@ -776,8 +785,8 @@ export default function MediaIndoor() {
                     ) : (
                       <EncartePrecos
                         key={`encarte-${encarteRefreshKey}`}
-                        duracao={parseInt(config.toledo_encarte_duracao || '15', 10)}
-                        itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
+                        duracao={parseInt(String(config.toledo_encarte_duracao ?? '15'), 10)}
+                        itensPorSlide={parseInt(String(config.toledo_itens_por_slide ?? '12'), 10)}
                         onComplete={onEncarteComplete}
                         config={config}
                         categoriasFiltro={parsedCategories}
@@ -929,8 +938,8 @@ export default function MediaIndoor() {
                   config.toledo_encarte_estilo === 'granel' ? (
                     <EncarteGranel
                       key={`encarte-granel-${encarteRefreshKey}`}
-                      duracao={parseInt(config.toledo_encarte_duracao || '15', 10)}
-                      itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
+                      duracao={parseInt(String(config.toledo_encarte_duracao ?? '15'), 10)}
+                      itensPorSlide={parseInt(String(config.toledo_itens_por_slide ?? '12'), 10)}
                       onComplete={onEncarteComplete}
                       config={config}
                       categoriasFiltro={parsedCategories}
@@ -944,8 +953,8 @@ export default function MediaIndoor() {
                   ) : (
                     <EncartePrecos
                       key={`encarte-${encarteRefreshKey}`}
-                      duracao={parseInt(config.toledo_encarte_duracao || '15', 10)}
-                      itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
+                      duracao={parseInt(String(config.toledo_encarte_duracao ?? '15'), 10)}
+                      itensPorSlide={parseInt(String(config.toledo_itens_por_slide ?? '12'), 10)}
                       onComplete={onEncarteComplete}
                       config={config}
                       categoriasFiltro={parsedCategories}

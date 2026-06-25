@@ -241,8 +241,8 @@ export default function SmartMediaLayer({
 
       return (
         <EncarteComponent
-          duracao={currentMedia.duration_seconds || parseInt(config.toledo_encarte_duracao || '15', 10)}
-          itensPorSlide={parseInt(config.toledo_itens_por_slide || '12', 10)}
+          duracao={currentMedia.duration_seconds || parseInt(String(config.toledo_encarte_duracao ?? '15'), 10)}
+          itensPorSlide={parseInt(String(config.toledo_itens_por_slide ?? '12'), 10)}
           onComplete={handleNext}
           config={config}
           categoriasFiltro={parsedCategories}

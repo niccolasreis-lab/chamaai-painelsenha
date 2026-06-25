@@ -333,7 +333,7 @@ export default function EncartePrecos({
         <div className="flex-1 overflow-hidden px-2 py-2">
           <div className="h-full" style={{ columnCount: colunas, columnGap: '2rem' }}>
             {currentSlideData.map((group, gIdx) => {
-              const style = getCategoryStyle(group.nome, group.isOferta);
+              const style = getCategoryStyle(group.nome, !!group.isOferta);
               return (
                 <div key={`${group.nome}-${gIdx}`} className="mb-6 break-inside-avoid-page">
                   {/* Category header */}
@@ -368,7 +368,7 @@ export default function EncartePrecos({
                               className={`font-bold leading-tight tracking-wide block ${
                                 produto.preco === 0 ? 'text-white/40' : group.isOferta ? 'text-red-100' : 'text-white'
                               } line-clamp-2`}
-                              style={getProductNameStyle(produto.descricao, isAutoDesc, config.toledo_fonte_descricao)}
+                              style={getProductNameStyle(produto.descricao, isAutoDesc, config.toledo_fonte_descricao ?? undefined)}
                             >
                               {cleanName}
                             </span>
@@ -382,7 +382,7 @@ export default function EncartePrecos({
                               <>
                                 <span 
                                   className={`${group.isOferta ? 'text-red-400' : accentClass} font-black tracking-tighter drop-shadow-sm`}
-                                  style={getPriceStyle(priceText, isAutoPrice, config.toledo_fonte_preco)}
+                                  style={getPriceStyle(priceText, isAutoPrice, config.toledo_fonte_preco ?? undefined)}
                                 >
                                   {priceText}
                                 </span>

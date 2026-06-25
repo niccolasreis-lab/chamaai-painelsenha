@@ -482,23 +482,38 @@ chamaAI_novo/
 
 ---
 
-## 6. Próximos Passos
+## 6. Próximos Passos e Status das Mudanças
 
-> *Seção reservada para planejamento de melhorias futuras.*
-> *Preencher conforme priorização do time.*
+### 6.1 Implementações Recentes (Concluído)
 
-### 6.1 Curto Prazo (Quick Wins)
+- [x] **Restauração Visual — Senha Chamada (TV Broadcast Style Otimizado):**
+  - Restauração do estilo visual de telão (TV / aeroporto / painel LED) no componente `SenhaChamada.tsx`.
+  - Introdução de filtros estáticos leves (`.broadcast-scanlines` e `.broadcast-vignette` em `index.css`) sem animações GPU infinitas, prevenindo stutters e lags em WebViews de TV Boxes e Android TVs limitadas.
+  - Fixação da escala visual em `scale-105` e aplicação do sombreamento de texto solicitado (`text-shadow`) para alto impacto visual e contraste à distância.
+  - Correção e alinhamento da hierarquia de elementos: Senha Atual -> Hero Number (gigante) -> Nome do Cliente (se houver) -> Guichê/Balcão (secundário e elegante).
+- [x] **Robustez do Encarte Digital em WebViews / TV Boxes:**
+  - Adicionado mecanismo de auto-recovery inteligente no componente `MediaIndoor.tsx` que monitora se a listagem de produtos Toledo está vazia em terminais WebViews de TV Box ativos, disparando recarregamento assíncrono seguro.
+  - Implementação de fallbacks defensivos via coerção (`String(...)` e `?? undefined`) para evitar crashes no processamento de chaves numéricas e strings nulas/indefinidas no banco SQLite de configurações locais (`toledo_encarte_duracao`, `toledo_itens_por_slide`, `toledo_encarte_posicao`).
 
-- [ ] _A definir_
+### 6.2 Curto Prazo (Pendentes & Quick Wins)
 
-### 6.2 Médio Prazo (Refactoring)
+- [ ] **Heartbeat Resiliente SSE (Item 10):** Implementar pulso de ping periódico no Express e reconexão ativa no frontend para evitar "clientes zumbis" em conexões locais instáveis.
+- [ ] **Sincronização de Versão do App (Item 13):** Atualizar a versão estática `v1.0.115` exibida no painel Home do frontend (`src/App.tsx`) para refletir a versão oficial do `package.json` (`v1.0.148`+).
+- [ ] **Remoção de Credenciais Supabase do Source Code (Item 2):** Migrar as chaves e URLs hardcoded do Supabase em `supabase-sync.ts` para variáveis de ambiente `.env`.
+- [ ] **Bloqueio de IP por Brute-force no Login Admin (Item 14):** Reforçar a segurança de primeiro acesso mudando a senha padrão inicial e aplicando testes de brute-force adicionais.
 
-- [ ] _A definir_
+### 6.3 Médio Prazo (Refactoring e Segurança)
 
-### 6.3 Longo Prazo (Evolução)
+- [ ] **Modularização do Servidor (Item 1):** Quebrar o arquivo monolítico de ~4400 linhas em `server/index.ts` em rotas, controllers e cron-jobs modulares para facilidade de manutenção.
+- [ ] **Unificação do Schema de Usuários (Item 3):** Consolidar as tabelas `operadores` e `usuarios` em uma única entidade de segurança com hashing bcrypt uniforme.
+- [ ] **Redução de Exposição do JWT (Item 4):** Reduzir a expiração padrão do JWT remoto (atualmente ~10 anos) para prazos mais seguros, utilizando mecanismos de refresh token se necessário.
+- [ ] **Desacoplamento de Paths do Windows (Item 5):** Substituir caminhos absolutos hardcoded (como `C:\ChamaAi`) por caminhos relativos ao `app.getPath('userData')` do Electron para suporte multiplataforma.
 
-- [ ] _A definir_
+### 6.4 Longo Prazo (Evolução de Infraestrutura)
+
+- [ ] **Suíte de Testes Automatizados (Item 6):** Introduzir testes básicos unitários para o motor de chamada de senhas e testes E2E com Playwright para os fluxos críticos de Totem e Telão.
+- [ ] **Containerização (Docker) (Item 15):** Criar imagem Docker do Servidor Master para facilitar implantações em ambientes que não sejam apenas Windows desktop bruto.
 
 ---
 
-> **Nota:** Este documento foi gerado a partir de análise estática do código-fonte e não substitui entrevistas com stakeholders ou análise de métricas de uso em produção. Recomenda-se validação cruzada com o time de produto antes de usar como base para decisões arquiteturais.
+> **Nota:** Este documento foi gerado a partir de análise estática do código-fonte e atualizações manuais do time de desenvolvimento, refletindo o progresso contra gargalos arquiteturais mapeados. Verifique periodicamente com a equipe de engenharia as prioridades de roadmap.

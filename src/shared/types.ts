@@ -53,6 +53,7 @@ export type MediaItem = {
   id: string | number;
   nome: string;
   tipo: 'imagem' | 'video' | 'weather' | 'youtube' | 'tabela' | 'encarte';
+  type?: 'imagem' | 'video' | 'weather' | 'youtube' | 'tabela' | 'encarte' | 'image' | 'video' | 'weather' | 'youtube' | 'tabela' | 'encarte' | string;
   caminho?: string;
   local_path?: string;
   ativo?: number;
