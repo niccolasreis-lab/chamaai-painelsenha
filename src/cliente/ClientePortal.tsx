@@ -31,7 +31,8 @@ function getTipoProduto(descricao: string): 'peso' | 'unidade' {
 
 export default function ClientePortal() {
   const [searchParams] = useSearchParams();
-  const ticketId = searchParams.get('ticket');
+  const token = searchParams.get('token');
+  const ticketId = searchParams.get('ticket') || searchParams.get('senha_id');
   const API_URL = getApiUrl();
 
   const [categoriasInfo, setCategoriasInfo] = useState<any[]>([]);
@@ -91,6 +92,19 @@ export default function ClientePortal() {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
+        if (token) {
+          const { fetchPortalSummary } = require('./portalApi');
+          const summary = await fetchPortalSummary(token);
+          if (summary.ok) {
+            setConfig({
+              nome_estabelecimento: summary.store.name,
+              logo_cliente: summary.store.theme.logo_url,
+              primary_color: summary.store.theme.primary_color,
+            });
+          }
+          return;
+        }
+
         const res = await fetch(`${API_URL}/api/configuracoes`);
         if (res.ok) {
           const data = await res.json();
@@ -104,7 +118,7 @@ export default function ClientePortal() {
       }
     };
     fetchConfig();
-  }, [API_URL]);
+  }, [API_URL, token]);
 
 
 
@@ -123,6 +137,56 @@ export default function ClientePortal() {
 
     const checkStatus = async () => {
       try {
+        if (token) {
+          const { fetchTicketStatus } = require('./portalApi');
+          const data = await fetchTicketStatus(token, ticketId);
+          if (!data.ok) throw new Error();
+
+          setTicketNumero(data.ticket.senha_id || '');
+
+          if (data.ticket.status === 'aguardando') {
+            setTicketStatus('aguardando');
+            
+            if (data.ticket.position !== undefined && data.ticket.position !== null) {
+              setQueuePosition(data.ticket.position);
+
+              // Alerta sonoro: toca apenas quando a posição DIMINUI e está <= 3
+              if (data.ticket.position <= 3 && (
+                ultimoAlertaPosicao.current === null || 
+                data.ticket.position < ultimoAlertaPosicao.current
+              )) {
+                ultimoAlertaPosicao.current = data.ticket.position;
+                try {
+                  playNotificationSound('chime', 80);
+                } catch (e) {
+                  // Silencioso se o navegador bloquear autoplay
+                }
+              }
+            }
+          } else {
+            // Senha foi chamada — manter banner por 4 segundos antes de mudar status
+            if (ticketStatus === 'aguardando' && queuePosition !== null && queuePosition <= 3) {
+              try {
+                playNotificationSound('bell', 80);
+              } catch (e) {}
+
+              setShowExpiringBanner(true);
+              if (bannerTimeoutRef.current) clearTimeout(bannerTimeoutRef.current);
+              bannerTimeoutRef.current = setTimeout(() => {
+                setShowExpiringBanner(false);
+                setTicketStatus('expirado');
+                // Limpa carrinho ao expirar
+                localStorage.removeItem(`carrinho_${ticketId}`);
+              }, 4000);
+            } else {
+              setTicketStatus('expirado');
+              localStorage.removeItem(`carrinho_${ticketId}`);
+            }
+            setQueuePosition(null);
+          }
+          return;
+        }
+
         const res = await fetch(`${API_URL}/api/senhas/${ticketId}/status`);
         if (!res.ok) throw new Error();
         const data = await res.json();
@@ -215,13 +279,29 @@ export default function ClientePortal() {
       if (intervalId) clearInterval(intervalId);
       if (bannerTimeoutRef.current) clearTimeout(bannerTimeoutRef.current);
     };
-  }, [ticketId, API_URL, queuePosition, config, ticketStatus]);
+  }, [ticketId, API_URL, queuePosition, config, ticketStatus, token]);
 
   // Carrega produtos e categorias dinâmicas
   useEffect(() => {
     const fetchData = async () => {
       setLoadingProdutos(true);
       try {
+        if (token) {
+          const { fetchPortalProducts } = require('./portalApi');
+          const data = await fetchPortalProducts(token, 1, 50);
+          if (data.ok && Array.isArray(data.products)) {
+            setProdutos(data.products as any);
+            
+            const cats = Array.from(new Set(data.products.map(p => p.categoria))).map((cat, idx) => ({
+              id: idx,
+              nome: cat,
+              emoji: '📦'
+            }));
+            setCategoriasInfo(cats);
+          }
+          return;
+        }
+
         const [resProds, resCats] = await Promise.all([
           fetch(`${API_URL}/api/toledo/produtos`),
           fetch(`${API_URL}/api/categorias`)
@@ -247,7 +327,7 @@ export default function ClientePortal() {
     if (ticketStatus === 'aguardando') {
       fetchData();
     }
-  }, [ticketStatus, API_URL]);
+  }, [ticketStatus, API_URL, token]);
 
   // Restaura carrinho local com migração robusta de dados legados e chaves unificadas por ID
   useEffect(() => {

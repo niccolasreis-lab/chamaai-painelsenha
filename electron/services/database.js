@@ -254,6 +254,22 @@ async function initDatabase({ appVersion }) {
         criado_em TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
         expira_em TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS cloud_installation (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tenant_id TEXT,
+        store_id TEXT,
+        installation_id TEXT NOT NULL UNIQUE,
+        license_key TEXT,
+        cloud_enabled INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'pending',
+        last_checkin_at TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_cloud_installation_installation_id
+      ON cloud_installation(installation_id);
     `);
         // Add primeiro_acesso if it doesn't exist
         try {

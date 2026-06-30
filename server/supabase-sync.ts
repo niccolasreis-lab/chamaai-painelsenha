@@ -17,31 +17,110 @@
  * comandos do operador na nuvem instantaneamente, com fallback de polling a cada 30s.
  */
 
-import { createClient } from '@supabase/supabase-js';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { 
+  isSupabaseConfigured, 
+  getSupabaseDisabledReason, 
+  createSupabaseAnonClient 
+} from './services/supabase-config.service';
+import { getCloudIdentity, getDeviceToken } from './services/cloud-identity.service';
+import { getCloudIngestionConfig, sendCloudIngestionBatch } from './services/cloud-ingestion.service';
 
-// Load default .env from current working directory
-dotenv.config();
+// ── Multi-Tenant Context Helpers ──────────────────────────────────────────────
 
-// Try loading from the persistent data directory C:\ChamaAi\.env
-const prodEnvPath = 'C:\\ChamaAi\\.env';
-if (fs.existsSync(prodEnvPath)) {
-  dotenv.config({ path: prodEnvPath });
+export function getRequiredCloudContext() {
+  const identity = getCloudIdentity();
+  const isSupabaseConfig = isSupabaseConfigured();
+  
+  const device_token = getDeviceToken();
+  const ingestConfig = getCloudIngestionConfig();
+  
+  if (!identity.cloud_enabled || !identity.tenant_id || !identity.store_id) {
+    return {
+      enabled: false,
+      tenant_id: identity.tenant_id,
+      store_id: identity.store_id,
+      installation_id: identity.installation_id,
+      device_token: device_token,
+      disabledReason: !identity.cloud_enabled ? 'cloud_enabled = false' :
+                      !identity.tenant_id ? 'tenant_id ausente' :
+                      !identity.store_id ? 'store_id ausente' : 'Erro de identidade cloud'
+    };
+  }
+
+  // Se a Cloud Ingestion estiver configurada, exige device_token
+  if (ingestConfig.url && !device_token) {
+    console.warn('[CLOUD INGESTION] ⚠️ Pausado: device_token ausente. Ative a licença/cloud para provisionar o token.');
+    return {
+      enabled: false,
+      tenant_id: identity.tenant_id,
+      store_id: identity.store_id,
+      installation_id: identity.installation_id,
+      device_token: null,
+      disabledReason: 'device_token ausente'
+    };
+  }
+
+  // Se a Cloud Ingestion NÃO estiver configurada, exige a flag legado habilitada OU Supabase Configurado
+  if (!ingestConfig.url) {
+    if (!ingestConfig.allowDirectSupabaseSync) {
+      console.warn('[CLOUD INGESTION] ⚠️ Pausado: CHAMAAI_CLOUD_INGEST_URL ausente e CHAMAAI_ALLOW_DIRECT_SUPABASE_SYNC não habilitado.');
+      return {
+        enabled: false,
+        tenant_id: identity.tenant_id,
+        store_id: identity.store_id,
+        installation_id: identity.installation_id,
+        device_token: device_token,
+        disabledReason: 'ingestion cloud ausente'
+      };
+    }
+
+    if (!isSupabaseConfigured()) {
+      return {
+        enabled: false,
+        tenant_id: identity.tenant_id,
+        store_id: identity.store_id,
+        installation_id: identity.installation_id,
+        device_token: device_token,
+        disabledReason: 'Supabase não configurado'
+      };
+    }
+  }
+
+  return {
+    enabled: true,
+    tenant_id: identity.tenant_id,
+    store_id: identity.store_id,
+    installation_id: identity.installation_id,
+    device_token: device_token,
+  };
 }
 
-// Chaves padrão do Supabase de fallback caso não estejam configuradas no .env
-const DEFAULT_SUPABASE_URL = 'https://npfqnsgjicmxwmurwosu.supabase.co';
-const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5wZnFuc2dqaWNteHdtdXJ3b3N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3ODQyNDQsImV4cCI6MjA5MjM2MDI0NH0.wLIFMxZkE9rjGQjZF7eFi0dyDioOGQfg1jfhRy32O90';
+export function withTenantStoreContext(payload: any, context: any): any {
+  if (!payload) return payload;
+  
+  // Se o payload for um array (upsert em lote)
+  if (Array.isArray(payload)) {
+    return payload.map(item => withTenantStoreContext(item, context));
+  }
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-const SUPABASE_KEY = process.env.VITE_SUPABASE_KEY || DEFAULT_SUPABASE_KEY;
+  // Se o payload original já tiver tenant_id ou store_id, valida se bate
+  if (payload.tenant_id && payload.tenant_id !== context.tenant_id) {
+    throw new Error(`Divergência de tenant_id no payload: esperado ${context.tenant_id}`);
+  }
+  if (payload.store_id && payload.store_id !== context.store_id) {
+    throw new Error(`Divergência de store_id no payload: esperado ${context.store_id}`);
+  }
 
-export const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_KEY);
+  return {
+    ...payload,
+    tenant_id: context.tenant_id,
+    store_id: context.store_id,
+    installation_id: context.installation_id
+  };
+}
 
-// Inicializa o cliente com as credenciais válidas ou padrão
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Exportando como função para compatibilidade e verificação dinâmica
+export { isSupabaseConfigured };
 
 // ── Fila Local de Sincronização (Outbox Pattern) ────────────────────────────────
 
@@ -50,7 +129,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
  * Execução síncrona (<1ms) — nunca bloqueia o fluxo principal.
  */
 function enqueueSyncOp(tabela: string, acao: string, payload: any) {
-  if (!isSupabaseConfigured) return;
+  if (getSupabaseDisabledReason() !== null) return;
   try {
     const { getDb } = require('../electron/services/database');
     const db = getDb();
@@ -246,61 +325,155 @@ async function processSyncQueue() {
     const processedIds: number[] = [];
     const failedIds: number[] = [];
     let networkErrorOccurred = false;
+    
+    const context = getRequiredCloudContext();
+    if (!context.enabled) {
+      console.log(`[SYNC WORKER] Sincronização pausada: cloud identity incompleta (${context.disabledReason}).`);
+      isSyncRunning = false;
+      return;
+    }
 
-    for (const item of items) {
+    const ingestConfig = getCloudIngestionConfig();
+    let client: any = null;
+
+    // Só cria o client se formos usar o sync legado e ele estiver permitido
+    if (!ingestConfig.url && ingestConfig.allowDirectSupabaseSync) {
+      client = createSupabaseAnonClient();
+      if (!client) {
+        isSyncRunning = false;
+        return;
+      }
+    }
+
+    if (ingestConfig.url) {
+      if (!context.device_token) {
+        console.warn('[CLOUD INGESTION] Pausado: device_token ausente. Ative a licença/cloud para provisionar o token.');
+        isSyncRunning = false;
+        return;
+      }
+
+      // Prepara batch no formato esperado
+      const itemsToIngest = items.map((item: any) => {
+        let payload = JSON.parse(item.payload);
+        return {
+          queue_id: item.id,
+          tabela: item.tabela,
+          acao: item.acao,
+          payload: withTenantStoreContext(payload, context)
+        };
+      });
+
       try {
-        const payload = JSON.parse(item.payload);
-        let error: any = null;
+        const res = await sendCloudIngestionBatch(
+          context.tenant_id as string, 
+          context.store_id as string, 
+          context.installation_id as string, 
+          context.device_token as string, 
+          itemsToIngest
+        );
 
-        if (item.acao === 'upsert') {
-          const result = await supabase.from(item.tabela).upsert(payload);
-          error = result.error;
-        } else if (item.acao === 'update') {
-          // Para updates, extraímos o id do payload e atualizamos
-          const { id, ...updateData } = payload;
-          const result = await supabase.from(item.tabela).update(updateData).eq('id', id);
-          error = result.error;
-        } else if (item.acao === 'delete') {
-          const { id } = payload;
-          const result = await supabase.from(item.tabela).delete().eq('id', id);
-          error = result.error;
-        } else if (item.acao === 'delete_all') {
-          let result;
-          if (item.tabela === 'toledo_produtos_publicos') {
-            result = await supabase.from(item.tabela).delete().neq('plu', '');
-          } else {
-            result = await supabase.from(item.tabela).delete().gte('id', 0);
+        if (res.status === 200 || res.status === 207 || res.status === 400) {
+          try {
+            const data = await res.json();
+            if (data && Array.isArray(data.results)) {
+              for (const r of data.results) {
+                if (r.ok) {
+                  processedIds.push(r.queue_id);
+                } else {
+                  failedIds.push(r.queue_id);
+                }
+              }
+            } else {
+              failedIds.push(...items.map((i: any) => i.id));
+            }
+          } catch (e) {
+            failedIds.push(...items.map((i: any) => i.id));
           }
-          error = result.error;
+        } else if (res.status === 401 || res.status === 403) {
+          console.error(`[CLOUD INGESTION] ❌ Falha de Autenticação (${res.status}). Device Token inválido ou revogado. Pausando fila...`);
+          networkErrorOccurred = true; // Para não expirar itens injustamente
+        } else if (res.status === 409) {
+          console.error(`[CLOUD INGESTION] ❌ Divergência de Identidade (${res.status}). Verifique o tenant e store.`);
+          networkErrorOccurred = true;
+        } else {
+          console.error(`[CLOUD INGESTION] ⚠️ Erro inesperado: ${res.status} ${res.statusText}`);
+          if (res.status >= 500 || res.status === 429) {
+            networkErrorOccurred = true;
+          } else {
+            failedIds.push(...items.map((i: any) => i.id));
+          }
         }
-
-        if (error) {
-          throw error;
-        }
-
-        processedIds.push(item.id);
       } catch (err: any) {
         const errMessage = err?.message || String(err);
         const errCode = err?.code || '';
+        const isNetworkError = errMessage.includes('fetch failed') || errMessage.includes('NetworkError') || errMessage.includes('Failed to fetch') || errCode === 'UND_ERR_CONNECT_TIMEOUT' || errCode === 'ENOTFOUND' || errCode === 'ECONNREFUSED' || errCode === 'ETIMEDOUT';
         
-        // Detecta falhas de infraestrutura (rede, timeout, dns)
-        const isNetworkError = 
-          errMessage.includes('fetch failed') ||
-          errMessage.includes('NetworkError') ||
-          errMessage.includes('Failed to fetch') ||
-          errCode === 'UND_ERR_CONNECT_TIMEOUT' ||
-          errCode === 'ENOTFOUND' ||
-          errCode === 'ECONNREFUSED' ||
-          errCode === 'ETIMEDOUT';
-
         if (isNetworkError) {
-          console.warn('[SYNC WORKER] 🌐 Falha de rede detectada. Pausando fila temporariamente...');
+          console.warn('[CLOUD INGESTION] 🌐 Falha de rede detectada (Endpoint Indisponível). Pausando fila temporariamente...');
           networkErrorOccurred = true;
-          break; // Sai do loop para não penalizar as outras mensagens e pausa a fila
+        } else {
+          console.error('[CLOUD INGESTION] ⚠️ Falha na execução da requisição:', errMessage);
+          failedIds.push(...items.map((i: any) => i.id));
         }
+      }
+    } 
+    // Modo 2: Fallback (Inseguro - Legacy - Somente se explícito via ENV)
+    else if (client) {
+      for (const item of items) {
+        try {
+          const payload = JSON.parse(item.payload);
+          let error: any = null;
 
-        // Outros erros (ex: erro de schema, permissão, etc) — incrementa tentativas do item específico
-        failedIds.push(item.id);
+          if (item.acao === 'upsert') {
+            const tenantPayload = withTenantStoreContext(payload, context);
+            const result = await client.from(item.tabela).upsert(tenantPayload);
+            error = result.error;
+          } else if (item.acao === 'update') {
+            const { id, ...updateData } = payload;
+            const tenantUpdateData = withTenantStoreContext(updateData, context);
+            const result = await client.from(item.tabela).update(tenantUpdateData)
+              .eq('id', id)
+              .eq('tenant_id', context.tenant_id)
+              .eq('store_id', context.store_id);
+            error = result.error;
+          } else if (item.acao === 'delete') {
+            const { id } = payload;
+            const result = await client.from(item.tabela).delete()
+              .eq('id', id)
+              .eq('tenant_id', context.tenant_id)
+              .eq('store_id', context.store_id);
+            error = result.error;
+          } else if (item.acao === 'delete_all') {
+            let result;
+            if (item.tabela === 'toledo_produtos_publicos') {
+              result = await client.from(item.tabela).delete()
+                .neq('plu', '')
+                .eq('tenant_id', context.tenant_id)
+                .eq('store_id', context.store_id);
+            } else {
+              result = await client.from(item.tabela).delete()
+                .gte('id', 0)
+                .eq('tenant_id', context.tenant_id)
+                .eq('store_id', context.store_id);
+            }
+            error = result.error;
+          }
+
+          if (error) throw error;
+          processedIds.push(item.id);
+        } catch (err: any) {
+          const errMessage = err?.message || String(err);
+          const errCode = err?.code || '';
+          
+          const isNetworkError = errMessage.includes('fetch failed') || errMessage.includes('NetworkError') || errMessage.includes('Failed to fetch') || errCode === 'UND_ERR_CONNECT_TIMEOUT' || errCode === 'ENOTFOUND' || errCode === 'ECONNREFUSED' || errCode === 'ETIMEDOUT';
+
+          if (isNetworkError) {
+            console.warn('[SYNC WORKER] 🌐 Falha de rede detectada no modo legado. Pausando fila temporariamente...');
+            networkErrorOccurred = true;
+            break;
+          }
+          failedIds.push(item.id);
+        }
       }
     }
 
@@ -340,7 +513,16 @@ async function processSyncQueue() {
 }
 
 export function startSyncWorker() {
-  if (!isSupabaseConfigured) return;
+  const ingestConfig = getCloudIngestionConfig();
+  if (!ingestConfig.url && ingestConfig.allowDirectSupabaseSync) {
+    console.warn('[SYNC WORKER] ⚠️ AVISO: A sincronização direta com o Supabase está ativada. Isso NUNCA deve ser usado em produção!');
+  }
+
+  const disabledReason = getSupabaseDisabledReason();
+  if (disabledReason) {
+    console.log(`[SYNC WORKER] Sincronização inativa: ${disabledReason}`);
+    return;
+  }
   console.log('[SYNC WORKER] 🚀 Worker de sincronização iniciado (intervalo: 5s)');
   if (syncWorkerTimer) clearInterval(syncWorkerTimer);
   
@@ -364,6 +546,9 @@ let loopbackToken = '';
 export function setLoopbackToken(token: string) {
   loopbackToken = token;
 }
+export function getLoopbackToken(): string {
+  return loopbackToken;
+}
 
 let realtimeChannel: any = null;
 let fallbackTimer: NodeJS.Timeout | null = null;
@@ -376,7 +561,13 @@ async function processarComandoRemoto(data: any) {
     console.log(`[SUPABASE CMD] 📥 Comando recebido: ${data.comando}`, data.payload);
 
     // Marca imediatamente como processando para evitar duplicidade
-    await supabase.from('comandos_operador').update({ status: 'processando' }).eq('id', data.id);
+    const client = createSupabaseAnonClient();
+    if (client) {
+      await client.from('comandos_operador').update({ status: 'processando' })
+        .eq('id', data.id)
+        .eq('tenant_id', data.tenant_id)
+        .eq('store_id', data.store_id);
+    }
 
     // Processa o comando simulando uma requisição local
     const apiUrl = 'http://localhost:3001';
@@ -412,10 +603,16 @@ async function processarComandoRemoto(data: any) {
     }
 
     if (res && res.ok) {
-      await supabase.from('comandos_operador').update({ status: 'processado' }).eq('id', data.id);
+      if (client) await client.from('comandos_operador').update({ status: 'processado' })
+        .eq('id', data.id)
+        .eq('tenant_id', data.tenant_id)
+        .eq('store_id', data.store_id);
       console.log(`[SUPABASE CMD] ✅ Comando ${data.id} processado com sucesso.`);
     } else {
-      await supabase.from('comandos_operador').update({ status: 'erro' }).eq('id', data.id);
+      if (client) await client.from('comandos_operador').update({ status: 'erro' })
+        .eq('id', data.id)
+        .eq('tenant_id', data.tenant_id)
+        .eq('store_id', data.store_id);
       console.log(`[SUPABASE CMD] ❌ Comando ${data.id} falhou na execução local.`);
     }
   } catch (e) {
@@ -429,10 +626,18 @@ async function processarComandoRemoto(data: any) {
  */
 async function fallbackPollComandos() {
   try {
-    const { data, error } = await supabase
+    const client = createSupabaseAnonClient();
+    if (!client) return;
+
+    const context = getRequiredCloudContext();
+    if (!context.enabled) return;
+
+    const { data, error } = await client
       .from('comandos_operador')
       .select('*')
       .eq('status', 'pendente')
+      .eq('tenant_id', context.tenant_id)
+      .eq('store_id', context.store_id)
       .order('created_at', { ascending: true })
       .limit(5);
 
@@ -451,19 +656,34 @@ async function fallbackPollComandos() {
  * Com fallback de polling a cada 30 segundos.
  */
 export function startSupabaseCommandListener() {
-  if (!isSupabaseConfigured) return;
+  const allowLegacy = process.env.CHAMAAI_ALLOW_LEGACY_SUPABASE_COMMANDS === 'true';
+  if (!allowLegacy) {
+    console.log('[COMMANDS] Listener Supabase Realtime legado desativado. Usando Cloud Commands Polling.');
+    return;
+  }
+
+  console.warn('[SUPABASE CMD] ⚠️ AVISO: O listener Realtime do Supabase legado está ativo! Isso não é recomendado para produção.');
+
+  const disabledReason = getSupabaseDisabledReason();
+  if (disabledReason) {
+    console.log(`[SUPABASE CMD] Listener inativo: ${disabledReason}`);
+    return;
+  }
+  
+  const client = createSupabaseAnonClient();
+  if (!client) return;
   console.log('[SUPABASE CMD] 🎧 Iniciando listener Realtime de comandos...');
 
   // Limpa listeners anteriores
   if (realtimeChannel) {
-    supabase.removeChannel(realtimeChannel);
+    client.removeChannel(realtimeChannel);
   }
   if (fallbackTimer) {
     clearInterval(fallbackTimer);
   }
 
   // Canal Realtime — recebe INSERT na tabela comandos_operador com status 'pendente'
-  realtimeChannel = supabase
+  realtimeChannel = client
     .channel('comandos-locais')
     .on(
       'postgres_changes',
@@ -475,6 +695,13 @@ export function startSupabaseCommandListener() {
       },
       async (payload: any) => {
         const data = payload.new;
+        const context = getRequiredCloudContext();
+        
+        // Verifica na chegada do websocket se o comando pertence a este tenant/store
+        if (!context.enabled || data.tenant_id !== context.tenant_id || data.store_id !== context.store_id) {
+          return;
+        }
+
         console.log(`[SUPABASE CMD] ⚡ Comando recebido via Realtime: ${data.comando}`);
         await processarComandoRemoto(data);
       }
@@ -491,9 +718,10 @@ export function startSupabaseCommandListener() {
 }
 
 export function stopSupabaseCommandListener() {
-  if (realtimeChannel) {
+  const client = createSupabaseAnonClient();
+  if (realtimeChannel && client) {
     try {
-      supabase.removeChannel(realtimeChannel);
+      client.removeChannel(realtimeChannel);
     } catch (e) {}
     realtimeChannel = null;
   }
@@ -504,8 +732,8 @@ export function stopSupabaseCommandListener() {
   
   // Desconectar explicitamente o WebSocket do Supabase para evitar manter o event loop ativo
   try {
-    if (supabase && supabase.realtime && typeof supabase.realtime.disconnect === 'function') {
-      supabase.realtime.disconnect();
+    if (client && client.realtime && typeof client.realtime.disconnect === 'function') {
+      client.realtime.disconnect();
       console.log('[SUPABASE CMD] Conexão WebSocket Realtime desconectada.');
     }
   } catch (e) {

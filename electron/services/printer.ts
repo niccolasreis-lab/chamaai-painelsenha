@@ -120,6 +120,14 @@ export class PrinterService {
     try {
       const { getDb } = require('./database');
       const db = getDb();
+      
+      const cloudRow = db.prepare("SELECT portal_public_token FROM cloud_installation LIMIT 1").get() as any;
+      if (cloudRow && cloudRow.portal_public_token && cloudRow.portal_public_token.trim() !== '') {
+        const token = cloudRow.portal_public_token.trim();
+        const baseUrl = process.env.CHAMAAI_PUBLIC_PORTAL_BASE_URL || 'http://localhost:3001';
+        return `${baseUrl}/cliente?token=${token}`;
+      }
+
       const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'portal_cliente_url'").get() as any;
       if (row && row.valor && row.valor.trim() !== '') {
         return row.valor.trim();
@@ -127,7 +135,6 @@ export class PrinterService {
     } catch (err) {
       console.error('[PrinterService] Erro ao ler URL do portal:', err);
     }
-    // Fallback: usa a rota local (funciona via Wi-Fi da loja)
     return 'http://localhost:3001/#/cliente';
   }
 
@@ -264,7 +271,9 @@ export class PrinterService {
           const portalBase = this.getPortalUrl();
           const tId = data.ticketId || (data as any).id || '';
           let portalComTicket: string;
-          if (portalBase.includes('#')) {
+          if (portalBase.includes('?')) {
+            portalComTicket = portalBase + '&senha_id=' + tId;
+          } else if (portalBase.includes('#')) {
             portalComTicket = portalBase + '?ticket=' + tId;
           } else {
             portalComTicket = portalBase.endsWith('/')

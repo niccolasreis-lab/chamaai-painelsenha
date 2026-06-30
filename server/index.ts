@@ -8,7 +8,10 @@ import dgram from 'dgram';
 import cron from 'node-cron';
 import { getDb } from '../electron/services/database';
 import { startToledoWatcher, forceToledoRefresh, reloadCategorias, setBroadcastFn, syncToCatalogoProduto } from './toledo-watcher';
-import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica, startSyncWorker, stopSyncWorker, supabase, isSupabaseConfigured, setLoopbackToken, syncCatalogoCategorias, syncCatalogoProdutos, syncDeleteCatalogoItem } from './supabase-sync';
+import { syncNovaSenha, syncStatusSenha, syncLimparSenhas, syncProdutos, startSupabaseCommandListener, stopSupabaseCommandListener, syncConfiguracaoPublica, startSyncWorker, stopSyncWorker, isSupabaseConfigured, setLoopbackToken, syncCatalogoCategorias, syncCatalogoProdutos, syncDeleteCatalogoItem } from './supabase-sync';
+import { startCloudCheckinCron } from './services/cloud-license.service';
+import { startCloudCommandsCron, stopCloudCommandsCron } from './services/cloud-commands.service';
+import { createSupabaseAnonClient } from './services/supabase-config.service';
 import { migrateDatabaseAndConfigs } from './categorizador';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
@@ -2233,21 +2236,24 @@ export function startServer() {
       if (configuracoes.toledo_ocultar_em_falta !== undefined) syncConfiguracaoPublica('toledo_ocultar_em_falta', String(configuracoes.toledo_ocultar_em_falta));
       if (configuracoes.telao_ticker_texto !== undefined) syncConfiguracaoPublica('telao_ticker_texto', String(configuracoes.telao_ticker_texto));
       
-      if (configuracoes.cor_primaria !== undefined && isSupabaseConfigured) {
+      if (configuracoes.cor_primaria !== undefined && isSupabaseConfigured()) {
         const novaCor = configuracoes.cor_primaria;
         try {
-          const { error } = await supabase
-            .from('configuracoes_publicas')
-            .upsert({ chave: 'cor_primaria', valor: novaCor, updated_at: new Date().toISOString() });
-          if (error) throw error;
-          
-          db.prepare(
-            `INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('sync_pendente_cor_primaria', '0', datetime('now'))`
-          ).run();
+          const client = createSupabaseAnonClient();
+          if (client) {
+            const { error } = await client
+              .from('configuracoes_publicas')
+              .upsert({ chave: 'cor_primaria', valor: novaCor, updated_at: new Date().toISOString() });
+            
+            if (error) {
+              console.error('[API] Erro ao sincronizar nova cor_primaria com o Supabase:', error);
+              db.prepare(`INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('sync_pendente_cor_primaria', '1', datetime('now'))`).run();
+            } else {
+              db.prepare(`INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('sync_pendente_cor_primaria', '0', datetime('now'))`).run();
+            }
+          }
         } catch (err) {
-          db.prepare(
-            `INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('sync_pendente_cor_primaria', '1', datetime('now'))`
-          ).run();
+          db.prepare(`INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('sync_pendente_cor_primaria', '1', datetime('now'))`).run();
           console.warn('[Sync] Supabase offline — cor_primaria marcada como pendente de sincronização.');
         }
       }
@@ -3315,7 +3321,7 @@ export function startServer() {
       if (!oldCat) return res.status(404).json({ success: false, error: "Categoria antiga não encontrada" });
       
       const newCat = db.prepare("SELECT id FROM categorias WHERE id = ? AND deleted_at IS NULL").get(nova_categoria_id);
-      if (!newCat) return res.status(400).json({ success: false, error: "Nova categoria não encontrada ou está excluída" });
+      if (!newCat) return res.status(404).json({ success: false, error: "Nova categoria não encontrada ou está excluída" });
 
       const result = db.prepare("UPDATE produtos SET categoria_id = ?, updated_at = datetime('now', 'localtime') WHERE categoria_id = ? AND deleted_at IS NULL").run(nova_categoria_id, oldId);
       
@@ -3629,6 +3635,181 @@ export function startServer() {
   });
 
   // ═══════════════════════════════════════════════════════════════════
+  // ── ROTAS DE IDENTIDADE CLOUD LOCAL (FASE 1) ──────────────────────
+  // ═══════════════════════════════════════════════════════════════════
+
+  // Retorna a identidade atual (com chaves e tokens mascarados/ocultados por completo)
+  app.get('/api/cloud/identity', (req, res) => {
+    try {
+      const { getCloudIdentity, maskLicenseKey, maskPortalToken } = require('./services/cloud-identity.service');
+      const identity = getCloudIdentity();
+      const result = {
+        ...identity,
+        device_token: undefined, // remove token real por completo
+        license_key: undefined, // remove chave real por completo
+        portal_public_token: undefined, // remove portal public token real
+        has_device_token: !!identity.device_token,
+        license_key_masked: maskLicenseKey(identity.license_key),
+        portal_public_token_masked: maskPortalToken(identity.portal_public_token)
+      };
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Retorna de forma segura apenas booleanos e status operacionais para diagnóstico
+  app.get('/api/cloud/status', (req, res) => {
+    try {
+      const { getCloudIdentity } = require('./services/cloud-identity.service');
+      const { getCloudIngestionConfig } = require('./services/cloud-ingestion.service');
+      const { getCloudLicenseConfig } = require('./services/cloud-license.service');
+      const { getCloudCommandsConfig } = require('./services/cloud-commands.service');
+      
+      const identity = getCloudIdentity();
+      const ingestConfig = getCloudIngestionConfig();
+      const licenseConfig = getCloudLicenseConfig();
+      const commandsConfig = getCloudCommandsConfig();
+      
+      // Contagem de itens pendentes na fila local
+      let pendingCount = 0;
+      try {
+        const db = getDb();
+        const row = db.prepare('SELECT count(*) as count FROM supabase_sync_queue').get() as { count: number };
+        pendingCount = row?.count || 0;
+      } catch (e) {}
+      
+      let syncStatus = 'disabled';
+      if (identity.cloud_enabled === 1 && identity.tenant_id && identity.store_id) {
+        syncStatus = pendingCount > 0 ? 'pending_items' : 'ready';
+      }
+      
+      res.json({
+        cloud_enabled: identity.cloud_enabled === 1,
+        has_tenant: !!identity.tenant_id,
+        has_store: !!identity.store_id,
+        has_device_token: !!identity.device_token,
+        has_portal_token: !!identity.portal_public_token,
+        ingest_configured: !!ingestConfig.url,
+        activate_configured: !!licenseConfig.activateUrl,
+        checkin_configured: !!licenseConfig.checkinUrl,
+        commands_configured: !!commandsConfig.commandsUrl,
+        last_checkin_at: identity.last_checkin_at || null,
+        sync_status: syncStatus,
+        pending_sync_items: pendingCount
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Ativa a sincronização na nuvem com tenant e store locais ou via Cloud
+  app.post('/api/cloud/activate', requireMaster, async (req, res) => {
+    try {
+      const { tenant_id, store_id, license_key } = req.body;
+      const { setCloudIdentity, maskLicenseKey, maskPortalToken, getDeviceToken } = require('./services/cloud-identity.service');
+
+      if (!license_key || typeof license_key !== 'string' || license_key.trim() === '') {
+        return res.status(400).json({ error: 'license_key é obrigatório e deve ser texto válido.' });
+      }
+
+      // MODO B: Ativação Manual (Fallback / Dev)
+      if (tenant_id && store_id) {
+        console.log(`[CLOUD IDENTITY] 🌐 Ativando nuvem localmente (MANUAL) para Tenant: ${tenant_id}, Loja: ${store_id}`);
+        
+        const updated = setCloudIdentity({
+          tenant_id: tenant_id.trim(),
+          store_id: store_id.trim(),
+          license_key: license_key.trim(),
+          cloud_enabled: 1,
+          status: 'active'
+        });
+
+        const token = getDeviceToken();
+
+        return res.json({
+          ...updated,
+          device_token: undefined, // remove token real por completo
+          license_key: undefined, // remove chave real por completo
+          portal_public_token: undefined, // remove portal public token real
+          has_device_token: !!token,
+          license_key_masked: maskLicenseKey(updated.license_key),
+          portal_public_token_masked: maskPortalToken(updated.portal_public_token),
+          message: token ? 'Ativado manualmente.' : 'Ativado manualmente. O sync cloud continuará pausado pois não há device_token.'
+        });
+      }
+      
+      // MODO A: Ativação Cloud Real
+      const { activateLicense } = require('./services/cloud-license.service');
+      const activationData = await activateLicense(license_key.trim());
+
+      const updated = require('./services/cloud-identity.service').getCloudIdentity();
+
+      res.json({
+        ...updated,
+        device_token: undefined, // remove token real por completo da resposta principal
+        license_key: undefined, // remove chave real por completo da resposta principal
+        portal_public_token: undefined, // remove portal public token real da resposta principal
+        has_device_token: !!updated.device_token,
+        license_key_masked: maskLicenseKey(updated.license_key),
+        portal_public_token_masked: maskPortalToken(updated.portal_public_token),
+        cloud_response: {
+          license: activationData.license,
+          next_checkin_seconds: activationData.next_checkin_seconds
+          // device_token retornado via Deno pode vir aqui se necessário para fins de exibição única
+        }
+      });
+    } catch (err: any) {
+      console.error('[CLOUD IDENTITY] ❌ Falha na ativação cloud:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+
+  // Retorna o status simplificado da licença/ativação
+  app.post('/api/cloud/check-license', (req, res) => {
+    try {
+      const { getCloudIdentity } = require('./services/cloud-identity.service');
+      const identity = getCloudIdentity();
+      if (identity.cloud_enabled === 1 && identity.tenant_id && identity.store_id) {
+        return res.json({
+          ok: true,
+          cloud_enabled: true,
+          status: identity.status || 'active'
+        });
+      } else {
+        return res.json({
+          ok: false,
+          cloud_enabled: false,
+          status: identity.status || 'pending'
+        });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Registra check-in do servidor
+  app.post('/api/cloud/checkin', (req, res) => {
+    try {
+      const { setCloudIdentity, getCloudCheckinPayload } = require('./services/cloud-identity.service');
+      const nowStr = new Date().toISOString();
+      
+      // Salva último check-in no banco local
+      setCloudIdentity({
+        last_checkin_at: nowStr
+      });
+
+      const payload = getCloudCheckinPayload();
+      console.log(`[CLOUD IDENTITY] 📡 Check-in executado localmente. Status: ${payload.status}`);
+      res.json(payload);
+    } catch (err: any) {
+      console.error('[CLOUD IDENTITY] ❌ Falha no check-in local:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
   
   setupMediaIndoorRoutes(app, broadcastEvent, requireMaster);
 
@@ -3723,6 +3904,15 @@ export function startServer() {
         console.error('[STARTUP] Erro ao executar migração de categorias:', migErr.message);
       }
 
+      // Inicializa a identidade cloud local
+      try {
+        const { ensureInstallationId } = require('./services/cloud-identity.service');
+        const identity = ensureInstallationId();
+        console.log(`[STARTUP] ✅ Identidade local da instalação inicializada. ID: ${identity.installation_id}`);
+      } catch (identityErr: any) {
+        console.error('[STARTUP] ⚠️ Erro ao inicializar identidade da instalação (não crítico):', identityErr.message);
+      }
+
       // Garante que a tabela de tokens remotos existe
       try {
         db.exec(`CREATE TABLE IF NOT EXISTS tokens_remotos (
@@ -3803,19 +3993,22 @@ export function startServer() {
       // Sincronização pendente da cor primária no startup
       try {
         const pendente = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'sync_pendente_cor_primaria'").get() as any;
-        if (pendente && pendente.valor === '1' && isSupabaseConfigured) {
+        if (pendente && pendente.valor === '1' && isSupabaseConfigured()) {
           const cor = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'cor_primaria'").get() as any;
           if (cor && cor.valor) {
             console.log('[STARTUP] Detectado cor_primaria pendente de sincronização. Tentando sincronizar com o Supabase...');
-            const { error } = await supabase
-              .from('configuracoes_publicas')
-              .upsert({ chave: 'cor_primaria', valor: cor.valor, updated_at: new Date().toISOString() });
+            const client = createSupabaseAnonClient();
+            if (client) {
+              const { error } = await client
+                .from('configuracoes_publicas')
+                .upsert({ chave: 'cor_primaria', valor: cor.valor, updated_at: new Date().toISOString() });
             
-            if (!error) {
-              db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('sync_pendente_cor_primaria', '0', datetime('now'))").run();
-              console.log('[STARTUP] ✅ Cor primária sincronizada com sucesso e flag de pendência limpa.');
-            } else {
-              throw error;
+              if (!error) {
+                db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('sync_pendente_cor_primaria', '0', datetime('now'))").run();
+                console.log('[STARTUP] ✅ Cor primária sincronizada com sucesso e flag de pendência limpa.');
+              } else {
+                throw error;
+              }
             }
           }
         }
@@ -3885,8 +4078,10 @@ export function startServer() {
     // Start Supabase sync worker (Outbox Pattern — processa fila local a cada 5s)
     try {
       startSyncWorker();
+      startCloudCheckinCron();
+      startCloudCommandsCron();
     } catch (err) {
-      console.error('[SUPABASE] Erro ao iniciar sync worker (não crítico):', err);
+      console.error('[SUPABASE] Erro ao iniciar sync worker, checkin ou commands cron (não crítico):', err);
     }
   });
 
@@ -4398,6 +4593,12 @@ export function stopServer(): Promise<void> {
       stopSyncWorker();
     } catch(e) {
       console.error('Erro ao parar Sync worker', e);
+    }
+
+    try {
+      stopCloudCommandsCron();
+    } catch(e) {
+      console.error('Erro ao parar Commands cron', e);
     }
 
     try {
