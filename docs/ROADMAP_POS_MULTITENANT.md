@@ -1,5 +1,10 @@
 # Roadmap Pós-Implementação Multi-Tenant
 
+> [!NOTE]
+> **Arquitetura multi-tenant concluída.**  
+> **Status:** pronto para homologação/staging.  
+> **Produção:** dependente de validação E2E.
+
 Este documento descreve os próximos passos técnicos recomendados para evolução, endurecimento e otimização da arquitetura multi-tenant híbrida do ChamaAí.
 
 ---
