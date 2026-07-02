@@ -5,6 +5,7 @@ import { gerarPDFLista } from '../shared/gerarPDF';
 import { ShoppingCart, Search, FileText, AlertTriangle, Plus, Trash2 } from 'lucide-react';
 import { playNotificationSound, preLoadCustomAudio } from '../shared/sounds';
 import { Bell, Volume2 } from 'lucide-react';
+import { fetchPortalSummary, fetchTicketStatus, fetchPortalProducts } from './portalApi';
 
 interface Produto {
   id: number;
@@ -93,7 +94,6 @@ export default function ClientePortal() {
     const fetchConfig = async () => {
       try {
         if (token) {
-          const { fetchPortalSummary } = require('./portalApi');
           const summary = await fetchPortalSummary(token);
           if (summary.ok) {
             setConfig({
@@ -138,7 +138,6 @@ export default function ClientePortal() {
     const checkStatus = async () => {
       try {
         if (token) {
-          const { fetchTicketStatus } = require('./portalApi');
           const data = await fetchTicketStatus(token, ticketId);
           if (!data.ok) throw new Error();
 
@@ -287,7 +286,6 @@ export default function ClientePortal() {
       setLoadingProdutos(true);
       try {
         if (token) {
-          const { fetchPortalProducts } = require('./portalApi');
           const data = await fetchPortalProducts(token, 1, 50);
           if (data.ok && Array.isArray(data.products)) {
             setProdutos(data.products as any);
