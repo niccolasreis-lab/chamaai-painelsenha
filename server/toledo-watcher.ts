@@ -215,6 +215,7 @@ function processToledoItems(items: ToledoItem[]): number {
       if (!existing) {
         // New product — insert with description
         insertNew.run(item.plu, item.descricao, item.preco, item.categoria);
+        syncToCatalogoProduto(db, item);
         updatedCount++;
       } else if (
         existing.preco !== item.preco || 
@@ -227,6 +228,7 @@ function processToledoItems(items: ToledoItem[]): number {
           SET preco = ?, descricao = ?, categoria = ?, atualizado_em = datetime('now', 'localtime') 
           WHERE plu = ?
         `).run(item.preco, item.descricao, item.categoria, item.plu);
+        syncToCatalogoProduto(db, item);
         updatedCount++;
       }
     }
