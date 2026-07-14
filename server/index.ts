@@ -468,6 +468,60 @@ export function startServer() {
     }
   }));
 
+  // Serve static files from tts folder
+  const TTS_DIR = path.join(UPLOADS_DIR, 'tts');
+  if (!fs.existsSync(TTS_DIR)) {
+    fs.mkdirSync(TTS_DIR, { recursive: true });
+    fs.mkdirSync(path.join(TTS_DIR, 'tipo1'), { recursive: true });
+    fs.mkdirSync(path.join(TTS_DIR, 'tipo2'), { recursive: true });
+    fs.mkdirSync(path.join(TTS_DIR, 'tipo3'), { recursive: true });
+  }
+
+  // Automatic migration of old tts folders from project root
+  const rootTtsDir = path.join(process.cwd(), 'tts');
+  if (fs.existsSync(rootTtsDir)) {
+    try {
+      const p1 = path.join(rootTtsDir, 'senha_1_100');
+      const p2 = path.join(rootTtsDir, 'senha_1_100_2_chamada');
+      const t1 = path.join(TTS_DIR, 'tipo1');
+      const t2 = path.join(TTS_DIR, 'tipo2');
+
+      if (fs.existsSync(p1)) {
+        const files = fs.readdirSync(p1);
+        for (const file of files) {
+          if (file.toLowerCase().endsWith('.mp3')) {
+            const dest = path.join(t1, file);
+            if (!fs.existsSync(dest)) {
+              fs.copyFileSync(path.join(p1, file), dest);
+            }
+          }
+        }
+      }
+      if (fs.existsSync(p2)) {
+        const files = fs.readdirSync(p2);
+        for (const file of files) {
+          if (file.toLowerCase().endsWith('.mp3')) {
+            const dest = path.join(t2, file);
+            if (!fs.existsSync(dest)) {
+              fs.copyFileSync(path.join(p2, file), dest);
+            }
+          }
+        }
+      }
+      console.log('[TTS MIGRATION] Migração automática de áudios TTS concluída.');
+    } catch (migErr) {
+      console.error('[TTS MIGRATION] Erro ao migrar pastas antigas:', migErr);
+    }
+  }
+
+  app.use('/tts', express.static(TTS_DIR, {
+    maxAge: 31536000000,
+    immutable: true,
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  }));
+
   // Resolve o diretório de atualizações locais de forma dinâmica
   function getLocalUpdatesDir(): string {
     try {
@@ -2331,6 +2385,151 @@ export function startServer() {
       res.json({ success: true, somPath });
     } catch (err: any) {
       console.error('Error uploading sound:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // TTS STATUS AND MANAGEMENT ROUTES
+  app.get('/api/tts/status', (req, res) => {
+    try {
+      const dataDir = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+      const ttsBaseDir = path.join(dataDir, 'uploads', 'tts');
+      const response: Record<string, { count: number; range: string }> = {};
+
+      const tipos = ['tipo1', 'tipo2', 'tipo3'];
+      for (const tipo of tipos) {
+        const tipoDir = path.join(ttsBaseDir, tipo);
+        if (fs.existsSync(tipoDir)) {
+          const files = fs.readdirSync(tipoDir).filter(f => f.toLowerCase().endsWith('.mp3'));
+          const numbers: number[] = [];
+          for (const file of files) {
+            const match = file.match(/Senha_(\d+)/i);
+            if (match) {
+              numbers.push(parseInt(match[1], 10));
+            }
+          }
+          if (numbers.length > 0) {
+            numbers.sort((a, b) => a - b);
+            response[tipo] = {
+              count: files.length,
+              range: `${numbers[0]}-${numbers[numbers.length - 1]}`
+            };
+          } else {
+            response[tipo] = { count: files.length, range: '' };
+          }
+        } else {
+          response[tipo] = { count: 0, range: '' };
+        }
+      }
+
+      res.json(response);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/tts/upload', requireMaster, upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+
+      const { execSync } = require('child_process');
+      const zipFilePath = req.file.path;
+      const dataDir = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+      const uploadsDir = path.join(dataDir, 'uploads');
+      const ttsBaseDir = path.join(uploadsDir, 'tts');
+      const tempDir = path.join(dataDir, 'Backups', `_extract_tts_${Date.now()}`);
+
+      fs.mkdirSync(tempDir, { recursive: true });
+
+      // Extrai o ZIP via PowerShell nativo (Expand-Archive)
+      try {
+        execSync(
+          `powershell -NoProfile -Command "Expand-Archive -Path '${zipFilePath.replace(/'/g, "''")}' -DestinationPath '${tempDir.replace(/'/g, "''")}' -Force"`,
+          { timeout: 60000 }
+        );
+      } catch (err: any) {
+        console.error('[TTS UPLOAD] Erro ao extrair ZIP:', err);
+        return res.status(500).json({ error: 'Erro ao extrair arquivo ZIP.' });
+      }
+
+      function getAllFiles(dirPath: string, arrayOfFiles: string[] = []): string[] {
+        if (!fs.existsSync(dirPath)) return arrayOfFiles;
+        const files = fs.readdirSync(dirPath);
+        files.forEach((file) => {
+          const fullPath = path.join(dirPath, file);
+          if (fs.statSync(fullPath).isDirectory()) {
+            arrayOfFiles = getAllFiles(fullPath, arrayOfFiles);
+          } else {
+            arrayOfFiles.push(fullPath);
+          }
+        });
+        return arrayOfFiles;
+      }
+
+      // Encontrar todos os arquivos extraídos
+      const allFiles = getAllFiles(tempDir);
+      let successCount = 0;
+
+      for (const filePath of allFiles) {
+        const baseName = path.basename(filePath);
+        if (!baseName.toLowerCase().endsWith('.mp3')) continue;
+
+        // Determinar o tipo do áudio pelo padrão do nome
+        let tipo = '';
+        if (/^Senha_\d+_1\.mp3$/i.test(baseName)) {
+          tipo = 'tipo1';
+        } else if (/^Senha_\d+_2_chamada\.mp3$/i.test(baseName) || /^Senha_\d+_2\.mp3$/i.test(baseName)) {
+          tipo = 'tipo2';
+        } else if (/^Senha_\d+_3\.mp3$/i.test(baseName)) {
+          tipo = 'tipo3';
+        }
+
+        if (tipo) {
+          const destDir = path.join(ttsBaseDir, tipo);
+          if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+          fs.copyFileSync(filePath, path.join(destDir, baseName));
+          successCount++;
+        }
+      }
+
+      // Limpar pasta temporária e o ZIP
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+        if (fs.existsSync(zipFilePath)) fs.unlinkSync(zipFilePath);
+      } catch (e) {
+        console.error('[TTS UPLOAD] Erro ao limpar arquivos temporários:', e);
+      }
+
+      broadcastEvent('CONFIG_ATUALIZADA', { tts_updated: Date.now().toString() });
+      res.json({ success: true, count: successCount });
+    } catch (err: any) {
+      console.error('[TTS UPLOAD] Erro geral:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/tts/clear/:tipo', requireMaster, (req, res) => {
+    try {
+      const tipo = req.params.tipo;
+      if (typeof tipo !== 'string' || !['tipo1', 'tipo2', 'tipo3'].includes(tipo)) {
+        return res.status(400).json({ error: 'Tipo inválido.' });
+      }
+
+      const dataDir = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+      const tipoDir = path.join(dataDir, 'uploads', 'tts', tipo);
+      
+      if (fs.existsSync(tipoDir)) {
+        const files = fs.readdirSync(tipoDir);
+        for (const file of files) {
+          if (file.toLowerCase().endsWith('.mp3')) {
+            fs.unlinkSync(path.join(tipoDir, file));
+          }
+        }
+      }
+
+      broadcastEvent('CONFIG_ATUALIZADA', { tts_cleared: Date.now().toString() });
+      res.json({ success: true });
+    } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });

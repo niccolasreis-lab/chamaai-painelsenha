@@ -206,7 +206,7 @@ export default function EncarteGranel({
   const isAutoPrice = config?.toledo_fonte_preco === 'auto';
 
   return (
-    <div className="h-full w-full flex flex-col" style={{ background: temaDinamico?.imagem_fundo ? 'transparent' : COLORS.bg, fontFamily: 'Barlow, Inter, sans-serif', overflow: 'hidden', ...dynamicBgStyle }}>
+    <div className="h-full w-full flex flex-col" style={{ background: temaDinamico?.imagem_fundo ? 'transparent' : COLORS.bg, fontFamily: 'var(--font-body), sans-serif', overflow: 'hidden', ...dynamicBgStyle }}>
       {temaDinamico && <div className="absolute inset-0 bg-white/70 z-0 backdrop-blur-sm"></div>}
       
       <div className="relative z-10 flex flex-col h-full w-full overflow-hidden">
@@ -221,17 +221,17 @@ export default function EncarteGranel({
               {config.logo_cliente ? (
                 <img src={`${API_URL}${config.logo_cliente}`} alt="" style={{ width: 36, height: 36, objectFit: 'contain' }} />
               ) : (
-                <span style={{ fontFamily: 'Playfair Display, serif', fontWeight: 800, fontSize: 20, color: COLORS.goldLt }}>
+                <span style={{ fontFamily: 'var(--font-display), sans-serif', fontWeight: 800, fontSize: 20, color: COLORS.goldLt }}>
                   {storeName.substring(0, 2).toUpperCase()}
                 </span>
               )}
             </div>
             <div>
-              <div style={{ fontFamily: 'Playfair Display, serif', fontWeight: 700, fontSize: 22, color: '#fff', lineHeight: 1.1 }}>
+              <div style={{ fontFamily: 'var(--font-display), sans-serif', fontWeight: 700, fontSize: 22, color: '#fff', lineHeight: 1.1 }}>
                 {storeName}
               </div>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontWeight: 500, letterSpacing: 1, marginTop: 2 }}>
-                Produtos a Granel — <em style={{ fontFamily: 'Playfair Display, serif', color: COLORS.goldLt, fontStyle: 'italic' }}>Ofertas da Semana</em>
+                Produtos a Granel — <em style={{ fontFamily: 'var(--font-display), sans-serif', color: COLORS.goldLt, fontStyle: 'italic' }}>Ofertas da Semana</em>
               </div>
             </div>
           </div>
@@ -251,7 +251,7 @@ export default function EncarteGranel({
             fontSize: '10px',
           }}>Categoria</span>
           <span style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center' }}>{slide.icon}</span>
-          <span style={{ fontFamily: 'Playfair Display, serif', fontWeight: 800, color: COLORS.forest, fontSize: '1.4rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <span style={{ fontFamily: 'var(--font-display), sans-serif', fontWeight: 800, color: COLORS.forest, fontSize: '1.4rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {slide.category}
           </span>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -304,7 +304,7 @@ export default function EncarteGranel({
                   {/* Body */}
                   <div style={{ flex: 1, padding: '4px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', minWidth: 0 }}>
                     <span style={{
-                      fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, 
+                      fontFamily: 'var(--font-body), sans-serif', fontWeight: 700, 
                       lineHeight: 1.1,
                       color: p.preco === 0 ? '#9f9f9f' : COLORS.text, textTransform: 'uppercase',
                       display: '-webkit-box', 
@@ -330,7 +330,7 @@ export default function EncarteGranel({
                   }}>
                     {p.preco === 0 ? (
                       <span style={{
-                        fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800,
+                        fontFamily: 'var(--font-body), sans-serif', fontWeight: 800,
                         fontSize: '12px',
                         color: '#a1a1aa', textTransform: 'uppercase'
                       }}>
@@ -341,7 +341,7 @@ export default function EncarteGranel({
                         <div style={{ display: 'flex', alignItems: 'baseline' }}>
                           <sup style={{ fontWeight: 800, color: isOferta ? '#dc2626' : COLORS.amber, marginRight: 2, position: 'relative' as const, top: '-0.3em', fontSize: '10px' }}>R$</sup>
                           <span style={{
-                            fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, 
+                            fontFamily: 'var(--font-body), sans-serif', fontWeight: 800, 
                             lineHeight: 1,
                             color: isOferta ? '#dc2626' : COLORS.amber,
                             ...getPriceStyle(priceText, isAutoPrice, config?.toledo_fonte_preco ?? undefined)

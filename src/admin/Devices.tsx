@@ -1,6 +1,18 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
 import { getApiUrl } from '../shared/apiConfig';
+import {
+  Link2,
+  Tv,
+  Edit,
+  Trash2,
+  CheckSquare,
+  Square
+} from 'lucide-react';
+import { Button } from '../shared/components/Button';
+import { Input } from '../shared/components/Input';
+import { Dialog } from '../shared/components/Dialog';
+import { StatusBadge } from '../shared/components/StatusBadge';
 
 export default function Devices() {
   const [teloes, setTeloes] = useState<any[]>([]);
@@ -148,87 +160,96 @@ export default function Devices() {
 
   return (
     <AdminLayout>
-      <div className="max-w-7xl mx-auto space-y-8 font-sans">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+      <div className="max-w-7xl mx-auto space-y-6 font-sans">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="font-sans text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Dispositivos</h1>
-            <p className="text-ink-secondary mt-2 text-lg font-semibold tracking-wider">Gerencie os telões vinculados a esta loja.</p>
+            <h1 className="font-display text-2xl font-bold text-ink leading-tight">Dispositivos</h1>
+            <p className="text-ink-variant mt-1 text-sm">Gerencie os telões vinculados a esta loja.</p>
           </div>
-          <button 
+          <Button 
             onClick={openVincular}
-            className="bg-primary text-on-primary px-8 py-4 rounded-xl font-bold shadow-lg transition-all hover:bg-primary-hover active:scale-95 flex items-center space-x-2 outline-none uppercase tracking-widest text-sm"
+            icon={<Link2 className="h-4 w-4" />}
           >
-            <span className="material-symbols-outlined">add_link</span>
-            <span>Vincular Novo Telão</span>
-          </button>
+            Vincular Novo Telão
+          </Button>
         </div>
 
         {pendentes.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-xl font-bold text-ink mb-4 uppercase tracking-widest">Aguardando Vinculação ({pendentes.length})</h2>
+          <div className="mb-6">
+            <h2 className="text-sm font-bold text-ink mb-3 uppercase tracking-wider">Aguardando Vinculação ({pendentes.length})</h2>
             <div className="flex gap-4 flex-wrap">
               {pendentes.map(p => (
-                <div key={p.code} className="bg-surface-variant border border-outline-variant rounded-xl p-4 flex items-center gap-4">
-                  <div className="text-2xl font-black text-ink tracking-widest">{p.code}</div>
-                  <button onClick={() => { openVincular(); setFormData(prev => ({...prev, code: p.code})) }} className="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold text-xs uppercase hover:bg-primary-hover">Vincular</button>
+                <div key={p.code} className="bg-surface-container-low border border-outline-variant rounded-md p-4 flex items-center gap-4">
+                  <div className="text-lg font-bold text-ink tracking-wider">{p.code}</div>
+                  <Button size="sm" onClick={() => { openVincular(); setFormData(prev => ({...prev, code: p.code})) }}>Vincular</Button>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        <h2 className="text-xl font-bold text-ink mb-4 tracking-widest border-b border-outline-variant/30 pb-2">Telões vinculados</h2>
+        <h2 className="text-sm font-bold text-ink mb-3 uppercase tracking-wider border-b border-outline-variant/30 pb-2">Telões vinculados</h2>
         {loading ? (
-          <div className="text-ink-secondary uppercase tracking-widest">Carregando dispositivos...</div>
+          <StatusBadge variant="loading" />
         ) : vinculados.length === 0 ? (
-          <div className="bg-surface rounded-2xl p-8 text-center text-ink-secondary font-bold uppercase tracking-widest border border-outline-variant/50">
-            Nenhum telão vinculado.
-          </div>
+          <StatusBadge variant="empty" message="Nenhum telão vinculado." />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {vinculados.map((device) => (
-              <div key={device.code} className="bg-surface rounded-[24px] p-6 shadow-sm border border-outline-variant/50 hover:border-primary/50 transition-all group flex flex-col h-full">
-                <div className="flex justify-between items-start mb-6">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-primary/10 text-primary">
-                    <span className="material-symbols-outlined text-3xl">tv</span>
+              <div key={device.code} className="bg-surface rounded-md p-6 border border-outline-variant shadow-sm hover:shadow-md hover:border-primary/50 transition-all flex flex-col h-full">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-10 h-10 rounded-sm flex items-center justify-center bg-primary/10 text-primary">
+                    <Tv className="h-5 w-5" />
                   </div>
-                  <div className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border bg-success/10 text-success border-success/20">
+                  <div className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border bg-success/10 text-success border-success/20">
                     Ativo
                   </div>
                 </div>
 
-                <h3 className="font-sans text-xl font-bold text-ink uppercase tracking-wide">{device.nome || 'Sem Nome'}</h3>
-                <p className="text-ink-secondary font-bold text-sm uppercase tracking-widest mb-4">Código: {device.code}</p>
+                <h3 className="font-sans text-lg font-bold text-ink">{device.nome || 'Sem Nome'}</h3>
+                <p className="text-ink-variant font-bold text-xs uppercase tracking-wider mb-3">Código: {device.code}</p>
 
                 <div className="space-y-2 border-t border-outline-variant/30 pt-4 flex-1">
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {device.modulo_painel ? <span className="bg-ink/5 text-ink px-2 py-1 rounded text-[10px] font-bold">Painel</span> : null}
-                    {device.modulo_encarte ? <span className="bg-ink/5 text-ink px-2 py-1 rounded text-[10px] font-bold">Encarte</span> : null}
-                    {device.modulo_midia ? <span className="bg-ink/5 text-ink px-2 py-1 rounded text-[10px] font-bold">Mídia</span> : null}
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {device.modulo_painel ? <span className="bg-surface-container text-ink px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">Painel</span> : null}
+                    {device.modulo_encarte ? <span className="bg-surface-container text-ink px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">Encarte</span> : null}
+                    {device.modulo_midia ? <span className="bg-surface-container text-ink px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">Mídia</span> : null}
                   </div>
-                  <div className="text-[10px] text-ink-secondary/70 font-bold uppercase tracking-wider mt-2">
+                  <div className="text-[10px] text-ink-variant font-bold uppercase tracking-wider mt-2">
                     Layout: {device.template_layout === 'sidebar' ? 'Mídia + Fila' : device.template_layout === 'l-shape' ? 'Modo L' : 'Clássico'}
                   </div>
                   {device.modulo_encarte && device.encarte_categorias && (
-                    <div className="mt-2 text-xs text-ink-secondary font-semibold">
+                    <div className="mt-2 text-xs text-ink-variant font-semibold">
                       Categorias: {device.encarte_categorias}
                     </div>
                   )}
                 </div>
 
                 <div className="mt-6 flex gap-2">
-                  <button 
+                  <Button 
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1"
                     onClick={() => handleRestart(device.code)}
-                    className="flex-1 py-2 bg-surface-variant text-ink font-bold rounded-lg text-xs uppercase tracking-widest hover:bg-outline-variant transition-colors outline-none"
                   >
                     Reiniciar
-                  </button>
-                  <button onClick={() => openEdit(device)} className="p-2 text-ink bg-surface-variant rounded-lg hover:text-primary hover:bg-primary/10 transition-colors outline-none">
-                    <span className="material-symbols-outlined text-sm">edit</span>
-                  </button>
-                  <button onClick={() => handleDelete(device.code)} className="p-2 text-error bg-error/10 rounded-lg hover:bg-error hover:text-white transition-colors outline-none">
-                    <span className="material-symbols-outlined text-sm">delete</span>
-                  </button>
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="px-2 shrink-0" 
+                    onClick={() => openEdit(device)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="danger" 
+                    size="sm"
+                    className="px-2 shrink-0"
+                    onClick={() => handleDelete(device.code)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             ))}
@@ -237,156 +258,138 @@ export default function Devices() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 font-sans backdrop-blur-sm">
-          <div className="bg-surface rounded-[32px] p-8 max-w-lg w-full shadow-2xl relative border border-outline-variant/50">
-            <button 
-              onClick={() => setIsModalOpen(false)}
-              className="absolute top-6 right-6 text-ink-secondary hover:text-ink"
-            >
-              <span className="material-symbols-outlined">close</span>
-            </button>
-            <h2 className="text-2xl font-bold text-ink mb-6 uppercase tracking-widest">{editingCode ? 'Editar Telão' : 'Vincular Telão'}</h2>
-            
-            <form onSubmit={saveTelao} className="space-y-6">
-              {!editingCode && (
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-2">Código exibido no telão</label>
-                  <input 
-                    type="text" 
-                    required 
-                    value={formData.code}
-                    onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})}
-                    className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 text-ink font-black tracking-widest text-xl focus:border-primary outline-none uppercase"
-                    placeholder="Ex: ABC123"
-                    maxLength={6}
-                  />
-                </div>
-              )}
-              <div>
-                <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-2">Nome de identificação (ex: tv refeitório)</label>
-                <input 
-                  type="text" 
-                  required 
-                  value={formData.nome}
-                  onChange={e => setFormData({...formData, nome: e.target.value})}
-                  className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 text-ink font-bold focus:border-primary outline-none"
-                  placeholder="Nome do Telão"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-2">Layout do telão</label>
-                <select
-                  value={formData.template_layout || 'classic'}
-                  onChange={e => setFormData({...formData, template_layout: e.target.value})}
-                  className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 text-ink font-bold focus:border-primary outline-none"
-                >
-                  <option value="classic">Clássico ( classic )</option>
-                  <option value="sidebar">Mídia + Fila Lateral ( sidebar )</option>
-                  <option value="l-shape">Modo L ( l-shape )</option>
-                </select>
-              </div>
-
-              <div className="space-y-3 pt-4 border-t border-outline-variant/30">
-                <label className="block text-xs font-bold text-ink-secondary tracking-widest">Módulos ativos</label>
-                
-                <label className="flex items-center gap-3 p-3 bg-surface-variant rounded-xl cursor-pointer hover:border-primary border border-transparent transition-all">
-                  <input type="checkbox" checked={formData.modulo_painel} onChange={e => setFormData({...formData, modulo_painel: e.target.checked})} className="w-5 h-5 rounded text-primary" />
-                  <span className="font-bold text-ink uppercase tracking-wide text-sm">Painel de Senhas</span>
-                </label>
-                
-                <label className="flex items-center gap-3 p-3 bg-surface-variant rounded-xl cursor-pointer hover:border-primary border border-transparent transition-all">
-                  <input type="checkbox" checked={formData.modulo_encarte} onChange={e => setFormData({...formData, modulo_encarte: e.target.checked})} className="w-5 h-5 rounded text-primary" />
-                  <span className="font-bold text-ink tracking-wide text-sm">Encarte digital (preços)</span>
-                </label>
-                
-                <label className="flex items-center gap-3 p-3 bg-surface-variant rounded-xl cursor-pointer hover:border-primary border border-transparent transition-all">
-                  <input type="checkbox" checked={formData.modulo_midia} onChange={e => setFormData({...formData, modulo_midia: e.target.checked})} className="w-5 h-5 rounded text-primary" />
-                  <span className="font-bold text-ink tracking-wide text-sm">Mídia indoor (vídeos)</span>
-                </label>
-              </div>
-
-              {formData.modulo_encarte && (
-                <div className="pt-4 border-t border-outline-variant/30 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <label className="block text-xs font-bold text-ink-secondary tracking-widest">Selecionar categorias a exibir</label>
-                    <div className="flex gap-2">
-                      <button 
-                        type="button"
-                        onClick={() => setFormData({...formData, encarte_categorias: availableCategories.join(';')})}
-                        className="text-[10px] font-bold text-primary hover:underline uppercase tracking-wider bg-transparent border-none outline-none cursor-pointer"
-                      >
-                        Selecionar Todas
-                      </button>
-                      <span className="text-[10px] text-outline-variant">|</span>
-                      <button 
-                        type="button"
-                        onClick={() => setFormData({...formData, encarte_categorias: ''})}
-                        className="text-[10px] font-bold text-ink-secondary hover:underline uppercase tracking-wider bg-transparent border-none outline-none cursor-pointer"
-                      >
-                        Limpar Seleção
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {availableCategories.length === 0 ? (
-                    <p className="text-xs text-ink-secondary/60 italic tracking-wider">Nenhuma categoria encontrada no sistema.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-surface-variant/50 border border-outline-variant/30 rounded-xl">
-                      {availableCategories.map((cat) => {
-                        const selectedList = formData.encarte_categorias
-                          ? formData.encarte_categorias.split(';').map(s => s.trim())
-                          : [];
-                        const isSelected = selectedList.includes(cat);
-                        
-                        const toggleCategory = () => {
-                          let newList;
-                          if (isSelected) {
-                            newList = selectedList.filter(s => s !== cat);
-                          } else {
-                            newList = [...selectedList, cat];
-                          }
-                          setFormData({
-                            ...formData,
-                            encarte_categorias: newList.filter(Boolean).join(';')
-                          });
-                        };
-                        
-                        return (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={toggleCategory}
-                            className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border font-bold text-xs uppercase tracking-wide transition-all text-left outline-none ${
-                              isSelected
-                                ? 'bg-primary text-on-primary border-primary shadow-sm'
-                                : 'bg-surface hover:bg-surface-variant border-outline-variant/40 text-ink'
-                            }`}
-                          >
-                            <span className="material-symbols-outlined text-sm shrink-0">
-                              {isSelected ? 'check_box' : 'check_box_outline_blank'}
-                            </span>
-                            <span className="truncate">{cat}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <p className="text-[10px] text-ink-secondary/70 font-semibold tracking-wider leading-relaxed">* caso nenhuma categoria esteja selecionada, o telão exibirá todas as categorias do sistema automaticamente.</p>
-                </div>
-              )}
-
-              <button 
-                type="submit" 
-                className="w-full py-4 bg-primary text-on-primary rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-primary-hover active:scale-95 transition-all outline-none mt-8"
+        <Dialog 
+          open={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          title={editingCode ? 'Editar Telão' : 'Vincular Telão'}
+        >
+          <form onSubmit={saveTelao} className="space-y-4">
+            {!editingCode && (
+              <Input 
+                label="Código exibido no telão"
+                required 
+                value={formData.code}
+                onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})}
+                maxLength={6}
+                placeholder="Ex: ABC123"
+              />
+            )}
+            <Input 
+              label="Nome de identificação (ex: tv refeitório)"
+              required 
+              value={formData.nome}
+              onChange={e => setFormData({...formData, nome: e.target.value})}
+              placeholder="Nome do Telão"
+            />
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-ink">Layout do telão</label>
+              <select
+                value={formData.template_layout || 'classic'}
+                onChange={e => setFormData({...formData, template_layout: e.target.value})}
+                className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-sp-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               >
-                Salvar Configuração
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+                <option value="classic">Clássico ( classic )</option>
+                <option value="sidebar">Mídia + Fila Lateral ( sidebar )</option>
+                <option value="l-shape">Modo L ( l-shape )</option>
+              </select>
+            </div>
 
+            <div className="space-y-3 pt-4 border-t border-outline-variant/30">
+              <label className="block text-xs font-bold text-ink-variant tracking-wider uppercase">Módulos ativos</label>
+              
+              <label className="flex items-center gap-3 p-3 bg-surface-container-low rounded-md cursor-pointer hover:border-primary border border-transparent transition-all">
+                <input type="checkbox" checked={formData.modulo_painel} onChange={e => setFormData({...formData, modulo_painel: e.target.checked})} className="w-5 h-5 rounded text-primary" />
+                <span className="font-semibold text-ink text-sm">Painel de Senhas</span>
+              </label>
+              
+              <label className="flex items-center gap-3 p-3 bg-surface-container-low rounded-md cursor-pointer hover:border-primary border border-transparent transition-all">
+                <input type="checkbox" checked={formData.modulo_encarte} onChange={e => setFormData({...formData, modulo_encarte: e.target.checked})} className="w-5 h-5 rounded text-primary" />
+                <span className="font-semibold text-ink text-sm">Encarte digital (preços)</span>
+              </label>
+              
+              <label className="flex items-center gap-3 p-3 bg-surface-container-low rounded-md cursor-pointer hover:border-primary border border-transparent transition-all">
+                <input type="checkbox" checked={formData.modulo_midia} onChange={e => setFormData({...formData, modulo_midia: e.target.checked})} className="w-5 h-5 rounded text-primary" />
+                <span className="font-semibold text-ink text-sm">Mídia indoor (vídeos)</span>
+              </label>
+            </div>
+
+            {formData.modulo_encarte && (
+              <div className="pt-4 border-t border-outline-variant/30 space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="block text-xs font-bold text-ink-variant tracking-wider uppercase">Selecionar categorias a exibir</label>
+                  <div className="flex gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => setFormData({...formData, encarte_categorias: availableCategories.join(';')})}
+                      className="text-[10px] font-bold text-primary hover:underline uppercase tracking-wider bg-transparent border-none outline-none cursor-pointer"
+                    >
+                      Selecionar Todas
+                    </button>
+                    <span className="text-[10px] text-outline-variant">|</span>
+                    <button 
+                      type="button"
+                      onClick={() => setFormData({...formData, encarte_categorias: ''})}
+                      className="text-[10px] font-bold text-ink-variant hover:underline uppercase tracking-wider bg-transparent border-none outline-none cursor-pointer"
+                    >
+                      Limpar Seleção
+                    </button>
+                  </div>
+                </div>
+                
+                {availableCategories.length === 0 ? (
+                  <p className="text-xs text-ink-variant italic tracking-wider">Nenhuma categoria encontrada no sistema.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-surface-container-low border border-outline-variant/30 rounded-md">
+                    {availableCategories.map((cat) => {
+                      const selectedList = formData.encarte_categorias
+                        ? formData.encarte_categorias.split(';').map(s => s.trim())
+                        : [];
+                      const isSelected = selectedList.includes(cat);
+                      
+                      const toggleCategory = () => {
+                        let newList;
+                        if (isSelected) {
+                          newList = selectedList.filter(s => s !== cat);
+                        } else {
+                          newList = [...selectedList, cat];
+                        }
+                        setFormData({
+                          ...formData,
+                          encarte_categorias: newList.filter(Boolean).join(';')
+                        });
+                      };
+                      
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={toggleCategory}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-md border font-semibold text-xs transition-all text-left outline-none ${
+                            isSelected
+                              ? 'bg-primary text-on-primary border-primary shadow-sm'
+                              : 'bg-surface hover:bg-surface-container border-outline-variant text-ink'
+                          }`}
+                        >
+                          {isSelected ? <CheckSquare className="h-4 w-4 shrink-0 text-white" /> : <Square className="h-4 w-4 shrink-0 text-ink-variant" />}
+                          <span className="truncate">{cat}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="text-[10px] text-ink-variant font-semibold tracking-wider leading-relaxed">* caso nenhuma categoria esteja selecionada, o telão exibirá todas as categorias do sistema automaticamente.</p>
+              </div>
+            )}
+
+            <Button 
+              type="submit" 
+              className="w-full mt-6"
+            >
+              Salvar Configuração
+            </Button>
+          </form>
+        </Dialog>
+      )}
     </AdminLayout>
   );
 }
-

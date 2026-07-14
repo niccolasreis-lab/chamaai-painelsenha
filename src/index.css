@@ -1,5 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Syne:wght@400..800&display=swap');
 
+/* ══════════════════════════════════════════════════════════════════
+   ChamaAí Design System Tokens
+   Source of truth: docs/ui-ux/design-system.md
+   ══════════════════════════════════════════════════════════════════ */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -186,13 +191,117 @@
   }
 }
 
-/* ── Custom Theme variables ── */
+/* ── Design System Tokens ── */
 :root {
+  /* Brand */
+  --primary: #3525CD;
+  --primary-rgb: 53, 37, 205;
+  --on-primary: #ffffff;
+  --primary-container: #4f46e5;
+  --on-primary-container: #dad7ff;
+  --inverse-primary: #c3c0ff;
+
+  --secondary: #00687A;
+  --secondary-rgb: 0, 104, 122;
+  --on-secondary: #ffffff;
+  --secondary-container: #57dffe;
+  --on-secondary-container: #006172;
+
+  --tertiary: #7e3000;
+  --on-tertiary: #ffffff;
+
+  /* Surfaces */
+  --surface: #ffffff;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f5f2ff;
+  --surface-container: #f0ecf9;
+  --surface-container-high: #eae6f4;
+  --surface-container-highest: #e4e1ee;
+  --surface-dim: #dcd8e5;
+  --surface-bright: #fcf8ff;
+  --background: #fcf8ff;
+
+  /* Text */
+  --ink: #1B1B24;
+  --ink-variant: #464555;
+  --on-surface: #1B1B24;
+  --on-surface-variant: #464555;
+  --inverse-surface: #302f39;
+  --inverse-on-surface: #f3effc;
+
+  /* Borders */
+  --outline: #777587;
+  --outline-variant: #c7c4d8;
+
+  /* Semantic */
+  --success: #059669;
+  --success-ink: #047857; /* AA on white for body text */
+  --success-container: #ecfdf5;
+
+  --warning: #d97706;
+  --warning-ink: #b45309; /* AA on white for body text */
+  --warning-container: #fffbeb;
+
+  --error: #dc2626;
+  --error-ink: #ba1a1a;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+
+  /* Spacing (4px base) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px 0 rgba(27,27,36,0.05);
+  --shadow-md: 0 4px 6px -1px rgba(27,27,36,0.07), 0 2px 4px -2px rgba(27,27,36,0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(27,27,36,0.08), 0 4px 6px -4px rgba(27,27,36,0.04);
+
+  /* Z-Index */
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-backdrop: 30;
+  --z-modal: 40;
+  --z-toast: 50;
+  --z-tooltip: 60;
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 250ms;
+  --ease-out: cubic-bezier(0.25, 0, 0.5, 1);
+  --ease-in: cubic-bezier(0.5, 0, 1, 1);
+
+  /* Legacy aliases (consumed by existing code via --color-primary-rgb) */
+  --color-primary-rgb: var(--primary-rgb);
+
+  /* Legacy (kept for backward compat, migrate in Fase 1+) */
   --primary-blue: #0052cc;
-  --light-blue:   #e6f0ff;
-  --text-dark:    #0a192f;
-  --gray-text:    #657786;
+  --light-blue: #e6f0ff;
+  --text-dark: #0a192f;
+  --gray-text: #657786;
   --green-success: #22c55e;
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ── Live Badge Pulse Dot ── */

@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Sun, Cloud } from 'lucide-react';
 import { getApiUrl } from '../shared/apiConfig';
 import EncartePrecos from './EncartePrecos';
 import EncarteGranel from './EncarteGranel';
@@ -283,9 +284,11 @@ export default function SmartMediaLayer({
       if (!weather) return <div className="text-white">Carregando clima...</div>;
       return (
         <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-blue-900 to-indigo-900 text-white p-8">
-          <span className="material-symbols-outlined text-[80px] mb-4">
-            {weather.current_weather?.weathercode === 0 ? 'sunny' : 'cloud'}
-          </span>
+          {weather.current_weather?.weathercode === 0 ? (
+            <Sun className="h-20 w-20 mb-4 text-amber-400" />
+          ) : (
+            <Cloud className="h-20 w-20 mb-4 text-blue-200" />
+          )}
           <h2 className="text-4xl font-bold uppercase tracking-widest">{weather.current_weather?.temperature}°C</h2>
           <p className="text-xl opacity-80 mt-2 uppercase tracking-wider">Vento: {weather.current_weather?.windspeed} km/h</p>
         </div>

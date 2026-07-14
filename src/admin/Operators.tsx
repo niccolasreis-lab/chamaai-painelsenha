@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
 import { getApiUrl } from '../shared/apiConfig';
+import {
+  UserPlus,
+  Shield,
+  User,
+  Trash2
+} from 'lucide-react';
+import { Button } from '../shared/components/Button';
+import { Input } from '../shared/components/Input';
+import { Dialog } from '../shared/components/Dialog';
+import { StatusBadge } from '../shared/components/StatusBadge';
 
 interface Operador {
   id: number;
@@ -67,46 +77,48 @@ export default function Operators() {
 
   return (
     <AdminLayout>
-      <div className="max-w-6xl mx-auto space-y-8 font-sans">
+      <div className="max-w-6xl mx-auto space-y-6 font-sans">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h1 className="font-sans text-[48px] font-bold text-ink leading-tight uppercase tracking-widest">Operadores</h1>
-            <p className="text-ink-secondary mt-2 text-lg font-semibold tracking-wider">Gestão de acesso e perfis do sistema</p>
+            <h1 className="font-display text-2xl font-bold text-ink leading-tight">Operadores</h1>
+            <p className="text-ink-variant mt-1 text-sm">Gestão de acesso e perfis do sistema</p>
           </div>
-          <button 
+          <Button 
             onClick={() => setShowModal(true)}
-            className="px-6 py-3 bg-primary text-white rounded-xl font-bold shadow-lg hover:bg-primary-hover transition-all flex items-center gap-2 uppercase tracking-widest text-sm"
+            icon={<UserPlus className="h-4 w-4" />}
           >
-            <span className="material-symbols-outlined">person_add</span>
             Novo Operador
-          </button>
+          </Button>
         </div>
 
         {loading ? (
-          <div className="py-20 text-center text-xl font-bold text-ink-secondary animate-pulse uppercase tracking-widest">Carregando...</div>
+          <StatusBadge variant="loading" />
+        ) : operadores.length === 0 ? (
+          <StatusBadge variant="empty" message="Nenhum operador cadastrado." />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {operadores.map(op => (
-              <div key={op.id} className="bg-surface rounded-3xl p-6 border border-outline-variant/50 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-                <div className={`absolute top-0 left-0 w-2 h-full ${op.perfil === 'admin' ? 'bg-primary' : 'bg-success'}`}></div>
+              <div key={op.id} className="bg-surface rounded-md p-6 border border-outline-variant shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                <div className={`absolute top-0 left-0 w-1.5 h-full ${op.perfil === 'admin' ? 'bg-primary' : 'bg-success'}`}></div>
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-surface-variant flex items-center justify-center">
-                    <span className="material-symbols-outlined text-ink-secondary">{op.perfil === 'admin' ? 'admin_panel_settings' : 'person'}</span>
+                  <div className="w-10 h-10 rounded-sm bg-surface-container flex items-center justify-center text-ink-variant">
+                    {op.perfil === 'admin' ? <Shield className="h-5 w-5" /> : <User className="h-5 w-5" />}
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${op.perfil === 'admin' ? 'bg-primary/10 text-primary' : 'bg-success/10 text-success'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${op.perfil === 'admin' ? 'bg-primary/10 text-primary' : 'bg-success/10 text-success'}`}>
                     {op.perfil}
                   </span>
                 </div>
-                <h3 className="text-xl font-bold text-ink truncate">{op.nome}</h3>
-                <p className="text-ink-secondary font-medium mb-6">@{op.login}</p>
+                <h3 className="text-lg font-bold text-ink truncate">{op.nome}</h3>
+                <p className="text-ink-variant text-sm font-medium mb-4">@{op.login}</p>
                 
-                <div className="flex justify-end border-t border-outline-variant/30 pt-4">
+                <div className="flex justify-end border-t border-outline-variant/30 pt-3">
                   <button 
+                    disabled={op.id === 1}
                     onClick={() => handleDelete(op.id)}
-                    className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors"
+                    className="p-1.5 text-error hover:bg-error-container rounded-sm transition-colors disabled:opacity-30 disabled:pointer-events-none"
                     title="Remover Operador"
                   >
-                    <span className="material-symbols-outlined">delete</span>
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -115,38 +127,43 @@ export default function Operators() {
         )}
 
         {/* Modal Novo Operador */}
-        {showModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-surface w-full max-w-md rounded-[32px] p-8 shadow-2xl border border-outline-variant/50 animate-fade-in">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="font-sans text-2xl font-bold text-ink tracking-wider">Novo operador</h2>
-                <button onClick={() => setShowModal(false)} className="text-ink-secondary hover:text-ink"><span className="material-symbols-outlined">close</span></button>
-              </div>
-              <form onSubmit={handleAdd} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1">Nome completo</label>
-                  <input required value={newOp.nome} onChange={e => setNewOp({...newOp, nome: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="text" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1">Login (usuário)</label>
-                  <input required value={newOp.login} onChange={e => setNewOp({...newOp, login: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="text" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1">Senha de acesso</label>
-                  <input required value={newOp.senha} onChange={e => setNewOp({...newOp, senha: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="password" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1">Perfil</label>
-                  <select value={newOp.perfil} onChange={e => setNewOp({...newOp, perfil: e.target.value as any})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold uppercase">
-                    <option value="operador">Operador (Balcão)</option>
-                    <option value="admin">Administrador</option>
-                  </select>
-                </div>
-                <button type="submit" className="w-full py-4 bg-primary text-white rounded-2xl font-bold mt-6 hover:bg-primary-hover shadow-lg transition-all uppercase tracking-widest">Criar Operador</button>
-              </form>
+        <Dialog open={showModal} onClose={() => setShowModal(false)} title="Novo operador">
+          <form onSubmit={handleAdd} className="space-y-4">
+            <Input
+              label="Nome completo"
+              required
+              value={newOp.nome}
+              onChange={e => setNewOp({...newOp, nome: e.target.value})}
+            />
+            <Input
+              label="Login (usuário)"
+              required
+              value={newOp.login}
+              onChange={e => setNewOp({...newOp, login: e.target.value})}
+            />
+            <Input
+              label="Senha de acesso"
+              type="password"
+              required
+              value={newOp.senha}
+              onChange={e => setNewOp({...newOp, senha: e.target.value})}
+            />
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-ink">Perfil</label>
+              <select
+                value={newOp.perfil}
+                onChange={e => setNewOp({...newOp, perfil: e.target.value as any})}
+                className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-sp-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="operador">Operador (Balcão)</option>
+                <option value="admin">Administrador</option>
+              </select>
             </div>
-          </div>
-        )}
+            <Button type="submit" className="w-full mt-4">
+              Criar Operador
+            </Button>
+          </form>
+        </Dialog>
       </div>
     </AdminLayout>
   );

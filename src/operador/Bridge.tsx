@@ -1,5 +1,15 @@
 import { useState, useEffect } from 'react';
-
+import { 
+  DownloadCloud, 
+  Network, 
+  RefreshCw, 
+  CheckCircle2, 
+  AlertTriangle, 
+  Smartphone, 
+  Tablet, 
+  ArrowRight 
+} from 'lucide-react';
+import { Button } from '../shared/components/Button';
 import packageJson from '../../package.json';
 
 export default function Bridge() {
@@ -43,7 +53,7 @@ export default function Bridge() {
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
       const res = await fetch(`http://${targetIp}:3001/api/fila`, { 
-        signal: controller.signal 
+         signal: controller.signal 
       });
       
       clearTimeout(timeoutId);
@@ -60,48 +70,50 @@ export default function Bridge() {
     }
   };
 
-
-
   return (
-    <div className="min-h-[100dvh] bg-[#020617] text-white flex flex-col items-center justify-center p-6 font-sans overflow-hidden">
+    <div className="min-h-[100dvh] bg-background text-ink flex flex-col items-center justify-center p-6 font-sans overflow-hidden relative">
       {/* Background Glow */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none"></div>
 
       {deferredPrompt && (
-        <button 
+        <Button 
           onClick={handleInstall}
-          className="fixed top-6 right-6 z-50 bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-2xl font-bold text-xs flex items-center gap-2 shadow-xl shadow-blue-600/20 animate-bounce"
+          variant="primary"
+          size="sm"
+          className="fixed top-6 right-6 z-toast shadow-lg animate-bounce"
+          icon={<DownloadCloud className="h-4 w-4" />}
         >
-          <span className="material-symbols-outlined text-sm">download</span>
           INSTALAR APP
-        </button>
+        </Button>
       )}
 
-      <div className="w-full max-w-md z-10 flex flex-col items-center">
+      <div className="w-full max-w-md z-sticky flex flex-col items-center">
         {/* Logo Section */}
-        <div className="mb-12 flex flex-col items-center text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="w-24 h-24 bg-blue-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-blue-600/40 mb-6 rotate-3">
-            <span className="material-symbols-outlined text-5xl font-bold">hub</span>
+        <div className="mb-12 flex flex-col items-center text-center">
+          <div className="w-20 h-20 bg-primary rounded-lg flex items-center justify-center shadow-md mb-6 rotate-3">
+            <Network className="h-10 w-10 text-on-primary" />
           </div>
-          <h1 className="text-4xl font-black tracking-tighter mb-2 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
-            CONECTOR <span className="text-blue-500">CHAMA<span className="italic">AÍ</span></span>
+          <h1 className="text-3xl font-display font-bold tracking-tight mb-2 text-ink">
+            CONECTOR <span className="text-primary">CHAMA<span className="italic">AÍ</span></span>
           </h1>
-          <p className="text-slate-400 font-medium uppercase tracking-[0.2em] text-[10px]">Ponte de Conexão Mobile</p>
+          <p className="text-ink-variant font-medium uppercase tracking-[0.2em] text-[10px]">Ponte de Conexão Mobile</p>
         </div>
 
         {/* Card */}
-        <div className="w-full bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-[40px] p-8 shadow-2xl animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+        <div className="w-full bg-surface border border-outline-variant rounded-lg p-8 shadow-md">
 
           {/* Status Indicator */}
           {status !== 'idle' && (
-            <div className={`mb-8 p-4 rounded-2xl flex items-start gap-3 animate-in zoom-in duration-300 ${
-              status === 'testing' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-              status === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-              'bg-red-500/10 text-red-400 border border-red-500/20'
+            <div className={`mb-8 p-4 rounded-sm flex items-start gap-3 transition-colors ${
+              status === 'testing' ? 'bg-primary-container/10 text-primary border border-primary-container/20' :
+              status === 'success' ? 'bg-success-container/30 text-success-ink border border-success/20' :
+              'bg-error-container/30 text-error-ink border border-error/20'
             }`}>
-              <span className={`material-symbols-outlined mt-0.5 ${status === 'testing' ? 'animate-spin' : ''}`}>
-                {status === 'testing' ? 'sync' : status === 'success' ? 'check_circle' : 'error'}
+              <span className="shrink-0 mt-0.5">
+                {status === 'testing' && <RefreshCw className="h-5 w-5 animate-spin" />}
+                {status === 'success' && <CheckCircle2 className="h-5 w-5" />}
+                {status === 'error' && <AlertTriangle className="h-5 w-5" />}
               </span>
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider">
@@ -113,49 +125,50 @@ export default function Bridge() {
           )}
 
           <div className="space-y-4">
-            <button 
+            <Button 
               onClick={() => testConnection(ip)}
               disabled={status === 'testing'}
-              className="w-full bg-white/10 hover:bg-white/20 text-white transition-all py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 border border-white/10 disabled:opacity-50"
+              variant="secondary"
+              className="w-full"
+              icon={<RefreshCw className="h-4 w-4" />}
             >
-              <span className="material-symbols-outlined text-xl">sync</span>
               Testar Conexão Novamente
-            </button>
+            </Button>
 
             {status === 'success' && (
-              <div className="pt-4 space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+              <div className="pt-4 space-y-4">
                 <div className="relative">
-                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-white/10"></span></div>
-                  <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-black text-slate-500"><span className="bg-[#020617] px-4">Selecionar Interface</span></div>
+                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-outline-variant/50"></span></div>
+                  <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-black text-ink-variant"><span className="bg-surface px-4">Selecionar Interface</span></div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
                   <button 
                     onClick={() => window.location.hash = '/mobile'}
-                    className="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.98] transition-all py-5 rounded-2xl font-black text-lg flex items-center justify-between px-8 shadow-xl shadow-blue-600/20 group"
+                    className="w-full bg-primary hover:brightness-95 active:scale-[0.98] transition-all py-4 rounded-sm font-bold text-base text-on-primary flex items-center justify-between px-6 shadow-sm group"
                   >
                     <div className="flex items-center gap-4">
-                      <span className="material-symbols-outlined text-3xl">smartphone</span>
+                      <Smartphone className="h-6 w-6" />
                       <div className="text-left">
-                        <p className="leading-none">MOBILE</p>
-                        <p className="text-[10px] font-medium opacity-60 mt-1">Vertical • Smartphone</p>
+                        <p className="leading-none text-sm uppercase tracking-wider font-bold">Mobile</p>
+                        <p className="text-[10px] font-normal opacity-70 mt-1">Vertical • Smartphone</p>
                       </div>
                     </div>
-                    <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                    <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                   </button>
 
                   <button 
                     onClick={() => window.location.hash = '/operador-touch'}
-                    className="w-full bg-slate-800 hover:bg-slate-700 active:scale-[0.98] transition-all py-5 rounded-2xl font-black text-lg flex items-center justify-between px-8 border border-white/5 group"
+                    className="w-full bg-surface-container-low hover:bg-surface-container border border-outline-variant text-ink active:scale-[0.98] transition-all py-4 rounded-sm font-bold text-base flex items-center justify-between px-6 group"
                   >
                     <div className="flex items-center gap-4">
-                      <span className="material-symbols-outlined text-3xl">tablet_landscape</span>
+                      <Tablet className="h-6 w-6 text-primary" />
                       <div className="text-left">
-                        <p className="leading-none">TOUCH TV</p>
-                        <p className="text-[10px] font-medium opacity-60 mt-1">Horizontal • Tablet/TV</p>
+                        <p className="leading-none text-sm uppercase tracking-wider font-bold">Touch TV</p>
+                        <p className="text-[10px] font-normal text-ink-variant mt-1">Horizontal • Tablet/TV</p>
                       </div>
                     </div>
-                    <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                    <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform text-primary" />
                   </button>
                 </div>
               </div>
@@ -165,7 +178,7 @@ export default function Bridge() {
 
         {/* Footer Info */}
         <div className="mt-12 text-center opacity-40">
-          <p className="text-[9px] font-bold uppercase tracking-[0.3em]">
+          <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-ink-variant">
             CHAMAAÍ V{packageJson.version} • MOBILE BRIDGE
           </p>
         </div>

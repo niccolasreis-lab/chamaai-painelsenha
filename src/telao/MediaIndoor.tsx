@@ -9,6 +9,7 @@ import SmartMediaLayer from './SmartMediaLayer';
 import { useSSE } from '../shared/useSSE';
 import { getApiUrl } from '../shared/apiConfig';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import { ArrowLeft, Users, History, Ticket, Megaphone, Volume2, Clock } from 'lucide-react';
 import type { ProdutoToledo, Categoria, TemaEncarte, EstablishmentConfig, PerfilTelao, MediaItem, RecentCall, SmartMediaSettings } from '../shared/types';
 
 async function falarSenha(texto: string, rate: number, pitch: number, vozGenero: string): Promise<boolean> {
@@ -469,9 +470,9 @@ export default function MediaIndoor() {
       requestAnimationFrame(() => {
         if (!isMountedRef.current) return;
         const temSomPersonalizado = (config.tipo_som === 'custom' && !!config.som_personalizado) || !!config.portal_som_sua_vez;
-        const ttsAtivo = config.telao_tts_ativo === '1';
+        const ttsModo = config.telao_tts_modo || (config.telao_tts_ativo === '1' ? 'sintetizador' : 'desativado');
 
-        if (ttsAtivo && !temSomPersonalizado) {
+        const speakTtsSynthesizer = () => {
           const template = (payload.nome_cliente && config.telao_tts_template_nome)
             ? config.telao_tts_template_nome
             : (config.telao_tts_template || 'Senha {senha}, dirija-se ao {guiche}.');
@@ -496,6 +497,97 @@ export default function MediaIndoor() {
               playAudio('campainha', (config.volume_audio || 80) / 100);
             }
           });
+        };
+
+        const playMp3Tts = (tipoPasta: 'tipo1' | 'tipo2' | 'tipo3', num: number, onFail: () => void) => {
+          const urls: string[] = [];
+          if (tipoPasta === 'tipo1') {
+            urls.push(`${getApiUrl()}/tts/tipo1/Senha_${num}_1.mp3`);
+          } else if (tipoPasta === 'tipo2') {
+            urls.push(`${getApiUrl()}/tts/tipo2/Senha_${num}_2_chamada.mp3`);
+            urls.push(`${getApiUrl()}/tts/tipo2/Senha_${num}_2.mp3`);
+          } else if (tipoPasta === 'tipo3') {
+            urls.push(`${getApiUrl()}/tts/tipo3/Senha_${num}_3.mp3`);
+          }
+
+          let currentUrlIndex = 0;
+          const tryPlay = () => {
+            if (currentUrlIndex >= urls.length) {
+              onFail();
+              return;
+            }
+            const audioUrl = urls[currentUrlIndex];
+            const audio = new Audio(audioUrl);
+            audio.volume = (config.volume_audio || 80) / 100;
+            
+            audio.oncanplaythrough = () => {
+              audio.play().catch((err) => {
+                console.error('[TTS MP3] Erro ao dar play:', err);
+                currentUrlIndex++;
+                tryPlay();
+              });
+            };
+
+            audio.onerror = () => {
+              console.warn('[TTS MP3] Falha ao carregar áudio:', audioUrl);
+              currentUrlIndex++;
+              tryPlay();
+            };
+          };
+
+          tryPlay();
+        };
+
+        const playFirstCallMp3 = () => {
+          const escolherTipo1 = Math.random() < 0.5;
+          const num = Number(payload.numero);
+
+          if (escolherTipo1) {
+            playMp3Tts('tipo1', num, () => {
+              playMp3Tts('tipo3', num, () => {
+                if (ttsModo === 'ambos') {
+                  speakTtsSynthesizer();
+                } else {
+                  playAudio('campainha', (config.volume_audio || 80) / 100);
+                }
+              });
+            });
+          } else {
+            playMp3Tts('tipo3', num, () => {
+              playMp3Tts('tipo1', num, () => {
+                if (ttsModo === 'ambos') {
+                  speakTtsSynthesizer();
+                } else {
+                  playAudio('campainha', (config.volume_audio || 80) / 100);
+                }
+              });
+            });
+          }
+        };
+
+        const playRecallMp3 = () => {
+          const num = Number(payload.numero);
+          playMp3Tts('tipo2', num, () => {
+            playMp3Tts('tipo1', num, () => {
+              if (ttsModo === 'ambos') {
+                speakTtsSynthesizer();
+              } else {
+                playAudio('campainha', (config.volume_audio || 80) / 100);
+              }
+            });
+          });
+        };
+
+        if (ttsModo !== 'desativado' && !temSomPersonalizado) {
+          if (ttsModo === 'sintetizador') {
+            speakTtsSynthesizer();
+          } else {
+            if (payload.repeticao) {
+              playRecallMp3();
+            } else {
+              playFirstCallMp3();
+            }
+          }
         } else {
           playAudio('campainha', (config.volume_audio || 80) / 100);
         }
@@ -712,7 +804,7 @@ export default function MediaIndoor() {
             className="p-2 mr-2 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center outline-none" 
             title="Voltar ao Menu Principal"
           >
-            <span className="material-symbols-outlined text-2xl font-bold">arrow_back</span>
+            <ArrowLeft className="h-6 w-6" />
           </Link>
           {config.logo_cliente ? (
             <img src={`${API_URL}${config.logo_cliente}`} className="h-20 object-contain" alt="Logo" />
@@ -737,7 +829,7 @@ export default function MediaIndoor() {
 
           {/* Aguardando Badge */}
           <div className="flex items-center gap-6 bg-blue-500/5 px-8 py-3 rounded-3xl">
-            <span className="material-symbols-outlined text-blue-500 text-[3.5rem]">groups</span>
+            <Users className="text-blue-500 h-14 w-14" />
             <div className="flex flex-col items-center">
               <span className="text-sm font-bold text-ink-secondary uppercase tracking-[0.2em] mb-1">Aguardando</span>
               <span className="font-sans text-[4.5rem] font-black tracking-tighter text-blue-600 leading-none">{pessoasAguardando}</span>
@@ -893,7 +985,7 @@ export default function MediaIndoor() {
 
                 <div className="flex-1 overflow-hidden flex flex-col">
                   <div className="flex items-center gap-2 mb-4 border-b border-outline-variant/30 pb-2">
-                    <span className="material-symbols-outlined text-primary text-xl font-bold">history</span>
+                    <History className="text-primary h-5 w-5" />
                     <h3 className="font-sans text-sm font-bold text-ink uppercase tracking-widest">Histórico</h3>
                   </div>
                   
@@ -1033,7 +1125,7 @@ export default function MediaIndoor() {
               <div className="flex-[28] flex flex-col bg-surface shadow-[-10px_0_30px_rgba(0,0,0,0.05)] border-l border-outline-variant/30">
                 <div className="p-8 flex-1 overflow-hidden">
                   <div className="flex items-center gap-3 mb-8 border-b border-outline-variant/30 pb-4">
-                    <span className="material-symbols-outlined text-primary text-3xl font-bold">history</span>
+                    <History className="text-primary h-8 w-8" />
                     <h2 className="font-sans text-2xl font-bold text-ink uppercase tracking-widest">Histórico</h2>
                   </div>
                   
@@ -1067,7 +1159,7 @@ export default function MediaIndoor() {
                       ))
                     ) : (
                       <div className="flex flex-col items-center justify-center py-20 opacity-20">
-                        <span className="material-symbols-outlined text-[6rem]">pending_actions</span>
+                        <Clock className="h-24 w-24 text-ink/50" />
                         <p className="text-sm font-bold uppercase tracking-[0.3em] mt-4">Aguardando Chamada</p>
                       </div>
                     )}
@@ -1075,10 +1167,12 @@ export default function MediaIndoor() {
                 </div>
 
                 <div className="mt-auto p-10 flex flex-col items-center text-center gap-6 border-t border-outline-variant/20">
-                   <div className={`p-6 rounded-full ${!showMedia ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-ink-secondary/30'}`}>
-                      <span className="material-symbols-outlined text-[4rem]">
-                         {showMedia ? 'confirmation_number' : 'campaign'}
-                      </span>
+                   <div className={`p-6 rounded-full flex items-center justify-center ${!showMedia ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-ink-secondary/30'}`}>
+                      {showMedia ? (
+                         <Ticket className="h-16 w-16" />
+                      ) : (
+                         <Megaphone className="h-16 w-16 animate-bounce" />
+                      )}
                    </div>
                    <p className={`font-sans text-2xl font-bold uppercase tracking-widest ${showMedia ? 'text-ink-secondary/40' : 'text-primary animate-pulse'}`}>
                       {showMedia ? 'Aguardando chamada...' : 'Senha Chamada!'}
@@ -1151,7 +1245,7 @@ export default function MediaIndoor() {
             animation: 'totemGlow 2s infinite'
           }}
         >
-          <span className="material-symbols-outlined text-2xl">volume_up</span>
+          <Volume2 className="h-6 w-6" />
           <span className="font-sans text-sm uppercase tracking-widest leading-none">Clique para ativar áudio</span>
         </div>
       )}

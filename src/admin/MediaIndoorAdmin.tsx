@@ -1,6 +1,28 @@
 import { useState, useEffect, useRef } from 'react';
 import AdminLayout from './AdminLayout';
 import { getApiUrl } from '../shared/apiConfig';
+import {
+  Settings,
+  Image as ImageIcon,
+  Megaphone,
+  Palette,
+  Sidebar,
+  Layout,
+  Maximize,
+  Plus,
+  RefreshCw,
+  Edit,
+  Trash2,
+  Upload,
+  Play,
+  PlayCircle,
+  CloudSun,
+  Globe
+} from 'lucide-react';
+import { Button } from '../shared/components/Button';
+import { Input } from '../shared/components/Input';
+import { Dialog } from '../shared/components/Dialog';
+import { StatusBadge } from '../shared/components/StatusBadge';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface MediaItem {
@@ -44,18 +66,13 @@ interface Theme {
   ends_at?: string;
 }
 
-// ─── Icons inline ─────────────────────────────────────────────────────────────
-const Icon = ({ name, className = '' }: { name: string; className?: string }) => (
-  <span className={`material-symbols-outlined ${className}`}>{name}</span>
-);
-
 // ─── Type badge colors ────────────────────────────────────────────────────────
-const TYPE_META: Record<string, { label: string; icon: string; color: string }> = {
-  image:   { label: 'Imagem',      icon: 'image',           color: 'bg-blue-100 text-blue-700' },
-  video:   { label: 'Vídeo',       icon: 'smart_display',   color: 'bg-purple-100 text-purple-700' },
-  youtube: { label: 'YouTube',     icon: 'play_circle',     color: 'bg-red-100 text-red-700' },
-  weather: { label: 'Clima',       icon: 'partly_cloudy_day',color: 'bg-sky-100 text-sky-700' },
-  url:     { label: 'URL / Web',   icon: 'language',        color: 'bg-amber-100 text-amber-700' },
+const TYPE_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  image:   { label: 'Imagem',      icon: <ImageIcon className="h-5 w-5" />,   color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+  video:   { label: 'Vídeo',       icon: <Play className="h-5 w-5" />,        color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
+  youtube: { label: 'YouTube',     icon: <PlayCircle className="h-5 w-5" />,  color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
+  weather: { label: 'Clima',       icon: <CloudSun className="h-5 w-5" />,    color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' },
+  url:     { label: 'URL / Web',   icon: <Globe className="h-5 w-5" />,       color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
 };
 
 // ─── Confirm dialog helper ────────────────────────────────────────────────────
@@ -86,58 +103,68 @@ function TabConfig({ API_URL }: { API_URL: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(next),
       });
-      if (res.ok) { setSettings(next); setToast('Salvo!'); setTimeout(() => setToast(''), 2000); }
-    } catch { setToast('Erro ao salvar'); } finally { setSaving(false); }
+      if (res.ok) { 
+        setSettings(next); 
+        setToast('Salvo!'); 
+        setTimeout(() => setToast(''), 2000); 
+      }
+    } catch { 
+      setToast('Erro ao salvar'); 
+    } finally { 
+      setSaving(false); 
+    }
   };
 
   const LAYOUTS = [
-    { id: 'lateral',     label: 'Lateral',     desc: 'Painel lateral direito', icon: 'view_sidebar' },
-    { id: 'rodape',      label: 'Rodapé',      desc: 'Barra inferior',         icon: 'view_agenda' },
-    { id: 'background',  label: 'Background',  desc: 'Plano de fundo',         icon: 'wallpaper' },
-    { id: 'full',        label: 'Full Screen',  desc: 'Tela cheia',             icon: 'fullscreen' },
+    { id: 'lateral',     label: 'Lateral',     desc: 'Painel lateral direito', icon: <Sidebar className="h-6 w-6" /> },
+    { id: 'rodape',      label: 'Rodapé',      desc: 'Barra inferior',         icon: <Layout className="h-6 w-6" /> },
+    { id: 'background',  label: 'Background',  desc: 'Plano de fundo',         icon: <ImageIcon className="h-6 w-6" /> },
+    { id: 'full',        label: 'Full Screen',  desc: 'Tela cheia',             icon: <Maximize className="h-6 w-6" /> },
   ];
 
   return (
     <div className="space-y-6">
       {toast && (
-        <div className="fixed top-6 right-6 bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold shadow-xl z-50 text-sm uppercase tracking-widest">
+        <div className="fixed top-6 right-6 bg-emerald-600 text-white px-4 py-2.5 rounded-sm font-bold shadow-md z-50 text-xs uppercase tracking-wider">
           {toast}
         </div>
       )}
 
-      <div className="flex items-center justify-between p-6 bg-surface-variant rounded-2xl border border-outline-variant/40">
+      <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-md border border-outline-variant">
         <div>
-          <h3 className="font-bold text-lg text-ink">Mídia Indoor Ativada</h3>
-          <p className="text-sm text-ink-secondary mt-1">Se desativado, o telão exibirá apenas o painel de senhas.</p>
+          <h3 className="font-bold text-base text-ink">Mídia Indoor Ativada</h3>
+          <p className="text-xs text-ink-variant mt-0.5">Se desativado, o telão exibirá apenas o painel de senhas.</p>
         </div>
         <button
           disabled={saving}
+          type="button"
           onClick={() => save({ ...settings, midia_indoor_ativa: !settings.midia_indoor_ativa })}
-          className={`w-14 h-8 flex items-center rounded-full p-1 transition-all duration-200 ${settings.midia_indoor_ativa ? 'bg-primary' : 'bg-outline-variant'}`}
+          className={`w-12 h-7 flex items-center rounded-full p-1 transition-all duration-200 ${settings.midia_indoor_ativa ? 'bg-primary' : 'bg-outline-variant'}`}
         >
-          <div className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform duration-200 ${settings.midia_indoor_ativa ? 'translate-x-6' : 'translate-x-0'}`} />
+          <div className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-200 ${settings.midia_indoor_ativa ? 'translate-x-5' : 'translate-x-0'}`} />
         </button>
       </div>
 
-      <div className="p-6 bg-surface-variant rounded-2xl border border-outline-variant/40">
-        <h3 className="font-bold text-lg text-ink mb-1">Layout de Exibição</h3>
-        <p className="text-sm text-ink-secondary mb-5">Escolha como a Mídia Indoor aparecerá na tela do Telão.</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="p-4 bg-surface-container-low rounded-md border border-outline-variant">
+        <h3 className="font-bold text-base text-ink mb-0.5">Layout de Exibição</h3>
+        <p className="text-xs text-ink-variant mb-4">Escolha como a Mídia Indoor aparecerá na tela do Telão.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           {LAYOUTS.map(l => (
             <button
               key={l.id}
+              type="button"
               disabled={saving}
               onClick={() => save({ ...settings, midia_indoor_layout: l.id })}
-              className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all ${
+              className={`flex flex-col items-center gap-2.5 p-4 rounded-md border transition-all ${
                 settings.midia_indoor_layout === l.id
-                  ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                  : 'border-outline-variant/40 hover:border-primary/40 text-ink-secondary hover:bg-surface'
+                  ? 'border-primary bg-primary/5 text-primary shadow-sm'
+                  : 'border-outline-variant hover:border-primary/50 text-ink-variant hover:bg-surface-container-high'
               }`}
             >
-              <Icon name={l.icon} className="text-3xl" />
+              {l.icon}
               <div className="text-center">
-                <div className="font-bold text-sm uppercase tracking-wide">{l.label}</div>
-                <div className="text-xs opacity-60 mt-0.5">{l.desc}</div>
+                <div className="font-bold text-xs uppercase tracking-wider">{l.label}</div>
+                <div className="text-[10px] opacity-75 mt-0.5">{l.desc}</div>
               </div>
             </button>
           ))}
@@ -188,7 +215,6 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
     if (!form.title.trim()) { alert('Informe um título.'); return; }
     setSaving(true);
     try {
-      // Se tem arquivo local para upload, envia pelo endpoint de mídias clássicas
       if (uploadFile && (form.type === 'image' || form.type === 'video')) {
         const fd = new FormData();
         fd.append('file', uploadFile);
@@ -243,77 +269,75 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
   return (
     <div className="space-y-6 relative">
       {toast && (
-        <div className="fixed top-6 right-6 bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold shadow-xl z-50 text-sm uppercase tracking-widest">{toast}</div>
+        <div className="fixed top-6 right-6 bg-emerald-600 text-white px-4 py-2.5 rounded-sm font-bold shadow-md z-50 text-xs uppercase tracking-wider">{toast}</div>
       )}
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-ink uppercase tracking-wide">Conteúdos</h2>
-          <p className="text-ink-secondary text-sm mt-1">{items.length} item(s) cadastrado(s)</p>
+          <h2 className="text-base font-bold text-ink">Conteúdos</h2>
+          <p className="text-xs text-ink-variant mt-0.5">{items.length} item(s) cadastrado(s)</p>
         </div>
-        <button
+        <Button
           onClick={openCreate}
-          className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-primary/90 active:scale-95 transition-all"
+          icon={<Plus className="h-4 w-4" />}
         >
-          <Icon name="add" className="text-lg" /> Novo Conteúdo
-        </button>
+          Novo Conteúdo
+        </Button>
       </div>
 
       {/* List */}
       {loading ? (
-        <div className="py-16 flex items-center justify-center gap-3 text-ink-secondary text-sm font-bold uppercase tracking-widest">
-          <Icon name="refresh" className="animate-spin" /> Carregando...
-        </div>
+        <StatusBadge variant="loading" />
       ) : items.length === 0 ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-4 text-ink-secondary/40">
-          <Icon name="smart_display" className="text-6xl" />
-          <p className="font-bold uppercase tracking-widest text-sm">Nenhum conteúdo cadastrado</p>
-          <button onClick={openCreate} className="text-primary font-bold text-sm underline">Adicionar primeiro conteúdo</button>
+        <div className="py-16 flex flex-col items-center justify-center gap-3 text-ink-variant/50">
+          <Play className="h-10 w-10 text-outline" />
+          <p className="font-semibold text-sm">Nenhum conteúdo cadastrado</p>
+          <button onClick={openCreate} className="text-primary font-bold text-xs underline">Adicionar primeiro conteúdo</button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {items.map(item => {
             const meta = TYPE_META[item.type] || TYPE_META.url;
             return (
-              <div key={item.id} className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${item.is_active ? 'border-outline-variant/40 bg-surface hover:border-primary/30' : 'border-outline-variant/20 bg-surface-variant opacity-60'}`}>
+              <div key={item.id} className={`flex items-center gap-4 p-3 rounded-md border transition-all ${item.is_active ? 'border-outline-variant bg-surface hover:border-primary/50' : 'border-outline-variant/40 bg-surface-container-low opacity-60'}`}>
                 {/* Type icon */}
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${meta.color}`}>
-                  <Icon name={meta.icon} className="text-2xl" />
+                <div className={`w-10 h-10 rounded-sm flex items-center justify-center shrink-0 ${meta.color}`}>
+                  {meta.icon}
                 </div>
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-ink truncate">{item.title}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${meta.color}`}>{meta.label}</span>
-                    {item.priority > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">Prioridade {item.priority}</span>}
-                    {item.campaign_id && <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 font-bold">Campanha</span>}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-ink text-sm truncate">{item.title}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${meta.color}`}>{meta.label}</span>
+                    {item.priority > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold dark:bg-amber-900/30 dark:text-amber-300">P{item.priority}</span>}
+                    {item.campaign_id && <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 font-bold dark:bg-violet-900/30 dark:text-violet-300">Campanha</span>}
                   </div>
-                  <p className="text-xs text-ink-secondary mt-0.5 truncate">
+                  <p className="text-xs text-ink-variant mt-0.5 truncate">
                     {item.source_url || item.local_path || '—'} · {item.duration_seconds}s
                   </p>
                 </div>
 
                 {/* Sort order */}
-                <div className="hidden md:flex flex-col items-center shrink-0">
-                  <span className="text-xs text-ink-secondary uppercase font-bold tracking-wide">Ordem</span>
-                  <span className="font-black text-ink text-lg">{item.sort_order}</span>
+                <div className="hidden md:flex flex-col items-center shrink-0 px-2 border-r border-outline-variant/50">
+                  <span className="text-[10px] text-ink-variant uppercase font-bold tracking-wider">Ordem</span>
+                  <span className="font-bold text-ink text-sm">{item.sort_order}</span>
                 </div>
 
                 {/* Toggle */}
-                <button onClick={() => toggleActive(item)} className={`w-11 h-6 flex items-center rounded-full p-0.5 transition-all shrink-0 ${item.is_active ? 'bg-primary' : 'bg-outline-variant'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${item.is_active ? 'translate-x-5' : 'translate-x-0'}`} />
+                <button type="button" onClick={() => toggleActive(item)} className={`w-10 h-6 flex items-center rounded-full p-0.5 transition-all shrink-0 ${item.is_active ? 'bg-primary' : 'bg-outline-variant'}`}>
+                  <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${item.is_active ? 'translate-x-4' : 'translate-x-0'}`} />
                 </button>
 
                 {/* Actions */}
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => openEdit(item)} className="p-2 rounded-xl hover:bg-primary/10 text-ink-secondary hover:text-primary transition-colors">
-                    <Icon name="edit" className="text-lg" />
-                  </button>
-                  <button onClick={() => deleteItem(item)} className="p-2 rounded-xl hover:bg-error/10 text-ink-secondary hover:text-error transition-colors">
-                    <Icon name="delete" className="text-lg" />
-                  </button>
+                  <Button variant="ghost" size="sm" className="px-2" onClick={() => openEdit(item)} title="Editar">
+                    <Edit className="h-4 w-4 text-primary" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="px-2" onClick={() => deleteItem(item)} title="Excluir">
+                    <Trash2 className="h-4 w-4 text-error" />
+                  </Button>
                 </div>
               </div>
             );
@@ -323,138 +347,157 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
 
       {/* Modal de Formulário */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
-          <div 
-            className="bg-surface rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative pointer-events-auto"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-ink uppercase tracking-wide">{editing ? 'Editar Conteúdo' : 'Novo Conteúdo'}</h3>
-              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-surface-variant rounded-xl transition-colors"><Icon name="close" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              {/* Título */}
-              <div>
-                <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Título *</label>
-                <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                  className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface"
-                  placeholder="Ex: Promoção de Natal" />
-              </div>
+        <Dialog 
+          open={showForm} 
+          onClose={() => setShowForm(false)} 
+          title={editing ? 'Editar Conteúdo' : 'Novo Conteúdo'}
+        >
+          <div className="space-y-4">
+            <Input 
+              label="Título *"
+              value={form.title} 
+              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+              placeholder="Ex: Promoção de Natal" 
+            />
 
-              {/* Tipo */}
-              <div>
-                <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Tipo</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {Object.entries(TYPE_META).map(([k, v]) => (
-                    <button key={k} onClick={() => setForm(f => ({ ...f, type: k as any, source_url: '', local_path: '' }))}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-xs font-bold transition-all ${form.type === k ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant/40 text-ink-secondary hover:border-primary/30'}`}>
-                      <Icon name={v.icon} className="text-base" />{v.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* URL ou arquivo */}
-              {needsUrl(form.type) && (
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">
-                    {form.type === 'youtube' ? 'URL do YouTube' : form.type === 'weather' ? 'Cidade (opcional)' : 'URL da Página'}
-                  </label>
-                  <input value={form.source_url || ''} onChange={e => setForm(f => ({ ...f, source_url: e.target.value }))}
-                    className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface"
-                    placeholder={form.type === 'youtube' ? 'https://youtube.com/watch?v=...' : form.type === 'weather' ? '-23.55,-46.63' : 'https://...'} />
-                </div>
-              )}
-
-              {needsFile(form.type) && (
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Arquivo (upload)</label>
-                  <div
-                    onClick={() => fileRef.current?.click()}
-                    className="border-2 border-dashed border-outline-variant/50 rounded-xl p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all"
+            <div>
+              <label className="block text-xs font-bold text-ink-variant uppercase tracking-wider mb-2">Tipo</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {Object.entries(TYPE_META).map(([k, v]) => (
+                  <button 
+                    key={k} 
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, type: k as any, source_url: '', local_path: '' }))}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md border text-xs font-bold transition-all ${
+                      form.type === k 
+                        ? 'border-primary bg-primary/5 text-primary' 
+                        : 'border-outline-variant text-ink-variant hover:bg-surface-container'
+                    }`}
                   >
-                    <Icon name={uploadFile ? 'check_circle' : 'upload'} className={`text-3xl mb-2 ${uploadFile ? 'text-emerald-500' : 'text-ink-secondary/50'}`} />
-                    <p className="text-sm font-bold text-ink-secondary">
-                      {uploadFile ? uploadFile.name : (form.local_path || 'Clique para selecionar')}
-                    </p>
-                    <p className="text-xs text-ink-secondary/50 mt-1">
-                      {form.type === 'video' ? 'MP4, WebM, MOV' : 'JPG, PNG, GIF, WebP'}
-                    </p>
-                    <input ref={fileRef} type="file" className="hidden"
-                      accept={form.type === 'video' ? 'video/*' : 'image/*'}
-                      onChange={e => { if (e.target.files?.[0]) setUploadFile(e.target.files[0]); }} />
-                  </div>
-                  {/* Ou URL direta */}
-                  <p className="text-xs text-center text-ink-secondary my-2 font-bold">— ou informe o caminho —</p>
-                  <input value={form.local_path || ''} onChange={e => setForm(f => ({ ...f, local_path: e.target.value }))}
-                    className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface"
-                    placeholder="/uploads/minha-imagem.jpg" />
-                </div>
-              )}
-
-              {/* Duração e Ordem */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Duração (s)</label>
-                  <input type="number" min={3} max={300} value={form.duration_seconds}
-                    onChange={e => setForm(f => ({ ...f, duration_seconds: Number(e.target.value) }))}
-                    className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Prioridade</label>
-                  <input type="number" min={0} max={99} value={form.priority}
-                    onChange={e => setForm(f => ({ ...f, priority: Number(e.target.value) }))}
-                    className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface" />
-                </div>
-              </div>
-
-              {/* Campanha */}
-              {campaigns.length > 0 && (
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Vincular à Campanha (opcional)</label>
-                  <select value={form.campaign_id ?? ''} onChange={e => setForm(f => ({ ...f, campaign_id: e.target.value ? Number(e.target.value) : null }))}
-                    className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface">
-                    <option value="">— Padrão (sem campanha) —</option>
-                    {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-              )}
-
-              {/* Agendamento */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Início (opcional)</label>
-                  <input type="datetime-local" value={form.start_at || ''}
-                    onChange={e => setForm(f => ({ ...f, start_at: e.target.value }))}
-                    className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Término (opcional)</label>
-                  <input type="datetime-local" value={form.end_at || ''}
-                    onChange={e => setForm(f => ({ ...f, end_at: e.target.value }))}
-                    className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface" />
-                </div>
-              </div>
-
-              {/* Ativo */}
-              <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl">
-                <span className="font-bold text-sm text-ink">Ativo na playlist</span>
-                <button onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}
-                  className={`w-11 h-6 flex items-center rounded-full p-0.5 transition-all ${form.is_active ? 'bg-primary' : 'bg-outline-variant'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${form.is_active ? 'translate-x-5' : 'translate-x-0'}`} />
-                </button>
+                    {v.icon}
+                    {v.label}
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="p-6 border-t border-outline-variant/30 flex gap-3 justify-end">
-              <button onClick={() => setShowForm(false)} className="px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-widest text-ink-secondary hover:bg-surface-variant transition-all">Cancelar</button>
-              <button onClick={handleSave} disabled={saving}
-                className="px-8 py-3 rounded-xl font-bold text-sm uppercase tracking-widest bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2">
-                {saving && <Icon name="refresh" className="animate-spin text-base" />}
-                {editing ? 'Salvar alterações' : 'Criar conteúdo'}
+
+            {needsUrl(form.type) && (
+              <Input 
+                label={form.type === 'youtube' ? 'URL do YouTube' : form.type === 'weather' ? 'Cidade (opcional)' : 'URL da Página'}
+                value={form.source_url || ''} 
+                onChange={e => setForm(f => ({ ...f, source_url: e.target.value }))}
+                placeholder={form.type === 'youtube' ? 'https://youtube.com/watch?v=...' : form.type === 'weather' ? '-23.55,-46.63' : 'https://...'} 
+              />
+            )}
+
+            {needsFile(form.type) && (
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-ink-variant uppercase tracking-wider mb-1">Arquivo (upload)</label>
+                <div
+                  onClick={() => fileRef.current?.click()}
+                  className="border-2 border-dashed border-outline-variant rounded-md p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all"
+                >
+                  <Upload className={`h-8 w-8 mx-auto mb-2 ${uploadFile ? 'text-emerald-500' : 'text-ink-variant/50'}`} />
+                  <p className="text-xs font-bold text-ink-variant">
+                    {uploadFile ? uploadFile.name : (form.local_path || 'Clique para selecionar')}
+                  </p>
+                  <p className="text-[10px] text-ink-variant/50 mt-1">
+                    {form.type === 'video' ? 'MP4, WebM, MOV' : 'JPG, PNG, GIF, WebP'}
+                  </p>
+                  <input ref={fileRef} type="file" className="hidden"
+                    accept={form.type === 'video' ? 'video/*' : 'image/*'}
+                    onChange={e => { if (e.target.files?.[0]) setUploadFile(e.target.files[0]); }} />
+                </div>
+                <div className="relative flex py-2 items-center">
+                  <div className="flex-grow border-t border-outline-variant/30"></div>
+                  <span className="flex-shrink mx-4 text-xs font-bold text-ink-variant uppercase tracking-wider">ou informe o caminho</span>
+                  <div className="flex-grow border-t border-outline-variant/30"></div>
+                </div>
+                <Input 
+                  label="Caminho Local do Arquivo"
+                  value={form.local_path || ''} 
+                  onChange={e => setForm(f => ({ ...f, local_path: e.target.value }))}
+                  placeholder="/uploads/minha-imagem.jpg" 
+                />
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input 
+                type="number"
+                min={3} 
+                max={300}
+                label="Duração (s)"
+                value={form.duration_seconds}
+                onChange={e => setForm(f => ({ ...f, duration_seconds: Number(e.target.value) }))}
+              />
+              <Input 
+                type="number"
+                min={0} 
+                max={99}
+                label="Prioridade"
+                value={form.priority}
+                onChange={e => setForm(f => ({ ...f, priority: Number(e.target.value) }))}
+              />
+            </div>
+
+            {campaigns.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <label htmlFor="vincularCampanha" className="text-sm font-medium text-ink">Vincular à Campanha (opcional)</label>
+                <select 
+                  id="vincularCampanha"
+                  value={form.campaign_id ?? ''} 
+                  onChange={e => setForm(f => ({ ...f, campaign_id: e.target.value ? Number(e.target.value) : null }))}
+                  className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  <option value="">— Padrão (sem campanha) —</option>
+                  {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input 
+                type="datetime-local"
+                label="Início (opcional)"
+                value={form.start_at || ''}
+                onChange={e => setForm(f => ({ ...f, start_at: e.target.value }))}
+              />
+              <Input 
+                type="datetime-local"
+                label="Término (opcional)"
+                value={form.end_at || ''}
+                onChange={e => setForm(f => ({ ...f, end_at: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-surface-container-low rounded-md border border-outline-variant">
+              <span className="font-bold text-sm text-ink">Ativo na playlist</span>
+              <button 
+                type="button"
+                onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}
+                className={`w-10 h-6 flex items-center rounded-full p-0.5 transition-all ${form.is_active ? 'bg-primary' : 'bg-outline-variant'}`}
+              >
+                <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${form.is_active ? 'translate-x-4' : 'translate-x-0'}`} />
               </button>
             </div>
           </div>
-        </div>
+          <div className="flex gap-3 justify-end mt-6">
+            <Button 
+              variant="ghost"
+              onClick={() => setShowForm(false)}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSave} 
+              disabled={saving}
+              icon={saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : undefined}
+            >
+              {editing ? 'Salvar alterações' : 'Criar conteúdo'}
+            </Button>
+          </div>
+        </Dialog>
       )}
     </div>
   );
@@ -521,53 +564,54 @@ function TabCampaigns({ API_URL, themes, onCampaignsChange }: { API_URL: string;
 
   return (
     <div className="space-y-6">
-      {toast && <div className="fixed top-6 right-6 bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold shadow-xl z-50 text-sm uppercase tracking-widest">{toast}</div>}
+      {toast && <div className="fixed top-6 right-6 bg-emerald-600 text-white px-4 py-2.5 rounded-sm font-bold shadow-md z-50 text-xs uppercase tracking-wider">{toast}</div>}
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-ink uppercase tracking-wide">Campanhas</h2>
-          <p className="text-ink-secondary text-sm mt-1">Organize conteúdos por evento ou período.</p>
+          <h2 className="text-base font-bold text-ink">Campanhas</h2>
+          <p className="text-xs text-ink-variant mt-0.5">Organize conteúdos por evento ou período.</p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-primary/90 active:scale-95 transition-all">
-          <Icon name="add" className="text-lg" /> Nova Campanha
-        </button>
+        <Button 
+          onClick={openCreate}
+          icon={<Plus className="h-4 w-4" />}
+        >
+          Nova Campanha
+        </Button>
       </div>
 
       {loading ? (
-        <div className="py-16 flex items-center justify-center gap-3 text-ink-secondary text-sm font-bold uppercase tracking-widest">
-          <Icon name="refresh" className="animate-spin" /> Carregando...
-        </div>
+        <StatusBadge variant="loading" />
       ) : campaigns.length === 0 ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-4 text-ink-secondary/40">
-          <Icon name="campaign" className="text-6xl" />
-          <p className="font-bold uppercase tracking-widest text-sm">Nenhuma campanha cadastrada</p>
+        <div className="py-16 flex flex-col items-center justify-center gap-3 text-ink-variant/50">
+          <Megaphone className="h-10 w-10 text-outline" />
+          <p className="font-semibold text-sm">Nenhuma campanha cadastrada</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {campaigns.map(c => (
-            <div key={c.id} className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${c.is_active ? 'border-outline-variant/40 bg-surface' : 'border-outline-variant/20 bg-surface-variant opacity-60'}`}>
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${c.is_active ? 'bg-violet-100 text-violet-700' : 'bg-surface-variant text-ink-secondary'}`}>
-                <Icon name="campaign" className="text-2xl" />
+            <div key={c.id} className={`flex items-center gap-4 p-3 rounded-md border transition-all ${c.is_active ? 'border-outline-variant bg-surface' : 'border-outline-variant/40 bg-surface-container-low opacity-60'}`}>
+              <div className={`w-10 h-10 rounded-sm flex items-center justify-center shrink-0 ${c.is_active ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' : 'bg-surface-container text-ink-variant'}`}>
+                <Megaphone className="h-5 w-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold text-ink">{c.name}</span>
-                  {c.priority > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">P{c.priority}</span>}
-                  {c.replace_default_schedule && <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">Substitui padrão</span>}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-bold text-ink text-sm">{c.name}</span>
+                  {c.priority > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold dark:bg-amber-900/30 dark:text-amber-300">P{c.priority}</span>}
+                  {c.replace_default_schedule && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold dark:bg-red-900/30 dark:text-red-300">Substitui padrão</span>}
                 </div>
-                {c.description && <p className="text-xs text-ink-secondary mt-0.5 truncate">{c.description}</p>}
+                {c.description && <p className="text-xs text-ink-variant mt-0.5 truncate">{c.description}</p>}
                 {(c.starts_at || c.ends_at) && (
-                  <p className="text-xs text-ink-secondary/60 mt-0.5">
+                  <p className="text-[10px] text-ink-variant mt-0.5">
                     {c.starts_at ? new Date(c.starts_at).toLocaleDateString('pt-BR') : '∞'} → {c.ends_at ? new Date(c.ends_at).toLocaleDateString('pt-BR') : '∞'}
                   </p>
                 )}
               </div>
-              <button onClick={() => toggle(c)} className={`w-11 h-6 flex items-center rounded-full p-0.5 transition-all shrink-0 ${c.is_active ? 'bg-primary' : 'bg-outline-variant'}`}>
-                <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${c.is_active ? 'translate-x-5' : 'translate-x-0'}`} />
+              <button type="button" onClick={() => toggle(c)} className={`w-10 h-6 flex items-center rounded-full p-0.5 transition-all shrink-0 ${c.is_active ? 'bg-primary' : 'bg-outline-variant'}`}>
+                <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${c.is_active ? 'translate-x-4' : 'translate-x-0'}`} />
               </button>
               <div className="flex gap-1 shrink-0">
-                <button onClick={() => openEdit(c)} className="p-2 rounded-xl hover:bg-primary/10 text-ink-secondary hover:text-primary transition-colors"><Icon name="edit" className="text-lg" /></button>
-                <button onClick={() => del(c)} className="p-2 rounded-xl hover:bg-error/10 text-ink-secondary hover:text-error transition-colors"><Icon name="delete" className="text-lg" /></button>
+                <Button variant="ghost" size="sm" className="px-2" onClick={() => openEdit(c)} title="Editar"><Edit className="h-4 w-4 text-primary" /></Button>
+                <Button variant="ghost" size="sm" className="px-2" onClick={() => del(c)} title="Excluir"><Trash2 className="h-4 w-4 text-error" /></Button>
               </div>
             </div>
           ))}
@@ -576,83 +620,105 @@ function TabCampaigns({ API_URL, themes, onCampaignsChange }: { API_URL: string;
 
       {/* Modal campanha */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
-          <div 
-            className="bg-surface rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative pointer-events-auto"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-ink uppercase tracking-wide">{editing ? 'Editar Campanha' : 'Nova Campanha'}</h3>
-              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-surface-variant rounded-xl transition-colors"><Icon name="close" /></button>
+        <Dialog 
+          open={showForm} 
+          onClose={() => setShowForm(false)} 
+          title={editing ? 'Editar Campanha' : 'Nova Campanha'}
+        >
+          <div className="space-y-4">
+            <Input 
+              label="Nome *"
+              value={form.name} 
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="Ex: Promoção de Inverno" 
+            />
+            <div className="flex flex-col gap-1">
+              <label htmlFor="campanhaDescricao" className="text-sm font-medium text-ink">Descrição</label>
+              <textarea 
+                id="campanhaDescricao"
+                rows={2} 
+                value={form.description || ''} 
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                className="w-full bg-surface-container border border-outline-variant/50 rounded-sm px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold h-20 resize-none text-sm" 
+                placeholder="Descreva o objetivo desta campanha..." 
+              />
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Nome *</label>
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface"
-                  placeholder="Ex: Promoção de Inverno" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Descrição</label>
-                <textarea rows={2} value={form.description || ''} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                  className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface resize-none"
-                  placeholder="Descreva o objetivo desta campanha..." />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Início</label>
-                  <input type="datetime-local" value={form.starts_at || ''} onChange={e => setForm(f => ({ ...f, starts_at: e.target.value }))}
-                    className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary bg-surface" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Término</label>
-                  <input type="datetime-local" value={form.ends_at || ''} onChange={e => setForm(f => ({ ...f, ends_at: e.target.value }))}
-                    className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary bg-surface" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Prioridade (maior = exibido primeiro)</label>
-                <input type="number" min={0} max={99} value={form.priority} onChange={e => setForm(f => ({ ...f, priority: Number(e.target.value) }))}
-                  className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface" />
-              </div>
-              {themes.length > 0 && (
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Tema Visual (opcional)</label>
-                  <select value={form.theme_id ?? ''} onChange={e => setForm(f => ({ ...f, theme_id: e.target.value ? Number(e.target.value) : null }))}
-                    className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface">
-                    <option value="">— Sem tema específico —</option>
-                    {themes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-              )}
-              <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl">
-                <div>
-                  <span className="font-bold text-sm text-ink">Substituir programação padrão</span>
-                  <p className="text-xs text-ink-secondary mt-0.5">Quando ativa, exibe APENAS conteúdos desta campanha.</p>
-                </div>
-                <button onClick={() => setForm(f => ({ ...f, replace_default_schedule: !f.replace_default_schedule }))}
-                  className={`w-11 h-6 flex items-center rounded-full p-0.5 transition-all ${form.replace_default_schedule ? 'bg-red-500' : 'bg-outline-variant'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${form.replace_default_schedule ? 'translate-x-5' : 'translate-x-0'}`} />
-                </button>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl">
-                <span className="font-bold text-sm text-ink">Campanha Ativa</span>
-                <button onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}
-                  className={`w-11 h-6 flex items-center rounded-full p-0.5 transition-all ${form.is_active ? 'bg-primary' : 'bg-outline-variant'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${form.is_active ? 'translate-x-5' : 'translate-x-0'}`} />
-                </button>
-              </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input 
+                type="datetime-local"
+                label="Início"
+                value={form.starts_at || ''} 
+                onChange={e => setForm(f => ({ ...f, starts_at: e.target.value }))}
+              />
+              <Input 
+                type="datetime-local"
+                label="Término"
+                value={form.ends_at || ''} 
+                onChange={e => setForm(f => ({ ...f, ends_at: e.target.value }))}
+              />
             </div>
-            <div className="p-6 border-t border-outline-variant/30 flex gap-3 justify-end">
-              <button onClick={() => setShowForm(false)} className="px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-widest text-ink-secondary hover:bg-surface-variant transition-all">Cancelar</button>
-              <button onClick={handleSave} disabled={saving}
-                className="px-8 py-3 rounded-xl font-bold text-sm uppercase tracking-widest bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2">
-                {saving && <Icon name="refresh" className="animate-spin text-base" />}
-                {editing ? 'Salvar' : 'Criar'}
+            <Input 
+              type="number"
+              min={0} 
+              max={99}
+              label="Prioridade (maior = exibido primeiro)"
+              value={form.priority} 
+              onChange={e => setForm(f => ({ ...f, priority: Number(e.target.value) }))}
+            />
+            {themes.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <label htmlFor="campanhaTema" className="text-sm font-medium text-ink">Tema Visual (opcional)</label>
+                <select 
+                  id="campanhaTema"
+                  value={form.theme_id ?? ''} 
+                  onChange={e => setForm(f => ({ ...f, theme_id: e.target.value ? Number(e.target.value) : null }))}
+                  className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  <option value="">— Sem tema específico —</option>
+                  {themes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="flex items-center justify-between p-3 bg-surface-container-low rounded-md border border-outline-variant">
+              <div>
+                <span className="font-bold text-sm text-ink">Substituir programação padrão</span>
+                <p className="text-[10px] text-ink-variant mt-0.5">Quando ativa, exibe APENAS conteúdos desta campanha.</p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setForm(f => ({ ...f, replace_default_schedule: !f.replace_default_schedule }))}
+                className={`w-10 h-6 flex items-center rounded-full p-0.5 transition-all ${form.replace_default_schedule ? 'bg-red-500' : 'bg-outline-variant'}`}
+              >
+                <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${form.replace_default_schedule ? 'translate-x-4' : 'translate-x-0'}`} />
+              </button>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-surface-container-low rounded-md border border-outline-variant">
+              <span className="font-bold text-sm text-ink">Campanha Ativa</span>
+              <button 
+                type="button"
+                onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}
+                className={`w-10 h-6 flex items-center rounded-full p-0.5 transition-all ${form.is_active ? 'bg-primary' : 'bg-outline-variant'}`}
+              >
+                <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${form.is_active ? 'translate-x-4' : 'translate-x-0'}`} />
               </button>
             </div>
           </div>
-        </div>
+          <div className="flex gap-3 justify-end mt-6">
+            <Button 
+              variant="ghost"
+              onClick={() => setShowForm(false)}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSave} 
+              disabled={saving}
+              icon={saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : undefined}
+            >
+              {editing ? 'Salvar' : 'Criar'}
+            </Button>
+          </div>
+        </Dialog>
       )}
     </div>
   );
@@ -662,7 +728,7 @@ function TabCampaigns({ API_URL, themes, onCampaignsChange }: { API_URL: string;
 // TAB: TEMAS
 // ═══════════════════════════════════════════════════════════════════════════════
 const BLANK_THEME: Omit<Theme, 'id'> = {
-  name: '', type: 'custom', primary_color: '#2563eb', secondary_color: '#16a34a',
+  name: '', type: 'custom', primary_color: '#3525CD', secondary_color: '#059669',
   background_image: '', is_active: false,
 };
 
@@ -720,53 +786,53 @@ function TabThemes({ API_URL, onThemesChange }: { API_URL: string; onThemesChang
 
   return (
     <div className="space-y-6">
-      {toast && <div className="fixed top-6 right-6 bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold shadow-xl z-50 text-sm uppercase tracking-widest">{toast}</div>}
+      {toast && <div className="fixed top-6 right-6 bg-emerald-600 text-white px-4 py-2.5 rounded-sm font-bold shadow-md z-50 text-xs uppercase tracking-wider">{toast}</div>}
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-ink uppercase tracking-wide">Temas Visuais</h2>
-          <p className="text-ink-secondary text-sm mt-1">Personalize cores e visual do Telão por campanha ou período.</p>
+          <h2 className="text-base font-bold text-ink">Temas Visuais</h2>
+          <p className="text-xs text-ink-variant mt-0.5">Personalize cores e visual do Telão por campanha ou período.</p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-primary/90 active:scale-95 transition-all">
-          <Icon name="add" className="text-lg" /> Novo Tema
-        </button>
+        <Button 
+          onClick={openCreate}
+          icon={<Plus className="h-4 w-4" />}
+        >
+          Novo Tema
+        </Button>
       </div>
 
       {loading ? (
-        <div className="py-16 flex items-center justify-center gap-3 text-ink-secondary text-sm font-bold uppercase tracking-widest">
-          <Icon name="refresh" className="animate-spin" /> Carregando...
-        </div>
+        <StatusBadge variant="loading" />
       ) : themes.length === 0 ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-4 text-ink-secondary/40">
-          <Icon name="palette" className="text-6xl" />
-          <p className="font-bold uppercase tracking-widest text-sm">Nenhum tema cadastrado</p>
+        <div className="py-16 flex flex-col items-center justify-center gap-3 text-ink-variant/50">
+          <Palette className="h-10 w-10 text-outline" />
+          <p className="font-semibold text-sm">Nenhum tema cadastrado</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {themes.map(t => (
-            <div key={t.id} className={`rounded-2xl border overflow-hidden transition-all ${t.is_active ? 'border-primary/40 shadow-md' : 'border-outline-variant/30 opacity-70'}`}>
-              {/* Color preview strip */}
-              <div className="h-3 w-full" style={{ background: `linear-gradient(90deg, ${t.primary_color || '#2563eb'}, ${t.secondary_color || '#16a34a'})` }} />
-              <div className="p-4 bg-surface">
+            <div key={t.id} className={`rounded-md border overflow-hidden transition-all ${t.is_active ? 'border-primary/50 shadow-md bg-surface' : 'border-outline-variant bg-surface-container-low opacity-75'}`}>
+              <div className="h-2.5 w-full" style={{ background: `linear-gradient(90deg, ${t.primary_color || '#3525CD'}, ${t.secondary_color || '#059669'})` }} />
+              <div className="p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-ink">{t.name}</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-surface-variant text-ink-secondary font-bold">{TYPE_LABELS[t.type] || t.type}</span>
-                      {t.is_active && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold">Ativo</span>}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-ink text-sm">{t.name}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-container text-ink-variant font-bold">{TYPE_LABELS[t.type] || t.type}</span>
+                      {t.is_active && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold dark:bg-emerald-900/30 dark:text-emerald-300">Ativo</span>}
                     </div>
-                    <div className="flex items-center gap-3 mt-2">
-                      <div className="w-5 h-5 rounded-full border border-white shadow-sm" style={{ background: t.primary_color || '#2563eb' }} title="Cor primária" />
-                      <div className="w-5 h-5 rounded-full border border-white shadow-sm" style={{ background: t.secondary_color || '#16a34a' }} title="Cor secundária" />
-                      <span className="text-xs text-ink-secondary font-mono">{t.primary_color}</span>
+                    <div className="flex items-center gap-2 mt-2">
+                      <div className="w-4.5 h-4.5 rounded-full border border-white dark:border-black shadow-sm" style={{ background: t.primary_color || '#3525CD' }} title="Cor primária" />
+                      <div className="w-4.5 h-4.5 rounded-full border border-white dark:border-black shadow-sm" style={{ background: t.secondary_color || '#059669' }} title="Cor secundária" />
+                      <span className="text-[10px] text-ink-variant font-mono">{t.primary_color}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => toggle(t)} className={`w-11 h-6 flex items-center rounded-full p-0.5 transition-all ${t.is_active ? 'bg-primary' : 'bg-outline-variant'}`}>
-                      <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${t.is_active ? 'translate-x-5' : 'translate-x-0'}`} />
+                    <button type="button" onClick={() => toggle(t)} className={`w-10 h-6 flex items-center rounded-full p-0.5 transition-all ${t.is_active ? 'bg-primary' : 'bg-outline-variant'}`}>
+                      <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${t.is_active ? 'translate-x-4' : 'translate-x-0'}`} />
                     </button>
-                    <button onClick={() => openEdit(t)} className="p-1.5 rounded-xl hover:bg-primary/10 text-ink-secondary hover:text-primary transition-colors"><Icon name="edit" className="text-base" /></button>
-                    <button onClick={() => del(t)} className="p-1.5 rounded-xl hover:bg-error/10 text-ink-secondary hover:text-error transition-colors"><Icon name="delete" className="text-base" /></button>
+                    <Button variant="ghost" size="sm" className="px-2" onClick={() => openEdit(t)} title="Editar"><Edit className="h-4 w-4 text-primary" /></Button>
+                    <Button variant="ghost" size="sm" className="px-2" onClick={() => del(t)} title="Excluir"><Trash2 className="h-4 w-4 text-error" /></Button>
                   </div>
                 </div>
               </div>
@@ -777,90 +843,105 @@ function TabThemes({ API_URL, onThemesChange }: { API_URL: string; onThemesChang
 
       {/* Modal tema */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
-          <div 
-            className="bg-surface rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative pointer-events-auto"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-ink uppercase tracking-wide">{editing ? 'Editar Tema' : 'Novo Tema'}</h3>
-              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-surface-variant rounded-xl transition-colors"><Icon name="close" /></button>
+        <Dialog 
+          open={showForm} 
+          onClose={() => setShowForm(false)} 
+          title={editing ? 'Editar Tema' : 'Novo Tema'}
+        >
+          <div className="space-y-4">
+            <Input 
+              label="Nome *"
+              value={form.name} 
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="Ex: Natal 2025" 
+            />
+            <div>
+              <label className="block text-xs font-bold text-ink-variant uppercase tracking-wider mb-2">Tipo</label>
+              <div className="flex gap-2">
+                {(['seasonal', 'brand', 'custom'] as const).map(tp => (
+                  <button 
+                    key={tp} 
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, type: tp }))}
+                    className={`flex-1 py-2 rounded-md border text-xs font-bold transition-all ${
+                      form.type === tp 
+                        ? 'border-primary bg-primary/5 text-primary' 
+                        : 'border-outline-variant text-ink-variant hover:bg-surface-container'
+                    }`}
+                  >
+                    {TYPE_LABELS[tp]}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Nome *</label>
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface"
-                  placeholder="Ex: Natal 2025" />
+                <label className="block text-xs font-bold text-ink-variant uppercase tracking-wider mb-1.5">Cor Primária</label>
+                <div className="flex items-center gap-2 border border-outline-variant rounded-md px-2.5 py-1.5 bg-surface">
+                  <input type="color" value={form.primary_color || '#3525CD'} onChange={e => setForm(f => ({ ...f, primary_color: e.target.value }))}
+                    className="w-8 h-8 rounded-sm cursor-pointer border-0 bg-transparent" />
+                  <span className="font-mono text-xs text-ink-variant">{form.primary_color}</span>
+                </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Tipo</label>
-                <div className="flex gap-2">
-                  {(['seasonal', 'brand', 'custom'] as const).map(tp => (
-                    <button key={tp} onClick={() => setForm(f => ({ ...f, type: tp }))}
-                      className={`flex-1 py-2 rounded-xl border-2 text-xs font-bold transition-all ${form.type === tp ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant/40 text-ink-secondary hover:border-primary/30'}`}>
-                      {TYPE_LABELS[tp]}
-                    </button>
-                  ))}
+                <label className="block text-xs font-bold text-ink-variant uppercase tracking-wider mb-1.5">Cor Secundária</label>
+                <div className="flex items-center gap-2 border border-outline-variant rounded-md px-2.5 py-1.5 bg-surface">
+                  <input type="color" value={form.secondary_color || '#059669'} onChange={e => setForm(f => ({ ...f, secondary_color: e.target.value }))}
+                    className="w-8 h-8 rounded-sm cursor-pointer border-0 bg-transparent" />
+                  <span className="font-mono text-xs text-ink-variant">{form.secondary_color}</span>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Cor Primária</label>
-                  <div className="flex items-center gap-3 border border-outline-variant/50 rounded-xl px-3 py-2 bg-surface">
-                    <input type="color" value={form.primary_color || '#2563eb'} onChange={e => setForm(f => ({ ...f, primary_color: e.target.value }))}
-                      className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent" />
-                    <span className="font-mono text-sm text-ink-secondary">{form.primary_color}</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Cor Secundária</label>
-                  <div className="flex items-center gap-3 border border-outline-variant/50 rounded-xl px-3 py-2 bg-surface">
-                    <input type="color" value={form.secondary_color || '#16a34a'} onChange={e => setForm(f => ({ ...f, secondary_color: e.target.value }))}
-                      className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent" />
-                    <span className="font-mono text-sm text-ink-secondary">{form.secondary_color}</span>
-                  </div>
-                </div>
-              </div>
-              {/* Preview strip */}
-              <div className="h-4 rounded-full w-full" style={{ background: `linear-gradient(90deg, ${form.primary_color || '#2563eb'}, ${form.secondary_color || '#16a34a'})` }} />
+            </div>
+            {/* Preview strip */}
+            <div className="h-3 rounded-full w-full shadow-inner" style={{ background: `linear-gradient(90deg, ${form.primary_color || '#3525CD'}, ${form.secondary_color || '#059669'})` }} />
 
-              <div>
-                <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Imagem de Fundo (URL ou caminho)</label>
-                <input value={form.background_image || ''} onChange={e => setForm(f => ({ ...f, background_image: e.target.value }))}
-                  className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 font-semibold text-sm focus:outline-none focus:border-primary bg-surface"
-                  placeholder="/uploads/fundo-natal.jpg" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Início</label>
-                  <input type="datetime-local" value={form.starts_at || ''} onChange={e => setForm(f => ({ ...f, starts_at: e.target.value }))}
-                    className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary bg-surface" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary uppercase tracking-widest mb-1.5">Término</label>
-                  <input type="datetime-local" value={form.ends_at || ''} onChange={e => setForm(f => ({ ...f, ends_at: e.target.value }))}
-                    className="w-full border border-outline-variant/50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary bg-surface" />
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-surface-variant rounded-xl">
-                <span className="font-bold text-sm text-ink">Tema Ativo</span>
-                <button onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}
-                  className={`w-11 h-6 flex items-center rounded-full p-0.5 transition-all ${form.is_active ? 'bg-primary' : 'bg-outline-variant'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${form.is_active ? 'translate-x-5' : 'translate-x-0'}`} />
-                </button>
-              </div>
+            <Input 
+              label="Imagem de Fundo (URL ou caminho)"
+              value={form.background_image || ''} 
+              onChange={e => setForm(f => ({ ...f, background_image: e.target.value }))}
+              placeholder="/uploads/fundo-natal.jpg" 
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <Input 
+                type="datetime-local"
+                label="Início"
+                value={form.starts_at || ''} 
+                onChange={e => setForm(f => ({ ...f, starts_at: e.target.value }))}
+              />
+              <Input 
+                type="datetime-local"
+                label="Término"
+                value={form.ends_at || ''} 
+                onChange={e => setForm(f => ({ ...f, ends_at: e.target.value }))}
+              />
             </div>
-            <div className="p-6 border-t border-outline-variant/30 flex gap-3 justify-end">
-              <button onClick={() => setShowForm(false)} className="px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-widest text-ink-secondary hover:bg-surface-variant transition-all">Cancelar</button>
-              <button onClick={handleSave} disabled={saving}
-                className="px-8 py-3 rounded-xl font-bold text-sm uppercase tracking-widest bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2">
-                {saving && <Icon name="refresh" className="animate-spin text-base" />}
-                {editing ? 'Salvar' : 'Criar'}
+            <div className="flex items-center justify-between p-3 bg-surface-container-low rounded-md border border-outline-variant">
+              <span className="font-bold text-sm text-ink">Tema Ativo</span>
+              <button 
+                type="button"
+                onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}
+                className={`w-10 h-6 flex items-center rounded-full p-0.5 transition-all ${form.is_active ? 'bg-primary' : 'bg-outline-variant'}`}
+              >
+                <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${form.is_active ? 'translate-x-4' : 'translate-x-0'}`} />
               </button>
             </div>
           </div>
-        </div>
+          <div className="flex gap-3 justify-end mt-6">
+            <Button 
+              variant="ghost"
+              onClick={() => setShowForm(false)}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSave} 
+              disabled={saving}
+              icon={saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : undefined}
+            >
+              {editing ? 'Salvar' : 'Criar'}
+            </Button>
+          </div>
+        </Dialog>
       )}
     </div>
   );
@@ -871,52 +952,53 @@ function TabThemes({ API_URL, onThemesChange }: { API_URL: string; onThemesChang
 // ═══════════════════════════════════════════════════════════════════════════════
 type TabId = 'config' | 'items' | 'campaigns' | 'themes';
 
-const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: 'config',    label: 'Configurações', icon: 'tune' },
-  { id: 'items',     label: 'Conteúdo',      icon: 'photo_library' },
-  { id: 'campaigns', label: 'Campanhas',     icon: 'campaign' },
-  { id: 'themes',    label: 'Temas',         icon: 'palette' },
-];
-
 export default function MediaIndoorAdmin() {
   const [activeTab, setActiveTab] = useState<TabId>('config');
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
   const API_URL = getApiUrl();
 
+  const TABS = [
+    { id: 'config' as const,    label: 'Configurações', icon: <Settings className="h-4 w-4" /> },
+    { id: 'items' as const,     label: 'Conteúdo',      icon: <ImageIcon className="h-4 w-4" /> },
+    { id: 'campaigns' as const, label: 'Campanhas',     icon: <Megaphone className="h-4 w-4" /> },
+    { id: 'themes' as const,    label: 'Temas',         icon: <Palette className="h-4 w-4" /> },
+  ];
+
   return (
     <AdminLayout>
-      <div className="max-w-5xl mx-auto space-y-8 font-sans">
+      <div className="max-w-5xl mx-auto space-y-6 font-sans">
         {/* Header */}
-        <div className="flex flex-col gap-2">
-          <h1 className="font-sans text-[36px] font-bold text-ink leading-tight uppercase tracking-widest">
+        <div className="flex flex-col gap-1">
+          <h1 className="font-display text-2xl font-bold text-ink leading-tight">
             Mídia Indoor Inteligente
           </h1>
-          <p className="text-ink-secondary text-base font-semibold">
+          <p className="text-ink-variant text-sm">
             Gerencie vídeos, imagens, YouTube, clima e campanhas de exibição no Telão.
           </p>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 border-b border-outline-variant/30 pb-0">
+        <div className="flex border-b border-outline-variant overflow-x-auto">
           {TABS.map(tab => (
             <button
               key={tab.id}
+              type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-3 font-bold text-sm uppercase tracking-widest rounded-t-xl border-b-2 transition-all ${
+              className={`flex items-center gap-2 px-5 py-3 font-bold text-sm border-b-2 transition-all outline-none whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'border-primary text-primary bg-primary/5'
-                  : 'border-transparent text-ink-secondary hover:text-ink hover:bg-surface-variant'
+                  : 'border-transparent text-ink-variant hover:text-ink hover:bg-surface-container-low'
               }`}
             >
-              <Icon name={tab.icon} className="text-base" />
+              {tab.icon}
               {tab.label}
             </button>
           ))}
         </div>
 
         {/* Tab Content */}
-        <div className="bg-surface p-8 rounded-3xl border border-outline-variant/50 shadow-sm min-h-[400px]">
+        <div className="bg-surface p-6 rounded-md border border-outline-variant shadow-sm min-h-[350px]">
           {activeTab === 'config' && <TabConfig API_URL={API_URL} />}
           {activeTab === 'items' && <TabItems API_URL={API_URL} campaigns={campaigns} />}
           {activeTab === 'campaigns' && <TabCampaigns API_URL={API_URL} themes={themes} onCampaignsChange={setCampaigns} />}

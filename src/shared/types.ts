@@ -86,6 +86,7 @@ export type EstablishmentConfig = {
   toledo_fonte_preco?: string | null;
   toledo_ocultar_em_falta?: string | boolean | null;
   telao_tts_ativo?: string | null;
+  telao_tts_modo?: string | null; // 'sintetizador' | 'mp3' | 'ambos' | 'desativado'
   telao_tts_template?: string | null;
   telao_tts_template_nome?: string | null;
   telao_tts_tom?: string | null;

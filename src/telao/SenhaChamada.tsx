@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { getApiUrl } from '../shared/apiConfig';
 import Logo from '../shared/Logo';
 import type { RecentCall, EstablishmentConfig } from '../shared/types';
@@ -66,8 +67,6 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
   if (!ultimaSenha) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-950 via-slate-950 to-violet-950 p-12 relative overflow-hidden">
-        <div className="broadcast-scanlines" />
-        <div className="broadcast-vignette" />
         {/* Glows using radial-gradients instead of expensive blur filters */}
         {!isLowPerformanceMode && (
           <>
@@ -94,9 +93,6 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
 
   return (
     <div className="h-full w-full flex flex-col items-center justify-center bg-gradient-to-br from-indigo-950 via-slate-950 to-violet-950 p-12 relative overflow-hidden animate-fade-in">
-      <div className="broadcast-scanlines" />
-      <div className="broadcast-vignette" />
-
       {/* Background decoration using radial-gradients instead of expensive blur filters */}
       {!isLowPerformanceMode && (
         <div className="absolute top-0 left-0 w-full h-full opacity-15 pointer-events-none">
@@ -121,8 +117,9 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
               font-syne text-2xl font-black tracking-widest uppercase
               text-orange-500 border-2 border-orange-500
               px-8 py-2 rounded-full bg-orange-500/10
+              flex items-center gap-2
             ">
-              ⚠ 2ª CHAMADA
+              <AlertTriangle className="h-6 w-6" /> 2ª CHAMADA
             </span>
           </div>
         )}

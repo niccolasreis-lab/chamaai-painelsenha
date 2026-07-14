@@ -5,7 +5,7 @@
   "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev:vite": "vite --host",
-    "dev:electron": "tsc -p tsconfig.electron.json && electron .",
+    "dev:electron": "npx esbuild electron/main.ts electron/preload.ts electron/services/database.ts server/index.ts server/categorizador.ts server/file-parsers.ts server/media-indoor.ts server/supabase-sync.ts server/toledo-watcher.ts server/services/*.ts --platform=node --outdir=dist-electron --format=cjs --outbase=. && node -e \"const fs = require('fs'); if (!fs.existsSync('dist-electron/server/categorias.json')) { fs.mkdirSync('dist-electron/server', {recursive:true}); fs.copyFileSync('server/categorias.json', 'dist-electron/server/categorias.json'); }\" && electron .",
     "dev:server": "tsx start-server.ts",
     "dev:web": "concurrently \"npm run dev:vite\" \"npm run dev:server\"",
     "dev": "concurrently \"npm run dev:vite\" \"wait-on http://localhost:5175 && npm run dev:electron\"",

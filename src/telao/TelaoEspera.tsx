@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { Network, ArrowLeft } from 'lucide-react';
 import { getApiUrl } from '../shared/apiConfig';
 import type { EstablishmentConfig } from '../shared/types';
+import { Dialog } from '../shared/components/Dialog';
+import { Input } from '../shared/components/Input';
+import { Button } from '../shared/components/Button';
 
 interface TelaoEsperaProps {
   code: string;
@@ -157,7 +161,7 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
               onClick={() => setShowIpModal(true)}
               className="text-[10px] text-white/40 hover:text-white/80 font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
             >
-              <span className="material-symbols-outlined text-xs">hub</span>
+              <Network className="h-3 w-3" />
               Configurar Conexão (Atual: {localStorage.getItem('server_ip_override') || 'Localhost'})
             </button>
             <span className="text-white/20 text-[10px] font-bold">|</span>
@@ -166,7 +170,7 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
               onClick={() => localStorage.removeItem('app_mode')}
               className="text-[10px] text-white/40 hover:text-white/80 font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
             >
-              <span className="material-symbols-outlined text-xs">arrow_back</span>
+              <ArrowLeft className="h-3 w-3" />
               Voltar ao Menu
             </Link>
           </div>
@@ -179,48 +183,49 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
       </div>
 
       {/* Connection IP Setup Modal */}
-      {showIpModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0b1612] border border-emerald-900/30 rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col gap-6 relative text-left">
-            <div>
-              <h3 className="font-sans text-2xl font-bold text-white uppercase mb-2">Conectar ao Servidor</h3>
-              <p className="text-sm font-sans text-white/60 font-medium">
-                Digite o endereço IP do computador onde está rodando o Servidor Principal (Telão) para que esta TV se comunique com ele.
-              </p>
-            </div>
-            <div>
-              <label className="block font-bold tracking-widest text-emerald-400 uppercase mb-2 text-xs">IP do Servidor (Telão)</label>
-              <input 
-                type="text" 
-                value={tempIp}
-                onChange={(e) => setTempIp(e.target.value)}
-                placeholder="Ex: 192.168.1.100"
-                className="w-full bg-[#050d0a] border border-emerald-950 rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 text-white font-bold text-lg placeholder:text-white/10"
-                autoFocus
-              />
-              <p className="text-[10px] text-white/40 mt-2 font-semibold uppercase tracking-wider">
-                Deixe em branco para conectar localmente (Localhost).
-              </p>
-            </div>
-            <div className="flex gap-4">
-              <button 
-                type="button"
-                onClick={() => setShowIpModal(false)}
-                className="flex-1 py-4 bg-[#050d0a] hover:bg-white/5 text-white/60 border border-emerald-950 rounded-xl font-bold uppercase tracking-widest text-sm transition-all"
-              >
-                Cancelar
-              </button>
-              <button 
-                type="button"
-                onClick={handleSaveIp}
-                className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl font-bold uppercase tracking-widest text-sm transition-all shadow-lg shadow-emerald-900/20"
-              >
-                Salvar IP
-              </button>
-            </div>
+      <Dialog
+        open={showIpModal}
+        onClose={() => setShowIpModal(false)}
+        title="Conectar ao Servidor"
+        maxWidth="max-w-md"
+      >
+        <div className="flex flex-col gap-6 text-left">
+          <p className="text-sm font-sans text-ink-variant font-medium">
+            Digite o endereço IP do computador onde está rodando o Servidor Principal (Telão) para que esta TV se comunique com ele.
+          </p>
+          <div>
+            <Input 
+              type="text" 
+              label="IP do Servidor (Telão)"
+              value={tempIp}
+              onChange={(e) => setTempIp(e.target.value)}
+              placeholder="Ex: 192.168.1.100"
+              className="w-full text-lg"
+              autoFocus
+            />
+            <p className="text-[10px] text-ink-variant mt-2 font-semibold uppercase tracking-wider">
+              Deixe em branco para conectar localmente (Localhost).
+            </p>
+          </div>
+          <div className="flex gap-4">
+            <Button 
+              type="button"
+              variant="secondary"
+              onClick={() => setShowIpModal(false)}
+              className="flex-1 py-4 font-bold uppercase tracking-widest text-sm"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              type="button"
+              onClick={handleSaveIp}
+              className="flex-1 py-4 font-bold uppercase tracking-widest text-sm"
+            >
+              Salvar IP
+            </Button>
           </div>
         </div>
-      )}
+      </Dialog>
     </div>
   );
 }

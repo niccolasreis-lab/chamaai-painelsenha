@@ -1,6 +1,24 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { 
+  Radio, 
+  LogIn, 
+  DownloadCloud, 
+  Download, 
+  ArrowLeft, 
+  Settings, 
+  UserX, 
+  CheckCircle2, 
+  XCircle, 
+  Megaphone, 
+  RefreshCw, 
+  Undo2, 
+  AlertTriangle 
+} from 'lucide-react';
 import { useSSE } from '../shared/useSSE';
+import { Button } from '../shared/components/Button';
+import { Input } from '../shared/components/Input';
+import { Dialog } from '../shared/components/Dialog';
 
 export default function ControleTouch() {
   const [ip] = useState(window.location.hostname || 'localhost');
@@ -301,73 +319,62 @@ export default function ControleTouch() {
   // --- SCREEN 1: Setup & Connection ---
   if (!isSetup) {
     return (
-      <div className="min-h-screen bg-[#F8F9FA] text-[#1E293B] flex flex-col items-center justify-center p-6 font-sans">
-        <div className="w-full max-w-md bg-white rounded-3xl p-8 border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.03)] flex flex-col items-center">
+      <div className="min-h-screen bg-background text-ink flex flex-col items-center justify-center p-6 font-sans">
+        <div className="w-full max-w-md bg-surface rounded-lg p-8 border border-outline-variant shadow-md flex flex-col items-center">
           
           {/* Centralized Logo */}
           <div className="text-center mb-8 flex flex-col items-center gap-1">
-            <span className="material-symbols-outlined text-5xl text-[#2563EB]">sensors</span>
-            <h1 className="text-4xl font-extrabold text-[#2563EB] tracking-wider uppercase">ChamaAí</h1>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Módulo Operador Touch</p>
+            <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center shadow-sm mb-2">
+              <Radio className="h-8 w-8 text-on-primary" />
+            </div>
+            <h1 className="text-3xl font-display font-bold text-primary tracking-wider uppercase">ChamaAí</h1>
+            <p className="text-[10px] font-bold text-ink-variant uppercase tracking-widest">Módulo Operador Touch</p>
           </div>
 
           <div className="w-full space-y-5">
-
-
             {/* Guichê Field */}
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Número do Guichê</label>
-              <input
-                type="number"
-                value={guiche}
-                onChange={(e) => setGuiche(e.target.value)}
-                placeholder="Ex: 1"
-                className="w-full bg-[#F8F9FA] border border-slate-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10 rounded-2xl px-5 py-4 focus:outline-none font-bold text-lg text-slate-800 placeholder:text-slate-300"
-              />
-            </div>
+            <Input 
+              type="number"
+              label="Número do Guichê"
+              value={guiche}
+              onChange={e => setGuiche(e.target.value)}
+              placeholder="Ex: 1"
+            />
 
             {/* Error Message */}
             {errorMsg && (
-              <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 text-rose-600 text-xs font-bold text-center leading-relaxed">
+              <div className="bg-error-container/30 border border-error/20 rounded-sm p-3 text-error-ink text-xs font-bold text-center leading-relaxed">
                 {errorMsg}
               </div>
             )}
 
             {/* Connect Button */}
-            <button
+            <Button
               onClick={handleConnect}
               disabled={isValidating}
-              className="w-full bg-[#2563EB] text-white py-4 rounded-2xl font-bold uppercase tracking-widest hover:bg-[#1D4ED8] transition-all active:scale-[0.98] shadow-lg shadow-[#2563EB]/15 flex items-center justify-center gap-3 disabled:opacity-50 outline-none"
+              loading={isValidating}
+              className="w-full"
+              icon={!isValidating ? <LogIn className="h-4 w-4" /> : undefined}
             >
-              {isValidating ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  Conectando...
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-xl">login</span>
-                  CONECTAR
-                </>
-              )}
-            </button>
+              CONECTAR
+            </Button>
 
             {/* PWA Install Button */}
             {deferredPrompt && (
-              <button
+              <Button
                 onClick={handleInstallPWA}
-                className="w-full bg-[#16A34A] text-white py-3.5 rounded-2xl font-bold uppercase tracking-widest hover:bg-[#15803D] transition-all active:scale-[0.98] shadow-lg shadow-[#16A34A]/15 flex items-center justify-center gap-3 outline-none"
+                className="w-full bg-success text-white hover:brightness-95 active:brightness-90"
+                icon={<DownloadCloud className="h-4 w-4" />}
               >
-                <span className="material-symbols-outlined text-xl">download_for_offline</span>
                 Instalar no Aparelho
-              </button>
+              </Button>
             )}
 
             {/* Back Button */}
             <Link
               to="/"
               onClick={() => localStorage.removeItem('app_mode')}
-              className="w-full border border-slate-200 text-slate-500 py-3 rounded-2xl font-bold uppercase tracking-widest hover:bg-slate-50 transition-all text-center text-xs block outline-none"
+              className="w-full border border-outline-variant text-ink-variant py-3 rounded-sm font-bold uppercase tracking-widest hover:bg-surface-container-low transition-all text-center text-xs block outline-none"
             >
               Voltar ao Menu Principal
             </Link>
@@ -379,70 +386,76 @@ export default function ControleTouch() {
 
   // --- SCREEN 2: Operator Landscape Workspace ---
   return (
-    <div className="h-screen w-screen bg-[#F8F9FA] text-[#1E293B] flex flex-row font-sans p-6 overflow-hidden select-none">
+    <div className="h-screen w-screen bg-background text-ink flex flex-row font-sans p-6 overflow-hidden select-none">
       
       {/* LEFT COLUMN (~40% width) */}
       <div className="w-[40%] flex flex-col gap-5 pr-3 h-full shrink-0">
         
         {/* Card 1: Guichê & Connection Status */}
-        <div className="bg-white border border-slate-200/80 rounded-[20px] p-5 shadow-[0_4px_12px_rgba(0,0,0,0.01)] flex items-center justify-between shrink-0">
+        <div className="bg-surface border border-outline-variant rounded-md p-5 shadow-sm flex items-center justify-between shrink-0">
           <div>
-            <h2 className="text-2xl font-black text-[#1E293B] leading-none uppercase tracking-wide">
+            <h2 className="text-xl font-display font-bold text-ink leading-none uppercase tracking-wide">
               GUICHÊ {guiche}
             </h2>
             <div className="flex items-center gap-2 mt-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${sseConnected ? 'bg-[#16A34A] animate-pulse' : 'bg-[#EF4444]'}`}></span>
-              <span className={`text-[10px] font-black uppercase tracking-widest ${sseConnected ? 'text-[#16A34A]' : 'text-[#EF4444]'}`}>
+              <span className={`w-2.5 h-2.5 rounded-full ${sseConnected ? 'bg-success animate-pulse' : 'bg-error'}`}></span>
+              <span className={`text-[10px] font-bold uppercase tracking-widest ${sseConnected ? 'text-success-ink' : 'text-error-ink'}`}>
                 {sseConnected ? 'CONECTADO' : 'DESCONECTADO'}
               </span>
             </div>
           </div>
           <div className="flex gap-2">
             {deferredPrompt && (
-              <button
+              <Button
                 onClick={handleInstallPWA}
-                className="w-12 h-12 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#16A34A] flex items-center justify-center transition-all active:scale-95 outline-none border-none"
+                variant="ghost"
+                className="w-12 h-12 p-0 flex items-center justify-center border border-outline-variant"
                 title="Instalar Aplicativo (PWA)"
               >
-                <span className="material-symbols-outlined text-2xl font-bold">download</span>
-              </button>
+                <Download className="h-5 w-5 text-success-ink" />
+              </Button>
             )}
             <Link
               to="/"
               onClick={() => localStorage.removeItem('app_mode')}
-              className="w-12 h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all active:scale-95 outline-none"
+              className="w-12 h-12 rounded-sm bg-surface-container hover:bg-surface-container-high text-ink flex items-center justify-center transition-all active:scale-95 outline-none border border-outline-variant"
               title="Voltar ao Menu Principal"
             >
-              <span className="material-symbols-outlined text-2xl">arrow_back</span>
+              <ArrowLeft className="h-5 w-5" />
             </Link>
-            <button
+            <Button
               onClick={() => setIsSetup(false)}
-              className="w-12 h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all active:scale-95 outline-none"
+              variant="ghost"
+              className="w-12 h-12 p-0 flex items-center justify-center border border-outline-variant"
               title="Voltar à Tela de Conexão"
             >
-              <span className="material-symbols-outlined text-2xl">settings</span>
-            </button>
+              <Settings className="h-5 w-5 text-ink-variant" />
+            </Button>
           </div>
         </div>
 
         {/* Card 2: Senha em Atendimento */}
-        <div className="bg-white border border-slate-200/80 rounded-[20px] p-6 shadow-[0_4px_12px_rgba(0,0,0,0.01)] flex-1 flex flex-col items-center justify-center text-center relative overflow-hidden">
+        <div className="bg-surface border border-outline-variant rounded-md p-6 shadow-sm flex-1 flex flex-col items-center justify-center text-center relative overflow-hidden">
           {senhaAtual ? (
             <div className="flex flex-col items-center">
-              <span className="text-[#1E293B] font-black text-6xl md:text-7xl lg:text-8xl leading-none tracking-tighter">
+              <span className="text-ink font-display font-bold text-6xl md:text-7xl leading-none tracking-tighter">
                 {senhaAtual.numero}
               </span>
-              <span className="text-slate-400 font-extrabold uppercase tracking-[0.3em] text-[10px] md:text-xs mt-4">
+              <span className="text-ink-variant font-bold uppercase tracking-[0.2em] text-[10px] md:text-xs mt-4">
                 EM ATENDIMENTO
               </span>
-              <span className={`mt-3 px-3 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-widest ${senhaAtual.preferencial ? 'bg-amber-50 text-amber-600 border border-amber-200/50' : 'bg-blue-50 text-blue-600 border border-blue-200/50'}`}>
+              <span className={`mt-3 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${
+                senhaAtual.preferencial 
+                  ? 'bg-warning-container text-warning-ink border-warning/20' 
+                  : 'bg-primary/5 text-primary border-primary/20'
+              }`}>
                 {senhaAtual.preferencial ? 'Prioritário' : 'Normal'}
               </span>
             </div>
           ) : (
-            <div className="flex flex-col items-center opacity-40 text-slate-400">
-              <span className="material-symbols-outlined text-6xl mb-3 text-slate-300">chair</span>
-              <span className="text-xs font-black uppercase tracking-widest">NENHUM ATENDIMENTO</span>
+            <div className="flex flex-col items-center opacity-45 text-outline">
+              <UserX className="h-16 w-16 mb-3" />
+              <span className="text-xs font-bold uppercase tracking-widest">NENHUM ATENDIMENTO</span>
             </div>
           )}
         </div>
@@ -450,15 +463,15 @@ export default function ControleTouch() {
         {/* Card 3: Contadores de Fila */}
         <div className="grid grid-cols-2 gap-4 h-24 shrink-0">
           {/* Fila Geral */}
-          <div className="bg-white border-b-4 border-[#2563EB] border border-slate-200/80 rounded-[20px] flex flex-col items-center justify-center p-2 shadow-[0_4px_12px_rgba(0,0,0,0.01)]">
-            <span className="text-3xl font-black text-slate-800 leading-none">{queueCounts.geral}</span>
-            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px] mt-1">FILA GERAL</span>
+          <div className="bg-surface border-b-4 border-primary border border-outline-variant rounded-md flex flex-col items-center justify-center p-2 shadow-sm">
+            <span className="text-3xl font-mono font-bold text-ink leading-none">{queueCounts.geral}</span>
+            <span className="text-ink-variant font-bold uppercase tracking-widest text-[9px] mt-1">FILA GERAL</span>
           </div>
           
           {/* Fila Preferencial */}
-          <div className="bg-white border-b-4 border-[#D97706] border border-slate-200/80 rounded-[20px] flex flex-col items-center justify-center p-2 shadow-[0_4px_12px_rgba(0,0,0,0.01)]">
-            <span className="text-3xl font-black text-[#D97706] leading-none">{queueCounts.preferencial}</span>
-            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px] mt-1">FILA PREFERENCIAL</span>
+          <div className="bg-surface border-b-4 border-warning border border-outline-variant rounded-md flex flex-col items-center justify-center p-2 shadow-sm">
+            <span className="text-3xl font-mono font-bold text-warning-ink leading-none">{queueCounts.preferencial}</span>
+            <span className="text-ink-variant font-bold uppercase tracking-widest text-[9px] mt-1">FILA PREFERENCIAL</span>
           </div>
         </div>
       </div>
@@ -471,107 +484,117 @@ export default function ControleTouch() {
             {(config.painel_habilitar_concluir !== '0' || config.painel_habilitar_nao_compareceu !== '0') && (
               <div className="flex-1 w-full flex gap-4 animate-fade-in">
                 {config.painel_habilitar_concluir !== '0' && (
-                  <button
+                  <Button
                     onClick={handleConcluir}
                     disabled={isActionPending}
-                    className="flex-1 bg-[#16A34A] hover:bg-[#15803D] text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-all shadow-lg shadow-[#16A34A]/10 border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+                    className="flex-1 bg-success hover:brightness-95 active:brightness-90 text-white rounded-md flex flex-col items-center justify-center gap-2 border-none shadow-md"
+                    icon={<CheckCircle2 className="h-6 w-6" />}
                   >
-                    <span className="material-symbols-outlined text-2xl md:text-3xl">check_circle</span>
-                    <span className="text-base md:text-lg lg:text-xl font-black">CONCLUIR</span>
-                  </button>
+                    <span className="text-base font-bold tracking-wider">CONCLUIR</span>
+                  </Button>
                 )}
                 {config.painel_habilitar_nao_compareceu !== '0' && (
-                  <button
+                  <Button
                     onClick={handleCancelar}
                     disabled={isActionPending}
-                    className="flex-1 bg-[#EF4444] hover:bg-[#DC2626] text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-all shadow-lg shadow-[#EF4444]/10 border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+                    variant="danger"
+                    className="flex-1 rounded-md flex flex-col items-center justify-center gap-2 shadow-md"
+                    icon={<XCircle className="h-6 w-6" />}
                   >
-                    <span className="material-symbols-outlined text-2xl md:text-3xl">cancel</span>
-                    <span className="text-base md:text-lg lg:text-xl font-black">NÃO COMP.</span>
-                  </button>
+                    <span className="text-base font-bold tracking-wider">NÃO COMP.</span>
+                  </Button>
                 )}
               </div>
             )}
 
             {/* Row 2: Chamar Próximo */}
-            <button
+            <Button
               onClick={handleProximo}
               disabled={isActionPending}
-              className="flex-1 w-full bg-slate-800 hover:bg-slate-700 text-white font-extrabold uppercase tracking-widest rounded-3xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-all shadow-md border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+              variant="primary"
+              className="flex-1 w-full rounded-md flex flex-col items-center justify-center gap-2 shadow-md"
+              icon={<Megaphone className="h-6 w-6" />}
             >
-              <span className="material-symbols-outlined text-2xl md:text-3xl">campaign</span>
-              <span className="text-lg md:text-xl font-black">CHAMAR PRÓXIMO</span>
-            </button>
+              <span className="text-lg font-bold tracking-wider">CHAMAR PRÓXIMO</span>
+            </Button>
 
             {/* Row 3: Repetir & Devolver */}
             {(config.painel_habilitar_repetir !== '0' || config.painel_habilitar_devolver !== '0') && (
               <div className="flex-1 w-full flex gap-4">
                 {config.painel_habilitar_repetir !== '0' && (
-                  <button
+                  <Button
                     onClick={handleRepetir}
                     disabled={isActionPending}
-                    className="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-extrabold uppercase tracking-widest rounded-3xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-md border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+                    variant="secondary"
+                    className="flex-1 bg-surface rounded-md flex items-center justify-center gap-2 shadow-sm border border-outline-variant hover:bg-surface-container-low"
+                    icon={<RefreshCw className="h-5 w-5 text-primary" />}
                   >
-                    <span className="material-symbols-outlined text-xl md:text-2xl">refresh</span>
-                    <span className="text-sm md:text-base font-black">REPETIR</span>
-                  </button>
+                    <span className="text-sm font-bold tracking-wider">REPETIR</span>
+                  </Button>
                 )}
                 {config.painel_habilitar_devolver !== '0' && (
-                  <button
+                  <Button
                     onClick={() => setShowConfirmDevolver(true)}
                     disabled={isActionPending}
-                    className="flex-1 bg-white hover:bg-amber-50/30 text-[#D97706] border-2 border-[#D97706] font-extrabold uppercase tracking-widest rounded-3xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm outline-none disabled:opacity-50 select-none cursor-pointer"
+                    variant="secondary"
+                    className="flex-1 bg-surface rounded-md flex items-center justify-center gap-2 shadow-sm border border-outline-variant hover:bg-surface-container-low"
+                    icon={<Undo2 className="h-5 w-5 text-warning-ink" />}
                   >
-                    <span className="material-symbols-outlined text-xl md:text-2xl">undo</span>
-                    <span className="text-sm md:text-base font-black">DEVOLVER</span>
-                  </button>
+                    <span className="text-sm font-bold tracking-wider text-warning-ink">DEVOLVER</span>
+                  </Button>
                 )}
               </div>
             )}
           </>
         ) : (
           /* PRÓXIMO BUTTON (Full Height) */
-          <button
+          <Button
             onClick={handleProximo}
             disabled={isActionPending}
-            className="h-full w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-extrabold uppercase tracking-widest rounded-[40px] flex flex-col items-center justify-center gap-4 active:scale-[0.98] transition-all shadow-2xl shadow-[#16A34A]/20 border-none outline-none disabled:opacity-50 select-none cursor-pointer"
+            className="h-full w-full bg-success hover:brightness-95 active:brightness-90 text-white rounded-md flex flex-col items-center justify-center gap-4 shadow-md"
+            icon={<Megaphone className="h-16 w-16" />}
           >
-            <span className="material-symbols-outlined text-7xl md:text-8xl">campaign</span>
-            <span className="text-4xl md:text-5xl lg:text-6xl font-black">CHAMAR PRÓXIMO</span>
-          </button>
+            <span className="text-3xl font-display font-bold tracking-wide">CHAMAR PRÓXIMO</span>
+          </Button>
         )}
       </div>
 
       {/* --- CONFIRM MODAL FOR DEVOLVER --- */}
       {showConfirmDevolver && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-[24px] p-6 max-w-sm w-full shadow-2xl flex flex-col gap-6">
+        <Dialog
+          open={showConfirmDevolver}
+          onClose={() => setShowConfirmDevolver(false)}
+          title="Confirmar Estorno"
+          maxWidth="max-w-sm"
+        >
+          <div className="flex flex-col gap-6">
             <div className="text-center">
-              <div className="w-14 h-14 bg-amber-50 text-[#D97706] rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-250/20">
-                <span className="material-symbols-outlined text-3xl">warning</span>
+              <div className="w-14 h-14 bg-warning-container text-warning-ink rounded-full flex items-center justify-center mx-auto mb-4 border border-warning/20">
+                <AlertTriangle className="h-7 w-7" />
               </div>
-              <h3 className="text-xl font-black text-slate-800 uppercase tracking-wide">Confirmar Estorno</h3>
-              <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mt-2 leading-relaxed">
-                Tem certeza que deseja devolver a senha <strong className="text-slate-800">{senhaAtual?.numero}</strong> de volta para a fila de espera?
+              <p className="text-ink-variant text-sm font-medium leading-relaxed">
+                Tem certeza que deseja devolver a senha <strong className="text-ink">{senhaAtual?.numero}</strong> de volta para a fila de espera?
               </p>
             </div>
             
             <div className="flex gap-4">
-              <button
+              <Button
+                variant="ghost"
                 onClick={() => setShowConfirmDevolver(false)}
-                className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold uppercase tracking-widest text-xs transition-all active:scale-95"
+                className="flex-1"
               >
                 CANCELAR
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={handleDevolver}
-                className="flex-1 py-4 bg-[#D97706] hover:bg-[#B45309] text-white rounded-xl font-bold uppercase tracking-widest text-xs transition-all active:scale-95"
+                className="flex-1 bg-warning text-white hover:brightness-95 border-none"
               >
                 CONFIRMAR
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

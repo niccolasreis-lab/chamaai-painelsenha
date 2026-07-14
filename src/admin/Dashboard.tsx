@@ -4,6 +4,21 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import AdminLayout from './AdminLayout';
 import { getApiUrl } from '../shared/apiConfig';
 import OnboardingWizard from './OnboardingWizard';
+import {
+  RefreshCw,
+  AlertTriangle,
+  Ticket,
+  TrendingUp,
+  Hourglass,
+  Users,
+  CheckCircle2,
+  Zap,
+  XCircle,
+  Sparkles,
+  RotateCcw
+} from 'lucide-react';
+import { Button } from '../shared/components/Button';
+import { StatusBadge } from '../shared/components/StatusBadge';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -18,7 +33,7 @@ export default function Dashboard() {
   
   const [chartDataHora, setChartDataHora] = useState<any[]>([]);
   const [chartDataBalcao, setChartDataBalcao] = useState<any[]>([]);
-  const COLORS = ['#2563eb', '#16a34a', '#dc2626', '#ca8a04', '#9333ea', '#db2777'];
+  const COLORS = ['#3525CD', '#059669', '#dc2626', '#d97706', '#00687A', '#7e3000'];
 
   const API_URL = getApiUrl();
 
@@ -79,124 +94,123 @@ export default function Dashboard() {
       {showWizard && (
         <OnboardingWizard onComplete={() => setShowWizard(false)} />
       )}
-      <div className="max-w-7xl mx-auto space-y-8 font-sans">
+      <div className="max-w-7xl mx-auto space-y-6 font-sans">
         {/* Page Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
-            <h1 className="font-sans text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">Dashboard</h1>
-            <p className="text-ink-secondary mt-2 text-lg font-semibold text-primary tracking-widest">Métricas em tempo real da fila</p>
+            <h1 className="font-display text-2xl font-bold text-ink leading-tight">Dashboard</h1>
+            <p className="text-primary text-sm font-semibold mt-1">Métricas em tempo real da fila</p>
           </div>
-          <button 
+          <Button 
+            variant="secondary"
+            size="sm"
             onClick={fetchStats} 
-            className="bg-surface-variant text-ink px-6 py-3 rounded-xl font-bold border border-outline-variant hover:bg-outline-variant transition-all active:scale-95 flex items-center gap-2 outline-none uppercase tracking-widest text-xs"
+            icon={<RefreshCw className="h-4 w-4" />}
           >
-            <span className="material-symbols-outlined text-sm">refresh</span>
             Atualizar
-          </button>
+          </Button>
         </div>
 
         {isNewInstall && (
-          <div className="bg-amber-500/10 border-l-4 border-amber-500 p-6 rounded-r-2xl shadow-sm flex items-start gap-4 animate-pulse">
-            <span className="material-symbols-outlined text-amber-500 text-3xl shrink-0 mt-1">warning</span>
+          <div className="bg-error-container border-l-4 border-error p-5 rounded-r-md shadow-sm flex items-start gap-4 animate-pulse">
+            <AlertTriangle className="text-error h-6 w-6 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h3 className="text-base font-bold text-amber-800 tracking-widest leading-none">⚠️ aviso: altere suas credenciais padrão</h3>
-              <p className="text-xs text-amber-700 font-semibold mt-2 leading-relaxed">
-                Este sistema está rodando com as credenciais administrativas originais de fábrica (<b>admin</b> / <b>admin</b>). Para garantir a integridade absoluta dos seus relatórios, preços e acessos remotos, por favor, <Link to="/admin/operators" className="underline font-bold text-amber-900 hover:text-black">CLIQUE AQUI</Link> ou vá em <b>Operadores</b> para atualizar a senha do administrador agora mesmo!
+              <h3 className="text-sm font-bold text-error-ink">Aviso: altere suas credenciais padrão</h3>
+              <p className="text-xs text-ink-variant mt-1.5 leading-relaxed">
+                Este sistema está rodando com as credenciais administrativas originais de fábrica (<b>admin</b> / <b>admin</b>). Para garantir a integridade absoluta dos seus relatórios, preços e acessos remotos, por favor, <Link to="/admin/operators" className="underline font-bold text-error-ink hover:text-ink">CLIQUE AQUI</Link> ou vá em <b>Operadores</b> para atualizar a senha do administrador agora mesmo!
               </p>
             </div>
           </div>
         )}
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Metric 1: Total */}
-          <div className="bg-surface rounded-[24px] p-8 shadow-sm border border-outline-variant/50 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-bl-[64px] -mr-8 -mt-8 group-hover:bg-primary/10 transition-colors"></div>
-            <p className="font-bold text-xs text-ink-secondary uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-              <span className="material-symbols-outlined text-sm text-primary">confirmation_number</span>
+          <div className="bg-surface rounded-md p-6 shadow-sm border border-outline-variant relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-bl-full -mr-4 -mt-4 group-hover:bg-primary/10 transition-colors"></div>
+            <p className="font-semibold text-xs text-ink-variant uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Ticket className="h-4 w-4 text-primary" />
               Total Emitidas
             </p>
-            <span className="font-sans text-[56px] font-black text-ink leading-none">{stats.total}</span>
-            <div className="mt-4 flex items-center text-success font-bold text-[10px] uppercase tracking-widest">
-              <span className="material-symbols-outlined text-sm mr-1">trending_up</span>
+            <span className="font-display text-4xl font-bold text-ink leading-none">{stats.total}</span>
+            <div className="mt-4 flex items-center text-success font-semibold text-xs">
+              <TrendingUp className="h-4 w-4 mr-1 text-success" />
               Fluxo Normal
             </div>
           </div>
 
           {/* Metric 2: Aguardando */}
-          <div className="bg-surface rounded-[24px] p-8 shadow-sm border border-primary/20 relative overflow-hidden group border-b-8 border-b-primary">
-            <p className="font-bold text-xs text-primary uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-              <span className="material-symbols-outlined text-sm">hourglass_empty</span>
+          <div className="bg-surface rounded-md p-6 shadow-sm border border-primary relative overflow-hidden group border-b-4">
+            <p className="font-semibold text-xs text-primary uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Hourglass className="h-4 w-4 text-primary animate-pulse" />
               Em Espera
             </p>
-            <span className="font-sans text-[56px] font-black text-primary leading-none">{stats.aguardando}</span>
-            <div className="mt-4 flex items-center text-primary font-bold text-[10px] uppercase tracking-widest">
-              <span className="material-symbols-outlined text-sm mr-1">group</span>
+            <span className="font-display text-4xl font-bold text-primary leading-none">{stats.aguardando}</span>
+            <div className="mt-4 flex items-center text-primary font-semibold text-xs">
+              <Users className="h-4 w-4 mr-1 text-primary" />
               Pessoas na fila
             </div>
           </div>
 
           {/* Metric 3: Atendidas */}
-          <div className="bg-surface rounded-[24px] p-8 shadow-sm border border-success/20 relative overflow-hidden group border-b-8 border-b-success">
-            <p className="font-bold text-xs text-success uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-              <span className="material-symbols-outlined text-sm">check_circle</span>
+          <div className="bg-surface rounded-md p-6 shadow-sm border border-success relative overflow-hidden group border-b-4">
+            <p className="font-semibold text-xs text-success uppercase tracking-wider mb-4 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-success" />
               Atendidas
             </p>
-            <span className="font-sans text-[56px] font-black text-ink leading-none">{stats.atendidos}</span>
-            <div className="mt-4 flex items-center text-success font-bold text-[10px] uppercase tracking-widest">
-              <span className="material-symbols-outlined text-sm mr-1">speed</span>
+            <span className="font-display text-4xl font-bold text-ink leading-none">{stats.atendidos}</span>
+            <div className="mt-4 flex items-center text-success font-semibold text-xs">
+              <Zap className="h-4 w-4 mr-1 text-success" />
               Alta Eficiência
             </div>
           </div>
 
           {/* Metric 4: Canceladas */}
-          <div className="bg-surface rounded-[24px] p-8 shadow-sm border border-error/20 relative overflow-hidden group border-b-8 border-b-error">
-            <p className="font-bold text-xs text-error uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-              <span className="material-symbols-outlined text-sm">cancel</span>
+          <div className="bg-surface rounded-md p-6 shadow-sm border border-error relative overflow-hidden group border-b-4">
+            <p className="font-semibold text-xs text-error uppercase tracking-wider mb-4 flex items-center gap-2">
+              <XCircle className="h-4 w-4 text-error" />
               Canceladas
             </p>
-            <span className="font-sans text-[56px] font-black text-ink leading-none">{stats.cancelados}</span>
-            <div className="mt-4 flex items-center text-error font-bold text-[10px] uppercase tracking-widest">
-              <span className="material-symbols-outlined text-sm mr-1">block</span>
+            <span className="font-display text-4xl font-bold text-ink leading-none">{stats.cancelados}</span>
+            <div className="mt-4 flex items-center text-error font-semibold text-xs">
+              <XCircle className="h-4 w-4 mr-1 text-error" />
               No-shows
             </div>
           </div>
         </div>
 
         {/* Bottom Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-2 bg-surface rounded-[32px] p-8 border border-outline-variant/50 shadow-sm flex flex-col gap-6">
-            <h3 className="font-sans text-xl font-bold text-ink tracking-widest">Atendimentos por hora</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 bg-surface rounded-md p-6 border border-outline-variant shadow-sm flex flex-col gap-4">
+            <h3 className="font-display text-lg font-bold text-ink">Atendimentos por hora</h3>
             <div className="flex-1 min-h-[250px] w-full">
               {chartDataHora.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartDataHora} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorQuant" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#3525CD" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#3525CD" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="hora" tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false} />
-                    <YAxis tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#c7c4d8" />
+                    <XAxis dataKey="hora" tick={{fontSize: 12, fill: '#464555'}} axisLine={false} tickLine={false} />
+                    <YAxis tick={{fontSize: 12, fill: '#464555'}} axisLine={false} tickLine={false} />
                     <RechartsTooltip 
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                      labelStyle={{ fontWeight: 'bold', color: '#0f172a' }}
+                      contentStyle={{ borderRadius: '6px', border: '1px solid #c7c4d8', boxShadow: 'var(--shadow-md)' }}
+                      labelStyle={{ fontWeight: 'bold', color: '#1B1B24' }}
                     />
-                    <Area type="monotone" dataKey="quantidade" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorQuant)" />
+                    <Area type="monotone" dataKey="quantidade" stroke="#3525CD" strokeWidth={3} fillOpacity={1} fill="url(#colorQuant)" />
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex items-center justify-center text-ink-secondary text-sm font-bold uppercase tracking-widest">
-                  Sem dados suficientes
-                </div>
+                <StatusBadge variant="empty" message="Sem dados suficientes de atendimentos por hora" className="h-full py-6" />
               )}
             </div>
           </div>
 
-          <div className="bg-surface rounded-[32px] p-8 border border-outline-variant/50 shadow-sm flex flex-col gap-6">
-            <h3 className="font-sans text-xl font-bold text-ink tracking-widest">Por balcão</h3>
+          <div className="bg-surface rounded-md p-6 border border-outline-variant shadow-sm flex flex-col gap-4">
+            <h3 className="font-display text-lg font-bold text-ink">Por balcão</h3>
             <div className="flex-1 min-h-[250px] w-full relative">
               {chartDataBalcao.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -215,28 +229,30 @@ export default function Dashboard() {
                       ))}
                     </Pie>
                     <RechartsTooltip 
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                      contentStyle={{ borderRadius: '6px', border: '1px solid #c7c4d8', boxShadow: 'var(--shadow-md)' }}
                       itemStyle={{ fontWeight: 'bold' }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex items-center justify-center text-ink-secondary text-sm font-bold uppercase tracking-widest">
-                  Sem dados
-                </div>
+                <StatusBadge variant="empty" message="Sem dados por balcão" className="h-full py-6" />
               )}
             </div>
           </div>
           
           {/* Version Card */}
-          <div className="bg-surface rounded-[32px] p-8 border border-outline-variant/50 shadow-sm flex flex-col items-center justify-center text-center group">
-            <span className="material-symbols-outlined text-5xl text-primary mb-4">new_releases</span>
-            <h3 className="font-sans text-2xl font-bold text-ink tracking-widest mb-2">Versão do sistema</h3>
-            <div className="bg-primary/10 text-primary px-6 py-2 rounded-full font-black text-xl tracking-[0.3em] border border-primary/20 mb-6">
+          <div className="bg-surface rounded-md p-6 border border-outline-variant shadow-sm flex flex-col items-center justify-center text-center group col-span-1 md:col-span-3 lg:col-span-1">
+            <Sparkles className="h-10 w-10 text-primary mb-3" />
+            <h3 className="font-display text-lg font-bold text-ink mb-1">Versão do sistema</h3>
+            <div className="bg-primary/10 text-primary px-4 py-1.5 rounded-full font-bold text-lg border border-primary/20 mb-4">
               v{appVersion}
             </div>
             
-            <button 
+            <Button 
+              variant="danger"
+              size="sm"
+              className="w-full"
+              icon={<RotateCcw className="h-4 w-4" />}
               onClick={async () => {
                 if(window.confirm('⚠️ ATENÇÃO: Deseja realmente ZERAR todas as senhas?\n\nIsso voltará o contador para 001 e limpará a fila de espera atual.')) {
                   try {
@@ -250,12 +266,10 @@ export default function Dashboard() {
                   }
                 }
               }}
-              className="w-full py-3 bg-error/10 text-error rounded-xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-error/20 active:scale-95 transition-all"
             >
-              <span className="material-symbols-outlined text-sm">restart_alt</span>
               Zerar Senhas
-            </button>
-            <p className="text-ink-secondary text-[10px] font-bold uppercase tracking-widest mt-4">Atualizações automáticas ativas</p>
+            </Button>
+            <p className="text-ink-variant text-[10px] font-bold uppercase tracking-wider mt-3">Atualizações automáticas ativas</p>
           </div>
         </div>
       </div>

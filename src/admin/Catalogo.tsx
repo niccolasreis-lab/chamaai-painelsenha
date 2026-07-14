@@ -1,6 +1,18 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
 import { getApiUrl } from '../shared/apiConfig';
+import {
+  PlusCircle,
+  Tag,
+  Search,
+  Edit,
+  Trash2,
+  AlertTriangle
+} from 'lucide-react';
+import { Button } from '../shared/components/Button';
+import { Input } from '../shared/components/Input';
+import { Dialog } from '../shared/components/Dialog';
+import { StatusBadge } from '../shared/components/StatusBadge';
 
 interface Categoria {
   id: number;
@@ -343,55 +355,53 @@ export default function Catalogo() {
 
   return (
     <AdminLayout>
-      <div className="max-w-6xl mx-auto space-y-8 font-sans">
+      <div className="max-w-6xl mx-auto space-y-6 font-sans">
         
         {/* Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h1 className="font-sans text-[48px] font-bold text-ink leading-tight uppercase tracking-widest">Catálogo</h1>
-            <p className="text-ink-secondary mt-2 text-lg font-semibold tracking-wider">
+            <h1 className="font-display text-2xl font-bold text-ink leading-tight">Catálogo</h1>
+            <p className="text-ink-variant text-sm mt-1">
               Gestão unificada de produtos a granel e categorias de balança
             </p>
           </div>
           <div>
             {activeTab === 'produtos' ? (
-              <button 
+              <Button 
                 onClick={openAddProd}
-                className="px-6 py-3 bg-primary text-white rounded-xl font-bold shadow-lg hover:bg-primary-hover transition-all flex items-center gap-2 uppercase tracking-widest text-sm"
+                icon={<PlusCircle className="h-4 w-4" />}
               >
-                <span className="material-symbols-outlined">add_circle</span>
                 Novo Produto
-              </button>
+              </Button>
             ) : (
-              <button 
+              <Button 
                 onClick={openAddCat}
-                className="px-6 py-3 bg-primary text-white rounded-xl font-bold shadow-lg hover:bg-primary-hover transition-all flex items-center gap-2 uppercase tracking-widest text-sm"
+                icon={<Tag className="h-4 w-4" />}
               >
-                <span className="material-symbols-outlined">category</span>
                 Nova Categoria
-              </button>
+              </Button>
             )}
           </div>
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-outline-variant/30">
+        <div className="flex border-b border-outline-variant">
           <button
             onClick={() => setActiveTab('produtos')}
-            className={`px-8 py-4 font-bold uppercase tracking-widest border-b-4 transition-all text-sm ${
+            className={`px-6 py-3 font-bold border-b-2 transition-all text-sm outline-none ${
               activeTab === 'produtos' 
                 ? 'border-primary text-primary' 
-                : 'border-transparent text-ink-secondary hover:text-ink'
+                : 'border-transparent text-ink-variant hover:text-ink'
             }`}
           >
             Produtos
           </button>
           <button
             onClick={() => setActiveTab('categorias')}
-            className={`px-8 py-4 font-bold uppercase tracking-widest border-b-4 transition-all text-sm ${
+            className={`px-6 py-3 font-bold border-b-2 transition-all text-sm outline-none ${
               activeTab === 'categorias' 
                 ? 'border-primary text-primary' 
-                : 'border-transparent text-ink-secondary hover:text-ink'
+                : 'border-transparent text-ink-variant hover:text-ink'
             }`}
           >
             Categorias
@@ -400,24 +410,26 @@ export default function Catalogo() {
 
         {/* TAB PRODUTOS */}
         {activeTab === 'produtos' && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Filtros */}
-            <div className="flex flex-col md:flex-row gap-4 bg-surface p-6 rounded-3xl border border-outline-variant/50 shadow-sm">
-              <div className="flex-1 flex items-center bg-surface-variant rounded-xl px-4 py-2 border border-outline-variant/50 focus-within:border-primary/50 transition-colors">
-                <span className="material-symbols-outlined text-ink-secondary mr-2">search</span>
+            <div className="flex flex-col md:flex-row gap-4 bg-surface p-4 rounded-md border border-outline-variant shadow-sm">
+              <div className="flex-1 flex items-center bg-surface-container-low rounded-md px-3 py-1.5 border border-outline-variant focus-within:border-primary transition-colors">
+                <Search className="h-4 w-4 text-ink-variant mr-2" />
                 <input 
                   type="text" 
                   value={search}
                   onChange={e => { setSearch(e.target.value); setPage(1); }}
                   placeholder="Buscar produto por nome ou PLU..." 
-                  className="bg-transparent border-none w-full focus:ring-0 text-sm text-ink placeholder-text-secondary outline-none font-semibold" 
+                  className="bg-transparent border-none w-full focus:ring-0 text-sm text-ink placeholder-outline outline-none font-medium" 
+                  aria-label="Buscar produto por nome ou PLU"
                 />
               </div>
               <div className="w-full md:w-64">
                 <select
                   value={filterCat}
                   onChange={e => { setFilterCat(e.target.value); setPage(1); }}
-                  className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold"
+                  className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  aria-label="Filtrar por Categoria"
                 >
                   <option value="">Todas as Categorias</option>
                   {categorias.map(c => (
@@ -429,103 +441,108 @@ export default function Catalogo() {
 
             {/* Listagem */}
             {loadingProds ? (
-              <div className="py-20 text-center text-xl font-bold text-ink-secondary animate-pulse uppercase tracking-widest">Carregando produtos...</div>
+              <StatusBadge variant="loading" />
             ) : produtos.length === 0 ? (
-              <div className="bg-surface rounded-3xl p-12 border border-outline-variant/50 shadow-sm text-center">
-                <span className="material-symbols-outlined text-5xl text-outline mb-2">inventory</span>
-                <p className="text-xl font-bold text-ink-secondary">Nenhum produto cadastrado ou encontrado.</p>
-              </div>
+              <StatusBadge variant="empty" message="Nenhum produto cadastrado ou encontrado." />
             ) : (
-              <div className="bg-surface rounded-3xl border border-outline-variant/50 shadow-sm overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-surface-variant/50 border-b border-outline-variant/30 text-ink-secondary text-xs font-bold uppercase tracking-widest">
-                      <th className="p-6">PLU</th>
-                      <th className="p-6">Nome / Descrição</th>
-                      <th className="p-6">Categoria</th>
-                      <th className="p-6 text-right">Preço</th>
-                      <th className="p-6 text-center">Unidade</th>
-                      <th className="p-6 text-center">Status</th>
-                      <th className="p-6 text-center">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-outline-variant/20">
-                    {produtos.map(p => {
-                      const catName = categorias.find(c => c.id === p.categoria_id);
-                      return (
-                        <tr key={p.id} className="hover:bg-surface-variant/20 transition-colors text-ink font-semibold">
-                          <td className="p-6 text-primary font-mono">{p.plu || '-'}</td>
-                          <td className="p-6">
-                            <p className="text-ink font-bold text-base">{p.nome}</p>
-                            {p.descricao && <p className="text-xs text-ink-secondary font-medium truncate max-w-sm mt-0.5">{p.descricao}</p>}
-                          </td>
-                          <td className="p-6">
-                            {catName ? (
-                              <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold">
-                                {catName.emoji} {catName.nome}
+              <div className="bg-surface rounded-md border border-outline-variant shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-surface-container-low border-b border-outline-variant text-ink-variant text-xs font-bold uppercase tracking-wider">
+                        <th className="p-4">PLU</th>
+                        <th className="p-4">Nome / Descrição</th>
+                        <th className="p-4">Categoria</th>
+                        <th className="p-4 text-right">Preço</th>
+                        <th className="p-4 text-center">Unidade</th>
+                        <th className="p-4 text-center">Status</th>
+                        <th className="p-4 text-center">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/20">
+                      {produtos.map(p => {
+                        const catName = categorias.find(c => c.id === p.categoria_id);
+                        return (
+                          <tr key={p.id} className="hover:bg-surface-container-low transition-colors text-ink font-semibold">
+                            <td className="p-4 text-primary font-mono text-sm">{p.plu || '-'}</td>
+                            <td className="p-4">
+                              <p className="text-ink font-bold text-sm">{p.nome}</p>
+                              {p.descricao && <p className="text-xs text-ink-variant font-medium truncate max-w-sm mt-0.5">{p.descricao}</p>}
+                            </td>
+                            <td className="p-4">
+                              {catName ? (
+                                <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-semibold">
+                                  {catName.emoji} {catName.nome}
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-surface-container text-ink-variant rounded-full text-xs font-semibold">
+                                  📦 {p.categoria_legada || 'Sem categoria'}
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-4 text-right font-mono text-sm text-ink">
+                              R$ {(p.preco / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="p-4 text-center lowercase text-xs font-semibold text-ink-variant">{p.unidade || 'kg'}</td>
+                            <td className="p-4 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                p.status === 1 ? 'bg-success/10 text-success border border-success/20' : 'bg-error/10 text-error border border-error/20'
+                              }`}>
+                                {p.status === 1 ? 'Ativo' : 'Inativo'}
                               </span>
-                            ) : (
-                              <span className="px-3 py-1 bg-surface-variant text-ink-secondary rounded-full text-xs font-bold">
-                                📦 {p.categoria_legada || 'Sem categoria'}
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-6 text-right font-mono text-ink">
-                            R$ {(p.preco / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                          <td className="p-6 text-center lowercase text-sm font-bold text-ink-secondary">{p.unidade || 'kg'}</td>
-                          <td className="p-6 text-center">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                              p.status === 1 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
-                            }`}>
-                              {p.status === 1 ? 'Ativo' : 'Inativo'}
-                            </span>
-                          </td>
-                          <td className="p-6 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <button 
-                                onClick={() => openEditProd(p)}
-                                className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors outline-none"
-                                title="Editar"
-                              >
-                                <span className="material-symbols-outlined text-lg">edit</span>
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteProd(p.id)}
-                                className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors outline-none"
-                                title="Deletar"
-                              >
-                                <span className="material-symbols-outlined text-lg">delete</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                            <td className="p-4 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <Button 
+                                  variant="ghost"
+                                  size="sm"
+                                  className="px-2"
+                                  onClick={() => openEditProd(p)}
+                                  title="Editar"
+                                >
+                                  <Edit className="h-4 w-4 text-primary" />
+                                </Button>
+                                <Button 
+                                  variant="ghost"
+                                  size="sm"
+                                  className="px-2"
+                                  onClick={() => handleDeleteProd(p.id)}
+                                  title="Deletar"
+                                >
+                                  <Trash2 className="h-4 w-4 text-error" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
                 
                 {/* Paginação */}
                 {totalPages > 1 && (
-                  <div className="p-6 flex items-center justify-between border-t border-outline-variant/30 bg-surface">
-                    <span className="text-sm font-semibold text-ink-secondary uppercase tracking-wider">
+                  <div className="p-4 flex items-center justify-between border-t border-outline-variant bg-surface">
+                    <span className="text-xs font-bold text-ink-variant uppercase tracking-wider">
                       Página {page} de {totalPages}
                     </span>
                     <div className="flex gap-2">
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         disabled={page === 1}
                         onClick={() => setPage(page - 1)}
-                        className="px-4 py-2 border border-outline-variant/50 rounded-xl font-bold uppercase tracking-widest text-xs disabled:opacity-50 hover:bg-surface-variant/30 transition-colors"
                       >
                         Anterior
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
                         disabled={page === totalPages}
                         onClick={() => setPage(page + 1)}
-                        className="px-4 py-2 bg-primary text-white rounded-xl font-bold uppercase tracking-widest text-xs disabled:opacity-50 hover:bg-primary-hover transition-colors shadow-sm"
                       >
                         Próxima
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -536,72 +553,75 @@ export default function Catalogo() {
 
         {/* TAB CATEGORIAS */}
         {activeTab === 'categorias' && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {loadingCats ? (
-              <div className="py-20 text-center text-xl font-bold text-ink-secondary animate-pulse uppercase tracking-widest">Carregando categorias...</div>
+              <StatusBadge variant="loading" />
             ) : categorias.length === 0 ? (
-              <div className="bg-surface rounded-3xl p-12 border border-outline-variant/50 shadow-sm text-center">
-                <span className="material-symbols-outlined text-5xl text-outline mb-2">category</span>
-                <p className="text-xl font-bold text-ink-secondary">Nenhuma categoria cadastrada.</p>
-              </div>
+              <StatusBadge variant="empty" message="Nenhuma categoria cadastrada." />
             ) : (
-              <div className="bg-surface rounded-3xl border border-outline-variant/50 shadow-sm overflow-hidden animate-fade-in">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-surface-variant/50 border-b border-outline-variant/30 text-ink-secondary text-xs font-bold uppercase tracking-widest">
-                      <th className="p-6 text-center w-20">Emoji</th>
-                      <th className="p-6">Nome</th>
-                      <th className="p-6">Slug</th>
-                      <th className="p-6">Setor / Tipo</th>
-                      <th className="p-6 text-center w-24">Ordem</th>
-                      <th className="p-6 text-center w-32">Status</th>
-                      <th className="p-6 text-center w-36">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-outline-variant/20">
-                    {categorias.map(c => (
-                      <tr key={c.id} className="hover:bg-surface-variant/20 transition-colors text-ink font-semibold">
-                        <td className="p-6 text-center text-2xl">{c.emoji || '📦'}</td>
-                        <td className="p-6">
-                          <p className="text-ink font-bold text-base">{c.nome}</p>
-                          {c.descricao && <p className="text-xs text-ink-secondary font-medium truncate max-w-sm mt-0.5">{c.descricao}</p>}
-                        </td>
-                        <td className="p-6 font-mono text-xs text-ink-secondary">{c.slug}</td>
-                        <td className="p-6">
-                          <span className="px-3 py-1 bg-surface-variant text-ink rounded-full text-xs font-bold uppercase tracking-wider">
-                            {c.setor || 'Geral'}
-                          </span>
-                        </td>
-                        <td className="p-6 text-center font-mono">{c.ordem}</td>
-                        <td className="p-6 text-center">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                            c.ativo === 1 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
-                          }`}>
-                            {c.ativo === 1 ? 'Ativa' : 'Inativa'}
-                          </span>
-                        </td>
-                        <td className="p-6 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <button 
-                              onClick={() => openEditCat(c)}
-                              className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors outline-none"
-                              title="Editar"
-                            >
-                              <span className="material-symbols-outlined text-lg">edit</span>
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteCat(c)}
-                              className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors outline-none"
-                              title="Excluir"
-                            >
-                              <span className="material-symbols-outlined text-lg">delete</span>
-                            </button>
-                          </div>
-                        </td>
+              <div className="bg-surface rounded-md border border-outline-variant shadow-sm overflow-hidden animate-fade-in">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-surface-container-low border-b border-outline-variant text-ink-variant text-xs font-bold uppercase tracking-wider">
+                        <th className="p-4 text-center w-20">Emoji</th>
+                        <th className="p-4">Nome</th>
+                        <th className="p-4">Slug</th>
+                        <th className="p-4">Setor / Tipo</th>
+                        <th className="p-4 text-center w-24">Ordem</th>
+                        <th className="p-4 text-center w-32">Status</th>
+                        <th className="p-4 text-center w-36">Ações</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/20">
+                      {categorias.map(c => (
+                        <tr key={c.id} className="hover:bg-surface-container-low transition-colors text-ink font-semibold">
+                          <td className="p-4 text-center text-xl">{c.emoji || '📦'}</td>
+                          <td className="p-4">
+                            <p className="text-ink font-bold text-sm">{c.nome}</p>
+                            {c.descricao && <p className="text-xs text-ink-variant font-medium truncate max-w-sm mt-0.5">{c.descricao}</p>}
+                          </td>
+                          <td className="p-4 font-mono text-xs text-ink-variant">{c.slug}</td>
+                          <td className="p-4">
+                            <span className="px-2 py-0.5 bg-surface-container text-ink rounded-full text-xs font-semibold uppercase tracking-wider">
+                              {c.setor || 'Geral'}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center font-mono text-sm">{c.ordem}</td>
+                          <td className="p-4 text-center">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                              c.ativo === 1 ? 'bg-success/10 text-success border border-success/20' : 'bg-error/10 text-error border border-error/20'
+                            }`}>
+                              {c.ativo === 1 ? 'Ativa' : 'Inativa'}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <Button 
+                                variant="ghost"
+                                size="sm"
+                                className="px-2"
+                                onClick={() => openEditCat(c)}
+                                title="Editar"
+                              >
+                                <Edit className="h-4 w-4 text-primary" />
+                              </Button>
+                              <Button 
+                                variant="ghost"
+                                size="sm"
+                                className="px-2"
+                                onClick={() => handleDeleteCat(c)}
+                                title="Excluir"
+                              >
+                                <Trash2 className="h-4 w-4 text-error" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -609,183 +629,227 @@ export default function Catalogo() {
 
         {/* Modal Produto (Criar / Editar) */}
         {showProdModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-surface w-full max-w-lg rounded-[32px] p-8 shadow-2xl border border-outline-variant/50 animate-scale-up max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="font-sans text-2xl font-bold text-ink tracking-wider">
-                  {editingProd ? 'Editar Produto' : 'Novo Produto'}
-                </h2>
-                <button onClick={() => setShowProdModal(false)} className="text-ink-secondary hover:text-ink outline-none">
-                  <span className="material-symbols-outlined">close</span>
-                </button>
+          <Dialog 
+            open={showProdModal} 
+            onClose={() => setShowProdModal(false)} 
+            title={editingProd ? 'Editar Produto' : 'Novo Produto'}
+          >
+            <form onSubmit={handleSaveProd} className="space-y-4">
+              <Input 
+                required 
+                label="Nome do Produto *"
+                value={prodForm.nome} 
+                onChange={e => setProdForm({...prodForm, nome: e.target.value})} 
+                placeholder="Ex: Picanha Argentina" 
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <Input 
+                  label="Código PLU (Toledo)"
+                  value={prodForm.plu} 
+                  onChange={e => setProdForm({...prodForm, plu: e.target.value})} 
+                  placeholder="Ex: 501" 
+                />
+                <Input 
+                  required 
+                  label="Preço (R$) *"
+                  type="number" 
+                  step="0.01" 
+                  value={prodForm.preco} 
+                  onChange={e => setProdForm({...prodForm, preco: e.target.value})} 
+                  placeholder="0.00" 
+                />
               </div>
-              <form onSubmit={handleSaveProd} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Nome do Produto *</label>
-                  <input required value={prodForm.nome} onChange={e => setProdForm({...prodForm, nome: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="text" placeholder="Ex: Picanha Argentina" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Código PLU (Toledo)</label>
-                    <input value={prodForm.plu} onChange={e => setProdForm({...prodForm, plu: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="text" placeholder="Ex: 501" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Preço (R$) *</label>
-                    <input required value={prodForm.preco} onChange={e => setProdForm({...prodForm, preco: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="number" step="0.01" placeholder="0.00" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Estoque inicial</label>
-                    <input value={prodForm.estoque} onChange={e => setProdForm({...prodForm, estoque: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="number" step="0.01" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Unidade de Medida</label>
-                    <select value={prodForm.unidade} onChange={e => setProdForm({...prodForm, unidade: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold">
-                      <option value="kg">Quilo (kg)</option>
-                      <option value="un">Unidade (un)</option>
-                      <option value="g">Grama (g)</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Categoria Vinculada</label>
-                  <select value={prodForm.categoria_id} onChange={e => setProdForm({...prodForm, categoria_id: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold">
-                    <option value="">Sem Categoria (Geral)</option>
-                    {categorias.map(c => (
-                      <option key={c.id} value={c.id}>{c.emoji} {c.nome}</option>
-                    ))}
+              <div className="grid grid-cols-2 gap-4">
+                <Input 
+                  label="Estoque inicial"
+                  type="number" 
+                  step="0.01"
+                  value={prodForm.estoque} 
+                  onChange={e => setProdForm({...prodForm, estoque: e.target.value})} 
+                />
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="prodUnidade" className="text-sm font-medium text-ink">Unidade de Medida</label>
+                  <select 
+                    id="prodUnidade"
+                    value={prodForm.unidade} 
+                    onChange={e => setProdForm({...prodForm, unidade: e.target.value})} 
+                    className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  >
+                    <option value="kg">Quilo (kg)</option>
+                    <option value="un">Unidade (un)</option>
+                    <option value="g">Grama (g)</option>
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Ordem de exibição</label>
-                    <input value={prodForm.ordem} onChange={e => setProdForm({...prodForm, ordem: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="number" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Tags (separadas por vírgula)</label>
-                    <input value={prodForm.tags} onChange={e => setProdForm({...prodForm, tags: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="text" placeholder="Ex: oferta, premium" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Descrição detalhada</label>
-                  <textarea value={prodForm.descricao} onChange={e => setProdForm({...prodForm, descricao: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold h-20 resize-none" placeholder="Descrição do produto para o catálogo digital" />
-                </div>
-                <div className="flex items-center space-x-3 bg-surface-variant/30 p-3 rounded-xl border border-outline-variant/30">
-                  <input id="prodStatus" type="checkbox" checked={prodForm.status} onChange={e => setProdForm({...prodForm, status: e.target.checked})} className="w-5 h-5 rounded text-primary focus:ring-primary border-outline-variant/50 cursor-pointer" />
-                  <label htmlFor="prodStatus" className="text-sm font-bold text-ink cursor-pointer select-none">Produto ativo para exibição</label>
-                </div>
-                <button type="submit" className="w-full py-4 bg-primary text-white rounded-2xl font-bold mt-6 hover:bg-primary-hover shadow-lg transition-all uppercase tracking-widest">
-                  {editingProd ? 'Atualizar Produto' : 'Criar Produto'}
-                </button>
-              </form>
-            </div>
-          </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="prodCategoria" className="text-sm font-medium text-ink">Categoria Vinculada</label>
+                <select 
+                  id="prodCategoria"
+                  value={prodForm.categoria_id} 
+                  onChange={e => setProdForm({...prodForm, categoria_id: e.target.value})} 
+                  className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  <option value="">Sem Categoria (Geral)</option>
+                  {categorias.map(c => (
+                    <option key={c.id} value={c.id}>{c.emoji} {c.nome}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Input 
+                  label="Ordem de exibição"
+                  type="number"
+                  value={prodForm.ordem} 
+                  onChange={e => setProdForm({...prodForm, ordem: e.target.value})} 
+                />
+                <Input 
+                  label="Tags (separadas por vírgula)"
+                  value={prodForm.tags} 
+                  onChange={e => setProdForm({...prodForm, tags: e.target.value})} 
+                  placeholder="Ex: oferta, premium" 
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="prodDescricao" className="text-sm font-medium text-ink">Descrição detalhada</label>
+                <textarea 
+                  id="prodDescricao"
+                  value={prodForm.descricao} 
+                  onChange={e => setProdForm({...prodForm, descricao: e.target.value})} 
+                  className="w-full bg-surface-container border border-outline-variant/50 rounded-sm px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold h-20 resize-none text-sm" 
+                  placeholder="Descrição do produto para o catálogo digital" 
+                />
+              </div>
+              <label className="flex items-center gap-3 p-3 bg-surface-container-low rounded-md cursor-pointer hover:border-primary border border-transparent transition-all">
+                <input id="prodStatus" type="checkbox" checked={prodForm.status} onChange={e => setProdForm({...prodForm, status: e.target.checked})} className="w-5 h-5 rounded text-primary focus:ring-primary border-outline-variant/50 cursor-pointer" />
+                <span className="text-sm font-bold text-ink cursor-pointer select-none">Produto ativo para exibição</span>
+              </label>
+              <Button type="submit" className="w-full mt-6">
+                {editingProd ? 'Atualizar Produto' : 'Criar Produto'}
+              </Button>
+            </form>
+          </Dialog>
         )}
 
         {/* Modal Categoria (Criar / Editar) */}
         {showCatModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-surface w-full max-w-md rounded-[32px] p-8 shadow-2xl border border-outline-variant/50 animate-scale-up">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="font-sans text-2xl font-bold text-ink tracking-wider font-bold">
-                  {editingCat ? 'Editar Categoria' : 'Nova Categoria'}
-                </h2>
-                <button onClick={() => setShowCatModal(false)} className="text-ink-secondary hover:text-ink outline-none">
-                  <span className="material-symbols-outlined">close</span>
-                </button>
+          <Dialog 
+            open={showCatModal} 
+            onClose={() => setShowCatModal(false)} 
+            title={editingCat ? 'Editar Categoria' : 'Nova Categoria'}
+          >
+            <form onSubmit={handleSaveCat} className="space-y-4">
+              <div className="grid grid-cols-4 gap-4">
+                <div className="col-span-1">
+                  <Input 
+                    required 
+                    label="Emoji"
+                    value={catForm.emoji} 
+                    onChange={e => setCatForm({...catForm, emoji: e.target.value})} 
+                    placeholder="🧀" 
+                    maxLength={4} 
+                    className="text-center"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <Input 
+                    required 
+                    label="Nome da Categoria"
+                    value={catForm.nome} 
+                    onChange={e => setCatForm({...catForm, nome: e.target.value})} 
+                    placeholder="Ex: Frios e Queijos" 
+                  />
+                </div>
               </div>
-              <form onSubmit={handleSaveCat} className="space-y-4">
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="col-span-1">
-                    <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase text-center">Emoji</label>
-                    <input required value={catForm.emoji} onChange={e => setCatForm({...catForm, emoji: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl py-3 focus:outline-none focus:border-primary text-2xl text-center font-bold" type="text" placeholder="Ex: 🧀" maxLength={4} />
-                  </div>
-                  <div className="col-span-3">
-                    <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Nome da Categoria *</label>
-                    <input required value={catForm.nome} onChange={e => setCatForm({...catForm, nome: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="text" placeholder="Ex: Frios e Queijos" />
-                  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="catSetor" className="text-sm font-medium text-ink">Setor / Departamento</label>
+                  <select 
+                    id="catSetor"
+                    value={catForm.setor} 
+                    onChange={e => setCatForm({...catForm, setor: e.target.value})} 
+                    className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  >
+                    <option value="Mercearia">Mercearia</option>
+                    <option value="QUEIJOS">Frios / Laticínios</option>
+                    <option value="TEMPEROS">Temperos / Especiarias</option>
+                    <option value="CASTANHAS">Grãos / Castanhas</option>
+                    <option value="Outros">Outros</option>
+                  </select>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Setor / Departamento</label>
-                    <select value={catForm.setor} onChange={e => setCatForm({...catForm, setor: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold">
-                      <option value="Mercearia">Mercearia</option>
-                      <option value="QUEIJOS">Frios / Laticínios</option>
-                      <option value="TEMPEROS">Temperos / Especiarias</option>
-                      <option value="CASTANHAS">Grãos / Castanhas</option>
-                      <option value="Outros">Outros</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Ordem</label>
-                    <input value={catForm.ordem} onChange={e => setCatForm({...catForm, ordem: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold" type="number" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Descrição Curta</label>
-                  <textarea value={catForm.descricao} onChange={e => setCatForm({...catForm, descricao: e.target.value})} className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold h-20 resize-none" placeholder="Ex: Variedade de embutidos e laticínios" />
-                </div>
-                <div className="flex items-center space-x-3 bg-surface-variant/30 p-3 rounded-xl border border-outline-variant/30">
-                  <input id="catStatus" type="checkbox" checked={catForm.ativo} onChange={e => setCatForm({...catForm, ativo: e.target.checked})} className="w-5 h-5 rounded text-primary focus:ring-primary border-outline-variant/50 cursor-pointer" />
-                  <label htmlFor="catStatus" className="text-sm font-bold text-ink cursor-pointer select-none">Categoria ativa</label>
-                </div>
-                <button type="submit" className="w-full py-4 bg-primary text-white rounded-2xl font-bold mt-6 hover:bg-primary-hover shadow-lg transition-all uppercase tracking-widest">
-                  {editingCat ? 'Atualizar Categoria' : 'Criar Categoria'}
-                </button>
-              </form>
-            </div>
-          </div>
+                <Input 
+                  label="Ordem"
+                  type="number"
+                  value={catForm.ordem} 
+                  onChange={e => setCatForm({...catForm, ordem: e.target.value})} 
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="catDescricao" className="text-sm font-medium text-ink">Descrição Curta</label>
+                <textarea 
+                  id="catDescricao"
+                  value={catForm.descricao} 
+                  onChange={e => setCatForm({...catForm, descricao: e.target.value})} 
+                  className="w-full bg-surface-container border border-outline-variant/50 rounded-sm px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold h-20 resize-none text-sm" 
+                  placeholder="Ex: Variedade de embutidos e laticínios" 
+                />
+              </div>
+              <label className="flex items-center gap-3 p-3 bg-surface-container-low rounded-md cursor-pointer hover:border-primary border border-transparent transition-all">
+                <input id="catStatus" type="checkbox" checked={catForm.ativo} onChange={e => setCatForm({...catForm, ativo: e.target.checked})} className="w-5 h-5 rounded text-primary focus:ring-primary border-outline-variant/50 cursor-pointer" />
+                <span className="text-sm font-bold text-ink cursor-pointer select-none">Categoria ativa</span>
+              </label>
+              <Button type="submit" className="w-full mt-6">
+                {editingCat ? 'Atualizar Categoria' : 'Criar Categoria'}
+              </Button>
+            </form>
+          </Dialog>
         )}
 
         {/* Modal Mover e Excluir Categoria */}
         {showMoverExcluirModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-surface w-full max-w-md rounded-[32px] p-8 shadow-2xl border border-outline-variant/50 animate-scale-up">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="font-sans text-xl font-bold text-error tracking-wider flex items-center gap-2">
-                  <span className="material-symbols-outlined">warning</span>
-                  Atenção: Ação Necessária
-                </h2>
-                <button onClick={() => setShowMoverExcluirModal(false)} className="text-ink-secondary hover:text-ink outline-none">
-                  <span className="material-symbols-outlined">close</span>
-                </button>
-              </div>
-              <p className="text-sm font-semibold text-ink-secondary mb-4 leading-relaxed">
+          <Dialog 
+            open={showMoverExcluirModal} 
+            onClose={() => setShowMoverExcluirModal(false)} 
+            title="Atenção: Ação Necessária"
+          >
+            <div className="flex items-start gap-3 p-3 bg-error-container text-error-ink rounded-md mb-4 text-xs font-semibold">
+              <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+              <p>
                 A categoria <strong className="text-ink">"{catParaExcluir?.nome}"</strong> possui <strong className="text-primary">{produtosVinculadosCount} produto(s)</strong> vinculados a ela. Para excluí-la de forma segura, você precisa mover esses produtos para outra categoria ativa primeiro.
               </p>
-              <form onSubmit={handleMoverExcluir} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-ink-secondary tracking-widest mb-1 uppercase">Mover produtos para:</label>
-                  <select 
-                    value={novaCatDestinoId} 
-                    onChange={e => setNovaCatDestinoId(e.target.value)}
-                    className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-semibold"
-                    required
-                  >
-                    {categorias.filter(c => c.id !== catParaExcluir?.id).map(c => (
-                      <option key={c.id} value={c.id}>{c.emoji} {c.nome}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex gap-3 mt-6">
-                  <button 
-                    type="button" 
-                    onClick={() => setShowMoverExcluirModal(false)}
-                    className="flex-1 py-3 border border-outline-variant/50 rounded-xl font-bold text-ink-secondary uppercase tracking-widest text-xs hover:bg-surface-variant/30"
-                  >
-                    Cancelar
-                  </button>
-                  <button 
-                    type="submit" 
-                    className="flex-1 py-3 bg-primary text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-primary-hover shadow-md"
-                  >
-                    Mover e Excluir
-                  </button>
-                </div>
-              </form>
             </div>
-          </div>
+            <form onSubmit={handleMoverExcluir} className="space-y-4">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="catMoverDestino" className="text-sm font-medium text-ink">Mover produtos para:</label>
+                <select 
+                  id="catMoverDestino"
+                  value={novaCatDestinoId} 
+                  onChange={e => setNovaCatDestinoId(e.target.value)}
+                  className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  required
+                >
+                  {categorias.filter(c => c.id !== catParaExcluir?.id).map(c => (
+                    <option key={c.id} value={c.id}>{c.emoji} {c.nome}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <Button 
+                  type="button" 
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={() => setShowMoverExcluirModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="flex-1"
+                >
+                  Mover e Excluir
+                </Button>
+              </div>
+            </form>
+          </Dialog>
         )}
       </div>
     </AdminLayout>

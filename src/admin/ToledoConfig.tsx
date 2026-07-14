@@ -1,7 +1,32 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
 import { getApiUrl } from '../shared/apiConfig';
-import { AlertTriangle } from 'lucide-react';
+import { 
+  AlertTriangle,
+  Scale,
+  CheckCircle2,
+  XCircle,
+  Package,
+  RefreshCw,
+  ShieldCheck,
+  Search,
+  Edit,
+  Trash2,
+  Star,
+  Flame,
+  Folder,
+  Save,
+  Download,
+  Upload,
+  Info,
+  GripVertical,
+  AlertCircle,
+  Plus
+} from 'lucide-react';
+import { Button } from '../shared/components/Button';
+import { Input } from '../shared/components/Input';
+import { Dialog } from '../shared/components/Dialog';
+import { StatusBadge } from '../shared/components/StatusBadge';
 
 const CATEGORY_RULES: { pattern: RegExp; category: string }[] = [
   { pattern: /mussarela|queijo|requeijão|ricota|provolone|brie|coalho|emental|parmesao|parmesão|gorgonzola/i, category: 'Mesa de Frios, Queijos e Antepastos' },
@@ -527,103 +552,98 @@ export default function ToledoConfig() {
 
   return (
     <AdminLayout>
-      <div className="max-w-7xl mx-auto space-y-8 font-sans">
+      <div className="max-w-7xl mx-auto space-y-6 font-sans">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <div className="flex items-center gap-4 mb-2">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <span className="material-symbols-outlined text-white text-2xl">scale</span>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-sm bg-primary/10 flex items-center justify-center text-primary">
+                <Scale className="h-5 w-5" />
               </div>
-              <h1 className="font-sans text-[40px] font-bold text-ink leading-tight uppercase tracking-widest">
+              <h1 className="font-display text-2xl font-bold text-ink">
                 Toledo — Encarte
               </h1>
             </div>
-            <p className="text-ink-secondary mt-1 text-lg font-semibold">
+            <p className="text-ink-variant text-sm mt-0.5">
               Monitoramento automático de preços da balança Toledo para exibição no Telão.
             </p>
-            <div className="flex space-x-3 mt-4">
-              <span className={`px-4 py-1 rounded-full text-xs font-bold tracking-widest flex items-center space-x-2 border uppercase ${
+            <div className="flex space-x-2 mt-2">
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider flex items-center gap-1 border uppercase ${
                 encarteAtivo 
                   ? 'bg-success/10 text-success border-success/20' 
                   : 'bg-error/10 text-error border-error/20'
               }`}>
-                <span className="material-symbols-outlined text-sm">
-                  {encarteAtivo ? 'check_circle' : 'cancel'}
-                </span>
+                {encarteAtivo ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
                 <span>{encarteAtivo ? 'ENCARTE ATIVO' : 'ENCARTE DESATIVADO'}</span>
               </span>
-              <span className="bg-primary/10 px-4 py-1 rounded-full text-xs font-bold tracking-widest text-primary flex items-center space-x-2 border border-primary/20 uppercase">
-                <span className="material-symbols-outlined text-sm">inventory_2</span>
+              <span className="bg-primary/10 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider text-primary flex items-center gap-1 border border-primary/20 uppercase">
+                <Package className="h-3 w-3" />
                 <span>{produtos.length} PRODUTOS</span>
               </span>
             </div>
           </div>
 
-          <div className="flex gap-4">
-            <button
+          <div className="flex gap-2">
+            <Button
               onClick={handleForceRefresh}
               disabled={refreshing || !isMasterServer}
-              className={`px-6 py-4 bg-ink text-white rounded-xl font-bold shadow-xl transition-all outline-none uppercase tracking-widest text-sm flex items-center gap-2 ${refreshing || !isMasterServer ? 'opacity-50 cursor-not-allowed' : 'hover:bg-ink-light active:scale-95'}`}
+              variant="secondary"
+              icon={<RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />}
             >
-              <span className={`material-symbols-outlined ${refreshing ? 'animate-spin' : ''}`}>sync</span>
               {refreshing ? 'Lendo...' : 'Forçar Leitura'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleSaveAllConfigs}
               disabled={!isMasterServer}
-              className={`px-8 py-4 bg-primary text-white rounded-xl font-bold shadow-xl transition-all outline-none uppercase tracking-widest text-sm ${!isMasterServer ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-hover active:scale-95'}`}
             >
               Salvar Alterações
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Master Server Banner */}
         {!isMasterServer && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-xl shadow-sm">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <AlertTriangle className="h-6 w-6 text-red-500" />
-              </div>
-              <div className="ml-3 flex-1">
-                <h3 className="text-lg font-bold text-red-800 tracking-wider">Acesso restrito: modo leitura</h3>
-                <div className="mt-1 text-sm text-red-700">
-                  <p>Você está acessando a partir de um dispositivo cliente. Alterações administrativas só podem ser realizadas no <b>Servidor Master</b> da loja.</p>
-                </div>
+          <div className="bg-error-container text-error-ink p-4 rounded-md border border-error/20 shadow-sm">
+            <div className="flex gap-3">
+              <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-error" />
+              <div className="flex-1">
+                <h3 className="text-sm font-bold tracking-wide">Acesso restrito: modo leitura</h3>
+                <p className="text-xs mt-1">Você está acessando a partir de um dispositivo cliente. Alterações administrativas só podem ser realizadas no <b>Servidor Master</b> da loja.</p>
                 {!showMasterLogin ? (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setShowMasterLogin(true)}
-                    className="mt-3 px-4 py-2 bg-red-100 border border-red-300 rounded-xl text-red-800 font-bold text-xs uppercase tracking-widest hover:bg-red-200 transition-all"
+                    className="mt-3 text-error hover:bg-error-container-high"
                   >
                     🔓 Desbloquear Acesso Remoto
-                  </button>
+                  </Button>
                 ) : (
                   <div className="mt-3 flex flex-col gap-2 max-w-sm">
-                    <input
+                    <Input
                       type="password"
-                      placeholder="Senha Master Remoto"
+                      label="Senha Master Remoto"
                       value={masterPassword}
                       onChange={(e) => setMasterPassword(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleMasterLogin()}
-                      className="w-full bg-white border border-red-300 rounded-xl px-4 py-3 focus:outline-none focus:border-red-500 text-ink font-semibold"
                       autoFocus
                     />
-                    {masterLoginError && <p className="text-red-600 text-xs font-bold">{masterLoginError}</p>}
+                    {masterLoginError && <p className="text-error font-bold text-xs">{masterLoginError}</p>}
                     <div className="flex gap-2">
-                      <button
+                      <Button
+                        size="sm"
                         onClick={handleMasterLogin}
                         disabled={masterLoginLoading || !masterPassword}
-                        className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-red-700 transition-all disabled:opacity-50"
                       >
                         {masterLoginLoading ? 'Verificando...' : 'Entrar'}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         onClick={() => { setShowMasterLogin(false); setMasterLoginError(''); setMasterPassword(''); }}
-                        className="px-4 py-2 bg-red-100 border border-red-300 rounded-xl text-red-800 font-bold text-xs uppercase tracking-widest hover:bg-red-200 transition-all"
                       >
                         Cancelar
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -634,21 +654,23 @@ export default function ToledoConfig() {
 
         {/* Remote Session Active Banner */}
         {isMasterRemote && (
-          <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 mb-6 rounded-r-xl shadow-sm">
+          <div className="bg-emerald-50 border-l-4 border-emerald-500 dark:bg-emerald-950/20 dark:border-emerald-700 p-4 rounded-r-md shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-emerald-600">verified_user</span>
+                <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 <div>
-                  <h3 className="text-sm font-bold text-emerald-800 tracking-wider">Sessão master remota ativa</h3>
-                  <p className="text-xs text-emerald-600">Você tem permissão de administrador via acesso remoto.</p>
+                  <h3 className="text-sm font-bold text-emerald-800 dark:text-emerald-300">Sessão master remota ativa</h3>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400">Você tem permissão de administrador via acesso remoto.</p>
                 </div>
               </div>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleMasterLogout}
-                className="px-4 py-2 bg-emerald-100 border border-emerald-300 rounded-xl text-emerald-800 font-bold text-xs uppercase tracking-widest hover:bg-emerald-200 transition-all"
+                className="text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
               >
                 Encerrar Sessão
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -656,105 +678,95 @@ export default function ToledoConfig() {
         <fieldset disabled={!isMasterServer} className="contents">
 
         {/* Settings Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {/* Encarte Ativo Toggle */}
-          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Encarte no telão</label>
-            <button
+          <div className="bg-surface rounded-md p-4 border border-outline-variant shadow-sm flex flex-col justify-between">
+            <label className="text-xs font-bold text-ink-variant tracking-wider block mb-2">Encarte no telão</label>
+            <Button
+              variant={encarteAtivo ? 'primary' : 'secondary'}
               onClick={() => handleSaveConfig('toledo_encarte_ativo', encarteAtivo ? '0' : '1')}
-              className={`w-full py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-all ${
-                encarteAtivo 
-                  ? 'bg-success/10 text-success border border-success/20 hover:bg-success/20' 
-                  : 'bg-surface-variant text-ink-secondary border border-outline-variant hover:bg-error/10 hover:text-error hover:border-error/20'
-              }`}
+              className="w-full"
             >
               {encarteAtivo ? '✓ Ativado' : '✕ Desativado'}
-            </button>
+            </Button>
           </div>
 
           {/* Ocultar em Falta Toggle */}
-          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Produtos em falta</label>
-            <button
+          <div className="bg-surface rounded-md p-4 border border-outline-variant shadow-sm flex flex-col justify-between">
+            <label className="text-xs font-bold text-ink-variant tracking-wider block mb-2">Produtos em falta</label>
+            <Button
+              variant={config.toledo_ocultar_em_falta === '1' ? 'secondary' : 'primary'}
               onClick={() => handleSaveConfig('toledo_ocultar_em_falta', config.toledo_ocultar_em_falta === '1' ? '0' : '1')}
-              className={`w-full py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-all ${
-                config.toledo_ocultar_em_falta === '1'
-                  ? 'bg-error/10 text-error border border-error/20 hover:bg-error/20'
-                  : 'bg-success/10 text-success border border-success/20 hover:bg-success/20'
-              }`}
+              className="w-full"
             >
               {config.toledo_ocultar_em_falta === '1' ? '✕ Ocultar' : '✓ Mostrar'}
-            </button>
+            </Button>
           </div>
 
           {/* Duração */}
-          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Duração por slide (seg)</label>
-            <input
+          <div className="bg-surface rounded-md p-4 border border-outline-variant shadow-sm">
+            <Input
               type="number"
               min="5"
               max="60"
+              label="Duração (seg)"
               value={config.toledo_encarte_duracao || '15'}
               onChange={(e) => handleSaveConfig('toledo_encarte_duracao', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              className="text-center font-bold"
             />
           </div>
 
           {/* Posição na rotação */}
-          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Posição na rotação</label>
-            <input
+          <div className="bg-surface rounded-md p-4 border border-outline-variant shadow-sm">
+            <Input
               type="number"
               min="0"
+              label="Posição rotação"
               value={config.toledo_encarte_posicao || '0'}
               onChange={(e) => handleSaveConfig('toledo_encarte_posicao', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              className="text-center font-bold"
+              helper="Aparece após qual mídia"
             />
-            <p className="text-[10px] text-ink-secondary mt-2 text-center">Após qual mídia o encarte aparece</p>
           </div>
 
           {/* Itens por slide */}
-          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Itens por slide</label>
-            <input
+          <div className="bg-surface rounded-md p-4 border border-outline-variant shadow-sm">
+            <Input
               type="number"
               min="4"
               max="96"
+              label="Itens por slide"
               value={config.toledo_itens_por_slide || '12'}
               onChange={(e) => handleSaveConfig('toledo_itens_por_slide', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              className="text-center font-bold"
+              helper="Produtos na tela"
             />
-            <p className="text-[10px] text-ink-secondary mt-2 text-center">Quantos produtos cabem na tela</p>
           </div>
           
           {/* Caminho da Pasta Toledo */}
-          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm md:col-span-2 lg:col-span-3">
-            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Caminho da pasta toledo (rede/local)</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder={"Ex: \\\\serverad\\Santa Paula\\08 - LOJA\\TOLEDO"}
-                value={config.toledo_caminho_rede || ''}
-                onChange={(e) => setConfig({ ...config, toledo_caminho_rede: e.target.value })}
-                onBlur={(e) => handleSaveConfig('toledo_caminho_rede', e.target.value)}
-                className="flex-1 px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-mono text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-            <p className="text-[11px] text-ink-secondary mt-2">
-              Pasta onde o arquivo é exportado pelo sistema.
-            </p>
+          <div className="bg-surface rounded-md p-4 border border-outline-variant shadow-sm md:col-span-2 lg:col-span-3">
+            <Input
+              type="text"
+              label="Caminho da pasta toledo (rede/local)"
+              placeholder="Ex: \\\\serverad\\Santa Paula\\TOLEDO"
+              value={config.toledo_caminho_rede || ''}
+              onChange={(e) => setConfig({ ...config, toledo_caminho_rede: e.target.value })}
+              onBlur={(e) => handleSaveConfig('toledo_caminho_rede', e.target.value)}
+              className="font-mono"
+              helper="Pasta de exportação dos arquivos da balança"
+            />
           </div>
 
           {/* Formato do Arquivo */}
-          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm md:col-span-2 lg:col-span-2">
-            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Formato de integração</label>
+          <div className="bg-surface rounded-md p-4 border border-outline-variant shadow-sm md:col-span-2 lg:col-span-2">
+            <label className="block text-xs font-bold text-ink-variant tracking-wider uppercase mb-1">Formato de integração</label>
             <select
               value={config.toledo_formato_arquivo || 'toledo_mgv6'}
               onChange={(e) => {
                 setConfig({ ...config, toledo_formato_arquivo: e.target.value });
                 handleSaveConfig('toledo_formato_arquivo', e.target.value);
               }}
-              className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 cursor-pointer"
+              className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer font-semibold"
             >
               <optgroup label="Balanças & Buscapreço">
                 <option value="toledo_mgv5">Toledo MGV5 (TXITENS.TXT)</option>
@@ -776,16 +788,15 @@ export default function ToledoConfig() {
                 <option value="avanco_xlsx">ERP Avanço (PRODUTOS.XLSX)</option>
               </optgroup>
             </select>
-            <p className="text-[10px] text-ink-secondary mt-2 text-center">Selecione a origem dos dados</p>
           </div>
 
-          {/* Colunas */}
-          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Qtd. colunas</label>
+          {/* Qtd Colunas */}
+          <div className="bg-surface rounded-md p-4 border border-outline-variant shadow-sm">
+            <label className="block text-xs font-bold text-ink-variant tracking-wider uppercase mb-1">Qtd. colunas</label>
             <select
               value={config.toledo_encarte_colunas || '3'}
               onChange={(e) => handleSaveConfig('toledo_encarte_colunas', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none text-center"
+              className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer text-center font-bold"
             >
               <option value="1">1 Coluna</option>
               <option value="2">2 Colunas</option>
@@ -795,12 +806,12 @@ export default function ToledoConfig() {
           </div>
 
           {/* Tamanho da Fonte — Descrição */}
-          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Fonte descrição</label>
+          <div className="bg-surface rounded-md p-4 border border-outline-variant shadow-sm">
+            <label className="block text-xs font-bold text-ink-variant tracking-wider uppercase mb-1">Fonte descrição</label>
             <select
               value={config.toledo_fonte_descricao || '1.25rem'}
               onChange={(e) => handleSaveConfig('toledo_fonte_descricao', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
+              className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer font-bold"
             >
               <optgroup label="Tamanhos Padrão (rem)">
                 <option value="auto">Automático (Ajustar ao Texto)</option>
@@ -831,16 +842,15 @@ export default function ToledoConfig() {
                 <option value="5vw">5.0vw (Escalonável Máximo)</option>
               </optgroup>
             </select>
-            <p className="text-[10px] text-ink-secondary mt-2 text-center">Tamanho do texto do produto</p>
           </div>
 
           {/* Tamanho da Fonte — Preço */}
-          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Fonte preço</label>
+          <div className="bg-surface rounded-md p-4 border border-outline-variant shadow-sm">
+            <label className="block text-xs font-bold text-ink-variant tracking-wider uppercase mb-1">Fonte preço</label>
             <select
               value={config.toledo_fonte_preco || '1.75rem'}
               onChange={(e) => handleSaveConfig('toledo_fonte_preco', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-center text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
+              className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer font-bold"
             >
               <optgroup label="Tamanhos Padrão (rem)">
                 <option value="auto">Automático (Ajustar ao Texto)</option>
@@ -879,52 +889,48 @@ export default function ToledoConfig() {
                 <option value="20vw">20.0vw (Escalonável Supremo)</option>
               </optgroup>
             </select>
-            <p className="text-[10px] text-ink-secondary mt-2 text-center">Tamanho do preço no encarte</p>
           </div>
 
           {/* Ocultar Guichê no Telão */}
-          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm">
-            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Guichê no telão</label>
-            <button
+          <div className="bg-surface rounded-md p-4 border border-outline-variant shadow-sm flex flex-col justify-between">
+            <label className="text-xs font-bold text-ink-variant tracking-wider block mb-2">Guichê no telão</label>
+            <Button
+              variant={config.telao_ocultar_guiche === '1' ? 'secondary' : 'primary'}
               onClick={() => handleSaveConfig('telao_ocultar_guiche', config.telao_ocultar_guiche === '1' ? '0' : '1')}
-              className={`w-full py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-all ${
-                config.telao_ocultar_guiche === '1'
-                  ? 'bg-error/10 text-error border border-error/20 hover:bg-error/20'
-                  : 'bg-success/10 text-success border border-success/20 hover:bg-success/20'
-              }`}
+              className="w-full"
             >
               {config.telao_ocultar_guiche === '1' ? '✕ Oculto' : '✓ Visível'}
-            </button>
-            <p className="text-[10px] text-ink-secondary mt-2 text-center">Exibir guichê na chamada</p>
+            </Button>
           </div>
 
           {/* Estilo do Encarte */}
-          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm md:col-span-2 lg:col-span-5">
-            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Estilo do encarte</label>
-            <div className="grid grid-cols-2 gap-3">
+          <div className="bg-surface rounded-md p-4 border border-outline-variant shadow-sm md:col-span-2 lg:col-span-5">
+            <label className="text-xs font-bold text-ink-variant tracking-wider block mb-3">Estilo do encarte</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
                 { id: 'kg', label: '🌙 Preços por KG (Escuro)', desc: 'Layout dark com colunas, ideal para carnes e frios' },
                 { id: 'granel', label: '🌿 Granel Premium (Claro)', desc: 'Layout premium com cards e animações, ideal para produtos a granel' },
               ].map(s => (
                 <button
                   key={s.id}
+                  type="button"
                   onClick={() => handleSaveConfig('toledo_encarte_estilo', s.id)}
-                  className={`flex flex-col items-start p-4 rounded-xl border-2 transition-all outline-none text-left ${
+                  className={`flex flex-col items-start p-4 rounded-md border-2 transition-all outline-none text-left ${
                     (config.toledo_encarte_estilo || 'kg') === s.id
-                      ? 'border-primary bg-primary/5 shadow-md shadow-primary/10'
-                      : 'border-outline-variant/50 bg-surface hover:bg-surface-variant/50'
+                      ? 'border-primary bg-primary/5 shadow-md shadow-primary/5'
+                      : 'border-outline-variant bg-surface hover:bg-surface-container'
                   }`}
                 >
                   <span className="font-bold text-sm text-ink">{s.label}</span>
-                  <span className="text-[10px] text-ink-secondary mt-1">{s.desc}</span>
+                  <span className="text-[10px] text-ink-variant mt-1">{s.desc}</span>
                 </button>
               ))}
             </div>
           </div>
 
           {/* Tema Visual */}
-          <div className="bg-surface rounded-2xl p-5 border border-outline-variant/50 shadow-sm md:col-span-2 lg:col-span-5">
-            <label className="text-xs font-bold text-ink-secondary tracking-widest block mb-3">Tema visual do encarte</label>
+          <div className="bg-surface rounded-md p-4 border border-outline-variant shadow-sm md:col-span-2 lg:col-span-5">
+            <label className="text-xs font-bold text-ink-variant tracking-wider block mb-3">Tema visual do encarte</label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { id: 'padrao', label: 'Verde (Padrão)', color: 'bg-emerald-500' },
@@ -934,14 +940,15 @@ export default function ToledoConfig() {
               ].map(t => (
                 <button
                   key={t.id}
+                  type="button"
                   onClick={() => handleSaveConfig('toledo_encarte_tema', t.id)}
-                  className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all outline-none ${
+                  className={`flex items-center gap-2.5 p-3 rounded-md border-2 transition-all outline-none ${
                     (config.toledo_encarte_tema || 'padrao') === t.id
-                      ? 'border-primary bg-primary/5 shadow-md shadow-primary/10'
-                      : 'border-outline-variant/50 bg-surface hover:bg-surface-variant/50'
+                      ? 'border-primary bg-primary/5 shadow-md shadow-primary/5'
+                      : 'border-outline-variant bg-surface hover:bg-surface-container'
                   }`}
                 >
-                  <div className={`w-4 h-4 rounded-full ${t.color} shadow-sm`}></div>
+                  <div className={`w-3.5 h-3.5 rounded-full ${t.color} shadow-sm`}></div>
                   <span className="font-bold text-sm text-ink">{t.label}</span>
                 </button>
               ))}
@@ -950,15 +957,16 @@ export default function ToledoConfig() {
         </div>
 
         {/* Tabs */}
-        <div className="flex space-x-2 border-b border-outline-variant/30">
+        <div className="flex border-b border-outline-variant overflow-x-auto">
           {(['produtos', 'categorias', 'ordenar', 'logs'] as const).map(tab => (
             <button
               key={tab}
+              type="button"
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 font-bold text-sm uppercase tracking-widest rounded-t-xl transition-all ${
+              className={`px-6 py-3 font-bold text-sm border-b-2 transition-all outline-none whitespace-nowrap ${
                 activeTab === tab
-                  ? 'bg-surface text-primary border border-outline-variant/50 border-b-transparent -mb-[1px]'
-                  : 'text-ink-secondary hover:text-ink hover:bg-surface-variant/50'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-ink-variant hover:text-ink hover:bg-surface-container-low'
               }`}
             >
               {tab === 'produtos' && '📦 Produtos'}
@@ -971,44 +979,37 @@ export default function ToledoConfig() {
 
         {/* Tab Content */}
         {loading ? (
-          <div className="text-center py-20">
-            <span className="material-symbols-outlined text-6xl text-outline-variant animate-spin">sync</span>
-            <p className="text-ink-secondary mt-4 font-bold tracking-widest">Carregando...</p>
-          </div>
+          <StatusBadge variant="loading" />
         ) : (
           <>
             {/* Products Tab */}
             {activeTab === 'produtos' && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 
                 {/* Barra de Busca */}
-                <div className="relative">
-                  <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-ink-secondary">search</span>
+                <div className="flex items-center bg-surface rounded-md px-3.5 py-1.5 border border-outline-variant focus-within:border-primary transition-all">
+                  <Search className="h-5 w-5 text-ink-variant mr-3 shrink-0" />
                   <input 
                     type="text" 
                     placeholder="Buscar por código ou descrição do produto..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold text-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                    className="w-full bg-transparent border-none text-sm text-ink placeholder-outline outline-none font-medium h-11"
                   />
                 </div>
 
                 {filteredProdutos.length === 0 ? (
-                  <div className="text-center py-20 bg-surface rounded-3xl border border-dashed border-outline-variant">
-                    <span className="material-symbols-outlined text-6xl text-outline-variant mb-4">scale</span>
-                    <p className="text-xl font-bold text-ink-secondary tracking-widest">Nenhum produto toledo encontrado</p>
-                    <p className="text-ink-secondary/60 mt-2">Nenhum produto corresponde à sua pesquisa ou a balança ainda não enviou arquivos.</p>
-                  </div>
+                  <StatusBadge variant="empty" message="Nenhum produto toledo encontrado correspondente à pesquisa." />
                 ) : (
                   Object.entries(grouped).sort(([a], [b]) => {
                     if (a === 'Outros') return 1;
                     if (b === 'Outros') return -1;
                     return a.localeCompare(b, 'pt-BR');
                   }).map(([categoria, items]) => (
-                    <div key={categoria} className="bg-surface rounded-2xl border border-outline-variant/50 shadow-sm overflow-hidden">
-                      <div className="px-6 py-4 bg-surface-variant/30 border-b border-outline-variant/30 flex items-center justify-between">
-                        <h3 className="font-bold text-lg text-ink uppercase tracking-wider">{categoria}</h3>
-                        <span className="text-xs font-bold text-ink-secondary tracking-widest uppercase">
+                    <div key={categoria} className="bg-surface rounded-md border border-outline-variant shadow-sm overflow-hidden">
+                      <div className="px-4 py-3 bg-surface-container-low border-b border-outline-variant flex items-center justify-between">
+                        <h3 className="font-bold text-sm text-ink uppercase tracking-wide">{categoria}</h3>
+                        <span className="text-[10px] font-bold text-ink-variant uppercase tracking-wider">
                           {items.length} {items.length === 1 ? 'item' : 'itens'}
                         </span>
                       </div>
@@ -1016,9 +1017,9 @@ export default function ToledoConfig() {
                         {items.sort((a, b) => a.descricao.localeCompare(b.descricao, 'pt-BR')).map(p => {
                           const isOferta = p.descricao.includes('* OFERTA *') || p.descricao.includes('OFERTA') || p.descricao.includes('*');
                           return (
-                            <div key={p.plu} className={`px-6 py-3 flex items-center justify-between hover:bg-surface-variant/20 transition-colors ${isOferta ? 'bg-error/5 border-l-4 border-error' : ''}`}>
-                              <div className="flex items-center gap-4 flex-1 mr-4 overflow-hidden group">
-                                <span className="text-xs font-mono text-ink-secondary bg-surface-variant px-2 py-1 rounded-lg shrink-0">{p.plu}</span>
+                            <div key={p.plu} className={`px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface-container-low transition-colors ${isOferta ? 'bg-error/5 border-l-4 border-error' : ''}`}>
+                              <div className="flex items-center gap-3 flex-1 min-w-0 group">
+                                <span className="text-[10px] font-mono font-bold text-ink-variant bg-surface-container px-2 py-0.5 rounded-sm shrink-0">{p.plu}</span>
                                 {editingPlu === p.plu ? (
                                   <input
                                     type="text"
@@ -1029,12 +1030,12 @@ export default function ToledoConfig() {
                                       if (e.key === 'Enter') handleInlineEditSave(p.plu);
                                       if (e.key === 'Escape') setEditingPlu(null);
                                     }}
-                                    className="px-3 py-1.5 rounded-lg border border-primary bg-surface text-ink font-semibold outline-none focus:ring-2 focus:ring-primary/20 text-sm flex-1 min-w-[200px]"
+                                    className="px-3 py-1.5 rounded-sm border border-primary bg-surface text-ink font-semibold outline-none focus:ring-2 focus:ring-primary/20 text-sm flex-1 min-w-[200px]"
                                     autoFocus
                                   />
                                 ) : (
                                   <div 
-                                    className="flex items-center gap-2 cursor-pointer max-w-[400px] overflow-hidden"
+                                    className="flex items-center gap-2 cursor-pointer min-w-0"
                                     onDoubleClick={() => {
                                       if (isMasterServer) {
                                         setEditingPlu(p.plu);
@@ -1043,21 +1044,22 @@ export default function ToledoConfig() {
                                     }}
                                   >
                                     <span 
-                                      className={`font-semibold truncate shrink-0 ${isOferta ? 'text-error font-bold' : 'text-ink font-medium'}`} 
+                                      className={`text-sm font-semibold truncate ${isOferta ? 'text-error font-bold' : 'text-ink'}`} 
                                       title="Dê um duplo clique para editar"
                                     >
                                       {p.descricao}
                                     </span>
                                     {isMasterServer && (
                                       <button
+                                        type="button"
                                         onClick={() => {
                                           setEditingPlu(p.plu);
                                           setEditDesc(p.descricao);
                                         }}
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-ink-secondary hover:text-primary rounded"
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-ink-variant hover:text-primary rounded-sm"
                                         title="Editar descrição"
                                       >
-                                        <span className="material-symbols-outlined text-[14px]">edit</span>
+                                        <Edit className="h-3.5 w-3.5" />
                                       </button>
                                     )}
                                   </div>
@@ -1066,7 +1068,7 @@ export default function ToledoConfig() {
                                   value={p.categoria}
                                   onChange={(e) => handleChangeCategoria(p, e.target.value)}
                                   disabled={!isMasterServer}
-                                  className="text-xs font-bold bg-surface border border-outline-variant rounded-lg px-2 py-1.5 outline-none focus:border-primary disabled:opacity-50"
+                                  className="text-xs font-bold bg-surface border border-outline-variant rounded-sm px-2 py-1 outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50 cursor-pointer text-ink font-semibold ml-2"
                                 >
                                   {getGroupedCategorias().map(([setor, cats]) => (
                                     <optgroup key={setor} label={setor.toUpperCase()}>
@@ -1084,10 +1086,11 @@ export default function ToledoConfig() {
                                   if (sugestao && sugestao !== p.categoria) {
                                     return (
                                       <button
+                                        type="button"
                                         onClick={() => handleChangeCategoria(p, sugestao)}
                                         disabled={!isMasterServer}
                                         title="Atribuir Categoria Sugerida"
-                                        className="ml-2 px-2 py-1 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-md hover:bg-amber-200 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                        className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-sm hover:bg-amber-200 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap dark:bg-amber-900/30 dark:text-amber-300"
                                       >
                                         💡 Sugestão: {sugestao}
                                       </button>
@@ -1096,23 +1099,23 @@ export default function ToledoConfig() {
                                   return null;
                                 })()}
                               </div>
-                              <div className="flex items-center gap-6">
-                                <div className="text-right flex flex-col items-end gap-1">
+                              <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
+                                <div className="text-right flex flex-col items-end gap-0.5">
                                   {p.preco === 0 ? (
-                                    <span className="font-black text-lg text-error block">
+                                    <span className="font-bold text-xs text-error block">
                                       PRODUTO EM FALTA 🥲
                                     </span>
                                   ) : (
                                     <div className="flex items-center gap-1">
-                                      <span className="font-black text-lg text-emerald-600">
+                                      <span className="font-bold text-sm text-emerald-600">
                                         {formatPreco(p.preco)}
                                       </span>
-                                      <span className="text-ink-secondary text-sm font-medium">/</span>
+                                      <span className="text-ink-variant text-xs font-medium">/</span>
                                       <select
                                         value={p.unidade || 'kg'}
                                         onChange={(e) => handleUnidadeChange(p.plu, e.target.value)}
                                         disabled={!isMasterServer}
-                                        className="text-xs font-bold bg-surface border border-outline-variant/60 rounded-lg px-1.5 py-1 outline-none focus:border-primary disabled:opacity-50 cursor-pointer text-ink font-semibold"
+                                        className="text-[10px] font-bold bg-surface border border-outline-variant rounded-sm px-1 py-0.5 outline-none focus:border-primary disabled:opacity-50 cursor-pointer text-ink font-semibold"
                                       >
                                         <option value="kg">kg</option>
                                         <option value="UN">UN</option>
@@ -1125,17 +1128,18 @@ export default function ToledoConfig() {
                                       </select>
                                     </div>
                                   )}
-                                  <span className="text-[10px] text-ink-secondary/50 font-bold block">{formatDate(p.atualizado_em)}</span>
+                                  <span className="text-[9px] text-ink-variant/50 font-bold block">{formatDate(p.atualizado_em)}</span>
                                 </div>
                                 <button 
+                                  type="button"
                                   onClick={() => toggleOferta(p)}
-                                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider transition-all ${
                                     isOferta 
-                                      ? 'bg-error text-white shadow-lg hover:bg-error-dark' 
-                                      : 'bg-surface-variant text-ink-secondary border border-outline-variant hover:bg-error/10 hover:text-error hover:border-error/30'
+                                      ? 'bg-error text-white shadow hover:bg-error-dark' 
+                                      : 'bg-surface border border-outline-variant text-ink-variant hover:bg-error/10 hover:text-error hover:border-error/20'
                                   }`}
                                 >
-                                  <span className="material-symbols-outlined text-sm">{isOferta ? 'local_fire_department' : 'star'}</span>
+                                  {isOferta ? <Flame className="h-3 w-3" /> : <Star className="h-3 w-3" />}
                                   <span>{isOferta ? 'Remover Oferta' : 'Destacar'}</span>
                                 </button>
                               </div>
@@ -1157,185 +1161,183 @@ export default function ToledoConfig() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   
                   {/* Formulário de Adicionar / Editar Categoria */}
-                  <div className="bg-surface rounded-2xl p-6 border border-outline-variant/50 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <h3 className="font-bold text-sm text-ink uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-base">category</span>
+                  <div className="bg-surface rounded-md p-5 border border-outline-variant shadow-sm flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <h3 className="font-bold text-sm text-ink uppercase tracking-wider flex items-center gap-2 border-b border-outline-variant/30 pb-2">
+                        <Folder className="h-4 w-4 text-primary" />
                         {editingCategoria ? 'Editar Categoria' : 'Nova Categoria'}
                       </h3>
                       
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Nome da categoria</label>
-                          <input
-                            type="text"
-                            value={catNome}
-                            onChange={(e) => setCatNome(e.target.value)}
-                            placeholder="Ex: Adega e Vinhos"
-                            className="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-variant text-ink font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Emoji / ícone</label>
-                          <input
-                            type="text"
-                            value={catEmoji}
-                            onChange={(e) => setCatEmoji(e.target.value)}
-                            placeholder="Ex: 🍷"
-                            maxLength={10}
-                            className="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-variant text-ink font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                          />
-                        </div>
+                      <Input
+                        label="Nome da categoria *"
+                        value={catNome}
+                        onChange={(e) => setCatNome(e.target.value)}
+                        placeholder="Ex: Adega e Vinhos"
+                      />
+                      
+                      <Input
+                        label="Emoji / ícone"
+                        value={catEmoji}
+                        onChange={(e) => setCatEmoji(e.target.value)}
+                        placeholder="Ex: 🍷"
+                        maxLength={10}
+                      />
 
-                        <div>
-                          <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Descrição personalizada</label>
-                          <textarea
-                            value={catDescricao}
-                            onChange={(e) => setCatDescricao(e.target.value)}
-                            placeholder="Descrição para exibir no portal do cliente (opcional)..."
-                            rows={3}
-                            className="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-variant text-ink font-medium text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-none"
-                          />
-                        </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-medium text-ink">Descrição personalizada</label>
+                        <textarea
+                          value={catDescricao}
+                          onChange={(e) => setCatDescricao(e.target.value)}
+                          placeholder="Exibida no portal do cliente (opcional)..."
+                          rows={3}
+                          className="w-full bg-surface-container border border-outline-variant/50 rounded-sm px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-ink font-medium text-sm resize-none"
+                        />
+                      </div>
 
-                        <div>
-                          <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Setor / departamento</label>
-                          <select
-                            value={catSetor}
-                            onChange={(e) => setCatSetor(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-variant text-ink font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-medium text-ink">Setor / departamento</label>
+                        <select
+                          value={catSetor}
+                          onChange={(e) => setCatSetor(e.target.value)}
+                          className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer font-semibold"
+                        >
+                          {SETORES_PADRAO.map(setor => (
+                            <option key={setor} value={setor}>
+                              {setor}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <Input
+                          type="number"
+                          label="Ordem"
+                          value={catOrdem}
+                          onChange={(e) => setCatOrdem(Number(e.target.value))}
+                          min="0"
+                          className="font-bold"
+                        />
+                        <div className="flex flex-col justify-between">
+                          <label className="text-xs font-bold text-ink-variant tracking-wider block">Ativo</label>
+                          <Button
+                            type="button"
+                            variant={catAtivo ? 'primary' : 'secondary'}
+                            onClick={() => setCatAtivo(!catAtivo)}
+                            className="w-full"
                           >
-                            {SETORES_PADRAO.map(setor => (
-                              <option key={setor} value={setor}>
-                                {setor}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-1">Ordem</label>
-                            <input
-                              type="number"
-                              value={catOrdem}
-                              onChange={(e) => setCatOrdem(Number(e.target.value))}
-                              min="0"
-                              className="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-2">Ativo</label>
-                            <button
-                              type="button"
-                              onClick={() => setCatAtivo(!catAtivo)}
-                              className={`w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest border transition-all ${
-                                catAtivo 
-                                  ? 'bg-success/10 text-success border-success/20 hover:bg-success/20' 
-                                  : 'bg-surface-variant text-ink-secondary border border-outline-variant hover:bg-error/5 hover:text-error hover:border-error/20'
-                              }`}
-                            >
-                              {catAtivo ? '✓ Sim' : '✕ Não'}
-                            </button>
-                          </div>
+                            {catAtivo ? '✓ Sim' : '✕ Não'}
+                          </Button>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex gap-2 mt-6">
-                      <button
+                    <div className="flex gap-2 mt-6 pt-4 border-t border-outline-variant/30">
+                      <Button
                         onClick={handleSaveCategoria}
                         disabled={!isMasterServer}
-                        className="flex-1 bg-primary text-white py-3 rounded-xl font-bold hover:bg-primary-hover active:scale-95 transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        icon={<Save className="h-4 w-4" />}
+                        className="flex-1 text-xs"
                       >
-                        <span className="material-symbols-outlined text-sm">save</span>
-                        <span>{editingCategoria ? 'Atualizar' : 'Criar'}</span>
-                      </button>
+                        {editingCategoria ? 'Atualizar' : 'Criar'}
+                      </Button>
                       
                       {editingCategoria && (
-                        <button
+                        <Button
+                          variant="ghost"
                           onClick={clearCatForm}
-                          className="px-4 bg-surface-variant border border-outline-variant text-ink rounded-xl font-bold hover:bg-surface-variant/80 active:scale-95 transition-all text-xs uppercase tracking-wider"
+                          className="text-xs"
                         >
                           Cancelar
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
 
                   {/* Lista de Categorias Atuais */}
-                  <div className="bg-surface rounded-2xl border border-outline-variant/50 shadow-sm overflow-hidden lg:col-span-2 flex flex-col justify-between">
+                  <div className="bg-surface rounded-md border border-outline-variant shadow-sm overflow-hidden lg:col-span-2 flex flex-col justify-between">
                     <div>
-                      <div className="px-6 py-4 bg-surface-variant/30 border-b border-outline-variant/30 flex justify-between items-center">
-                        <h3 className="font-bold text-sm text-ink uppercase tracking-widest">Categorias Cadastradas ({categoriasLista.length})</h3>
+                      <div className="px-4 py-3 bg-surface-container-low border-b border-outline-variant flex flex-col sm:flex-row gap-2 justify-between sm:items-center">
+                        <h3 className="font-bold text-xs text-ink uppercase tracking-wider">Categorias Cadastradas ({categoriasLista.length})</h3>
                         
-                        <div className="flex gap-2">
-                          <button
+                        <div className="flex gap-1.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleExportCategorias('json')}
-                            className="bg-surface border border-outline-variant hover:bg-surface-variant text-ink-secondary hover:text-ink px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1"
+                            icon={<Download className="h-3.5 w-3.5" />}
+                            className="text-[10px]"
                           >
-                            <span className="material-symbols-outlined text-[14px]">download</span>
-                            <span>JSON</span>
-                          </button>
-                          <button
+                            JSON
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleExportCategorias('csv')}
-                            className="bg-surface border border-outline-variant hover:bg-surface-variant text-ink-secondary hover:text-ink px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1"
+                            icon={<Download className="h-3.5 w-3.5" />}
+                            className="text-[10px]"
                           >
-                            <span className="material-symbols-outlined text-[14px]">download</span>
-                            <span>CSV</span>
-                          </button>
-                          <button
-                            onClick={() => setShowImportModal(true)}
+                            CSV
+                          </Button>
+                          <Button
+                            variant="primary"
+                            size="sm"
                             disabled={!isMasterServer}
-                            className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1 disabled:opacity-50"
+                            onClick={() => setShowImportModal(true)}
+                            icon={<Upload className="h-3.5 w-3.5" />}
+                            className="text-[10px]"
                           >
-                            <span className="material-symbols-outlined text-[14px]">upload</span>
-                            <span>Importar</span>
-                          </button>
+                            Importar
+                          </Button>
                         </div>
                       </div>
 
                       {categoriasLista.length === 0 ? (
-                        <div className="p-8 text-center text-ink-secondary">
-                          <p className="font-bold uppercase tracking-widest">Nenhuma categoria no banco</p>
+                        <div className="p-8 text-center text-ink-variant">
+                          <p className="font-semibold text-sm">Nenhuma categoria no banco</p>
                         </div>
                       ) : (
-                        <div className="max-h-[300px] overflow-y-auto divide-y divide-outline-variant/20">
+                        <div className="max-h-[350px] overflow-y-auto divide-y divide-outline-variant/20">
                           {categoriasLista.map((c) => (
-                            <div key={c.id} className={`px-6 py-3 flex items-center justify-between hover:bg-surface-variant/20 transition-colors ${!c.ativo ? 'opacity-50 bg-surface-variant/10' : ''}`}>
+                            <div key={c.id} className={`px-4 py-2.5 flex items-center justify-between hover:bg-surface-container-low transition-colors ${!c.ativo ? 'opacity-50 bg-surface-container' : ''}`}>
                               <div className="flex items-center gap-3 min-w-0">
-                                <span className="text-xl shrink-0 w-8 h-8 rounded-lg bg-surface-variant/65 flex items-center justify-center">{c.emoji || '📦'}</span>
+                                <span className="text-lg shrink-0 w-8 h-8 rounded-sm bg-surface-container flex items-center justify-center border border-outline-variant/30">{c.emoji || '📦'}</span>
                                 <div className="min-w-0">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="font-bold text-ink text-sm truncate">{c.nome}</span>
-                                    <span className="text-[9px] font-bold text-ink-secondary bg-surface-variant px-1.5 py-0.5 rounded-md">Posição: {c.ordem}</span>
-                                    <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider">{c.setor || 'Mercearia'}</span>
+                                    <span className="text-[9px] font-bold text-ink-variant bg-surface-container px-1.5 py-0.5 rounded-sm">Ordem: {c.ordem}</span>
+                                    <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-sm uppercase tracking-wider">{c.setor || 'Mercearia'}</span>
                                     {!c.ativo && (
-                                      <span className="text-[9px] font-bold text-error bg-error/10 px-1.5 py-0.5 rounded-md tracking-wider">Inativo</span>
+                                      <span className="text-[9px] font-bold text-error bg-error/10 px-1.5 py-0.5 rounded-sm tracking-wider">Inativo</span>
                                     )}
                                   </div>
                                   {c.descricao && (
-                                    <p className="text-[11px] text-ink-secondary truncate mt-0.5 max-w-[320px]">{c.descricao}</p>
+                                    <p className="text-xs text-ink-variant truncate mt-0.5 max-w-[320px]">{c.descricao}</p>
                                   )}
                                 </div>
                               </div>
                               
-                              <div className="flex gap-2">
-                                <button
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="px-2"
                                   onClick={() => handleEditCategoria(c)}
                                   disabled={!isMasterServer}
-                                  className="text-outline-variant hover:text-primary transition-colors p-2 outline-none disabled:opacity-50"
+                                  title="Editar"
                                 >
-                                  <span className="material-symbols-outlined text-sm">edit</span>
-                                </button>
-                                <button
+                                  <Edit className="h-4 w-4 text-primary" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="px-2"
                                   onClick={() => handleDeleteCategoria(c.id)}
                                   disabled={!isMasterServer}
-                                  className="text-outline-variant hover:text-error transition-colors p-2 outline-none disabled:opacity-50"
+                                  title="Excluir"
                                 >
-                                  <span className="material-symbols-outlined text-sm">delete</span>
-                                </button>
+                                  <Trash2 className="h-4 w-4 text-error" />
+                                </Button>
                               </div>
                             </div>
                           ))}
@@ -1349,50 +1351,47 @@ export default function ToledoConfig() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   
                   {/* Adicionar Mapeamento */}
-                  <div className="bg-surface rounded-2xl p-6 border border-outline-variant/50 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <h3 className="font-bold text-sm text-ink tracking-widest mb-4">Adicionar mapeamento PLU</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-2">Código PLU</label>
-                          <input
-                            type="text"
-                            value={novoPlu}
-                            onChange={(e) => setNovoPlu(e.target.value)}
-                            placeholder="Ex: 1441"
-                            maxLength={4}
-                            className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-ink-secondary tracking-widest block mb-2">Categoria visual</label>
-                          <select
-                            value={novaCategoria}
-                            onChange={(e) => setNovaCategoria(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-variant text-ink font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
-                          >
-                            {getGroupedCategorias().map(([setor, cats]) => (
-                              <optgroup key={setor} label={setor.toUpperCase()}>
-                                {cats.map(cat => (
-                                  <option key={cat.nome} value={cat.nome}>
-                                    {cat.emoji} {cat.nome}
-                                  </option>
-                                ))}
-                              </optgroup>
-                            ))}
-                          </select>
-                        </div>
+                  <div className="bg-surface rounded-md p-5 border border-outline-variant shadow-sm flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <h3 className="font-bold text-sm text-ink tracking-wider border-b border-outline-variant/30 pb-2">Mapear PLU a Categoria</h3>
+                      
+                      <Input
+                        label="Código PLU"
+                        value={novoPlu}
+                        onChange={(e) => setNovoPlu(e.target.value)}
+                        placeholder="Ex: 1441"
+                        maxLength={4}
+                        className="font-bold"
+                      />
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-medium text-ink">Categoria visual</label>
+                        <select
+                          value={novaCategoria}
+                          onChange={(e) => setNovaCategoria(e.target.value)}
+                          className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer font-bold"
+                        >
+                          {getGroupedCategorias().map(([setor, cats]) => (
+                            <optgroup key={setor} label={setor.toUpperCase()}>
+                              {cats.map(cat => (
+                                <option key={cat.nome} value={cat.nome}>
+                                  {cat.emoji} {cat.nome}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
                       </div>
                     </div>
                     
-                    <button
+                    <Button
                       onClick={handleAddCategoria}
                       disabled={!isMasterServer}
-                      className="w-full bg-primary text-white py-3.5 rounded-xl font-bold hover:bg-primary-hover transition-all active:scale-95 flex items-center justify-center space-x-2 outline-none uppercase tracking-widest text-xs mt-6 disabled:opacity-50"
+                      icon={<Plus className="h-4 w-4" />}
+                      className="w-full mt-6"
                     >
-                      <span className="material-symbols-outlined text-sm">add</span>
-                      <span>Vincular PLU</span>
-                    </button>
+                      Vincular PLU
+                    </Button>
                     
                     {/* Sugestão baseada no PLU digitado */}
                     {novoPlu && (() => {
@@ -1400,18 +1399,19 @@ export default function ToledoConfig() {
                       if (prodMatch) {
                         const sugestao = sugerirCategoria(prodMatch.descricao);
                         return (
-                          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex flex-col gap-2">
-                            <span className="font-bold text-xs text-blue-900 leading-tight">{prodMatch.descricao}</span>
+                          <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-md flex flex-col gap-1.5">
+                            <span className="font-bold text-xs text-ink truncate block">{prodMatch.descricao}</span>
                             {sugestao && (
                               <div className="flex items-center justify-between gap-2 mt-1">
-                                <span className="text-[10px] text-blue-700">💡 Sugerido: <b>{sugestao}</b></span>
+                                <span className="text-[10px] text-primary">💡 Sugerido: <b>{sugestao}</b></span>
                                 {novaCategoria !== sugestao && isMasterServer && (
-                                  <button
+                                  <Button
+                                    size="sm"
+                                    className="h-7 text-[9px] px-2 py-0"
                                     onClick={() => setNovaCategoria(sugestao)}
-                                    className="text-[9px] font-bold bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 transition-colors"
                                   >
                                     Aplicar
-                                  </button>
+                                  </Button>
                                 )}
                               </div>
                             )}
@@ -1423,35 +1423,38 @@ export default function ToledoConfig() {
                   </div>
 
                   {/* Mapeamentos Atuais */}
-                  <div className="bg-surface rounded-2xl border border-outline-variant/50 shadow-sm overflow-hidden lg:col-span-2">
-                    <div className="px-6 py-4 bg-surface-variant/30 border-b border-outline-variant/30">
-                      <h3 className="font-bold text-sm text-ink uppercase tracking-widest">Mapeamentos Atuais ({Object.keys(categorias).length})</h3>
+                  <div className="bg-surface rounded-md border border-outline-variant shadow-sm overflow-hidden lg:col-span-2">
+                    <div className="px-4 py-3 bg-surface-container-low border-b border-outline-variant">
+                      <h3 className="font-bold text-xs text-ink uppercase tracking-wider">Mapeamentos Atuais ({Object.keys(categorias).length})</h3>
                     </div>
                     {Object.keys(categorias).length === 0 ? (
-                      <div className="p-8 text-center text-ink-secondary">
-                        <p className="font-bold uppercase tracking-widest">Nenhum mapeamento cadastrado</p>
+                      <div className="p-8 text-center text-ink-variant">
+                        <p className="font-semibold text-sm">Nenhum mapeamento cadastrado</p>
                       </div>
                     ) : (
                       <div className="max-h-[300px] overflow-y-auto divide-y divide-outline-variant/20">
                         {Object.entries(categorias).sort(([, a], [, b]) => a.localeCompare(b, 'pt-BR')).map(([plu, cat]) => {
                           const catObj = categoriasLista.find(c => c.nome === cat);
                           return (
-                            <div key={plu} className="px-6 py-2.5 flex items-center justify-between hover:bg-surface-variant/20 transition-colors">
-                              <div className="flex items-center gap-4">
-                                <span className="text-xs font-mono font-bold text-primary bg-primary/10 px-3 py-1 rounded-lg min-w-[60px] text-center">{plu}</span>
-                                <span className="text-ink-secondary text-xs">→</span>
+                            <div key={plu} className="px-4 py-2 flex items-center justify-between hover:bg-surface-container-low transition-colors">
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-sm min-w-[50px] text-center">{plu}</span>
+                                <span className="text-ink-variant text-xs">→</span>
                                 <span className="font-bold text-ink text-sm flex items-center gap-2">
                                   <span className="text-base">{catObj?.emoji || '📦'}</span>
                                   {cat}
                                 </span>
                               </div>
-                              <button
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="px-2"
                                 onClick={() => handleRemoveCategoria(plu)}
                                 disabled={!isMasterServer}
-                                className="text-outline-variant hover:text-error transition-colors p-2 outline-none disabled:opacity-50"
+                                title="Excluir Mapeamento"
                               >
-                                <span className="material-symbols-outlined text-sm">delete</span>
-                              </button>
+                                <Trash2 className="h-4 w-4 text-error" />
+                              </Button>
                             </div>
                           );
                         })}
@@ -1460,11 +1463,11 @@ export default function ToledoConfig() {
                   </div>
                 </div>
 
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-4">
-                  <span className="material-symbols-outlined text-amber-600 text-2xl mt-0.5">info</span>
+                <div className="bg-surface-container-low border border-outline-variant rounded-md p-4 flex items-start gap-3">
+                  <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold text-amber-800 text-sm">Sobre os mapeamentos de categorias</p>
-                    <p className="text-amber-700 text-sm mt-1">
+                    <p className="font-bold text-ink text-sm">Sobre os mapeamentos de categorias</p>
+                    <p className="text-ink-variant text-xs mt-1">
                       O código PLU identifica cada produto na balança Toledo. Associe-o a uma categoria para
                       agrupar os itens no encarte do Telão. Produtos sem mapeamento aparecerão em "Outros".
                     </p>
@@ -1473,100 +1476,87 @@ export default function ToledoConfig() {
 
                 {/* Modal de Importação de Categorias */}
                 {showImportModal && (
-                  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-surface border border-outline-variant/65 rounded-3xl p-6 shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col justify-between overflow-hidden animate-slide-up">
-                      <div>
-                        <div className="flex justify-between items-center mb-4">
-                          <h3 className="font-bold text-lg text-ink uppercase tracking-wider flex items-center gap-2">
-                            <span className="material-symbols-outlined">upload</span>
-                            <span>Importar Categorias</span>
-                          </h3>
-                          <button 
-                            onClick={() => { setShowImportModal(false); setImportText(''); }}
-                            className="text-ink-secondary hover:text-ink font-bold text-xl outline-none"
-                          >✕</button>
-                        </div>
+                  <Dialog 
+                    open={showImportModal} 
+                    onClose={() => { setShowImportModal(false); setImportText(''); }} 
+                    title="Importar Categorias"
+                  >
+                    <div className="space-y-4">
+                      <p className="text-xs text-ink-variant leading-relaxed">
+                        Cole seu código JSON (formato array de objetos) ou conteúdo CSV. A importação irá mesclar novos itens com os já existentes baseados no nome da categoria.
+                      </p>
 
-                        <p className="text-xs text-ink-secondary mb-4 leading-relaxed">
-                          Cole seu código JSON (formato array de objetos) ou conteúdo CSV. A importação irá mesclar novos itens com os já existentes baseados no nome da categoria.
-                        </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant={importFormat === 'json' ? 'primary' : 'secondary'}
+                          onClick={() => setImportFormat('json')}
+                          className="flex-1"
+                        >
+                          JSON (Array)
+                        </Button>
+                        <Button
+                          variant={importFormat === 'csv' ? 'primary' : 'secondary'}
+                          onClick={() => setImportFormat('csv')}
+                          className="flex-1"
+                        >
+                          CSV (Colunas)
+                        </Button>
+                      </div>
 
-                        <div className="flex gap-4 mb-4">
-                          <button
-                            type="button"
-                            onClick={() => setImportFormat('json')}
-                            className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all ${
-                              importFormat === 'json'
-                                ? 'bg-primary text-white border-primary shadow-md shadow-primary/10'
-                                : 'bg-surface-variant text-ink border border-outline-variant'
-                            }`}
-                          >
-                            JSON (Array)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setImportFormat('csv')}
-                            className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all ${
-                              importFormat === 'csv'
-                                ? 'bg-primary text-white border-primary shadow-md shadow-primary/10'
-                                : 'bg-surface-variant text-ink border border-outline-variant'
-                            }`}
-                          >
-                            CSV (Colunas)
-                          </button>
-                        </div>
+                      <div className="bg-surface-container-high border border-outline-variant p-3 rounded-md text-[10px] font-mono text-ink-variant leading-normal">
+                        {importFormat === 'json' ? (
+                          <span>Exemplo JSON: <br />{'[{"nome": "Doces", "emoji": "🍰", "descricao": "Sobremesas", "ordem": 5, "ativo": true}]'}</span>
+                        ) : (
+                          <span>Exemplo CSV (com cabeçalho): <br />{'nome,emoji,descricao,ordem,ativo'}<br />{'Doces,🍰,Sobremesas,5,true'}</span>
+                        )}
+                      </div>
 
-                        <div className="bg-surface-variant/30 border border-outline-variant/50 p-2.5 rounded-2xl mb-4 text-[10px] font-mono text-ink-secondary leading-relaxed">
-                          {importFormat === 'json' ? (
-                            <span>Exemplo JSON: <br />{'[{"nome": "Doces", "emoji": "🍰", "descricao": "Sobremesas", "ordem": 5, "ativo": true}]'}</span>
-                          ) : (
-                            <span>Exemplo CSV (com cabeçalho): <br />{'nome,emoji,descricao,ordem,ativo'}<br />{'Doces,🍰,Sobremesas,5,true'}</span>
-                          )}
-                        </div>
-
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold text-ink-variant uppercase tracking-wider">Dados para Importação</label>
                         <textarea
                           value={importText}
                           onChange={(e) => setImportText(e.target.value)}
                           placeholder={importFormat === 'json' ? 'Cole o JSON aqui...' : 'Cole o CSV aqui...'}
-                          rows={8}
-                          className="w-full p-4 rounded-2xl border border-outline-variant bg-surface-variant text-ink font-mono text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                          rows={6}
+                          className="w-full p-4 rounded-sm border border-outline-variant bg-surface-container text-ink font-mono text-xs outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all resize-none"
                         />
                       </div>
-
-                      <div className="flex gap-3 mt-6">
-                        <button
-                          onClick={handleImportCategorias}
-                          disabled={!importText.trim()}
-                          className="flex-1 bg-primary hover:bg-primary-hover text-white py-3 rounded-xl font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all"
-                        >
-                          <span className="material-symbols-outlined text-sm">check_circle</span>
-                          <span>Confirmar Importação</span>
-                        </button>
-                        <button
-                          onClick={() => { setShowImportModal(false); setImportText(''); }}
-                          className="px-6 bg-surface-variant border border-outline-variant text-ink font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-surface-variant/80 active:scale-95 transition-all"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
                     </div>
-                  </div>
+
+                    <div className="flex gap-3 mt-6">
+                      <Button
+                        onClick={handleImportCategorias}
+                        disabled={!importText.trim()}
+                        icon={<CheckCircle2 className="h-4 w-4" />}
+                        className="flex-1"
+                      >
+                        Confirmar Importação
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => { setShowImportModal(false); setImportText(''); }}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </Dialog>
                 )}
               </div>
             )}
 
             {/* Ordenar Categorias Tab */}
             {activeTab === 'ordenar' && (
-              <div className="space-y-6">
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                  <p className="font-bold text-amber-800 text-sm">Ordem de exibição no Portal do Cliente</p>
-                  <p className="text-xs text-amber-700 mt-1">Defina a ordem em que as categorias aparecem no celular do cliente. Clique e **arraste as categorias para cima ou para baixo** para reordenar de forma simples e rápida!</p>
+              <div className="space-y-4">
+                <div className="bg-surface-container-low border border-outline-variant rounded-md p-4">
+                  <p className="font-bold text-ink text-sm">Ordem de exibição no Portal do Cliente</p>
+                  <p className="text-xs text-ink-variant mt-1">Defina a ordem em que as categorias aparecem no celular do cliente. Clique e **arraste as categorias para cima ou para baixo** para reordenar de forma simples e rápida!</p>
                 </div>
 
-                <div className="bg-surface rounded-2xl border border-outline-variant/50 shadow-sm overflow-hidden">
-                  <div className="px-6 py-4 bg-surface-variant/30 border-b border-outline-variant/30 flex justify-between items-center">
-                    <h3 className="font-bold text-sm text-ink uppercase tracking-widest">Categorias ({categoriasOrdem.length})</h3>
-                    <button
+                <div className="bg-surface rounded-md border border-outline-variant shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 bg-surface-container-low border-b border-outline-variant flex justify-between items-center">
+                    <h3 className="font-bold text-xs text-ink uppercase tracking-wider">Categorias ({categoriasOrdem.length})</h3>
+                    <Button
+                      size="sm"
                       onClick={async () => {
                         try {
                           await fetch(`${API_URL}/api/toledo/categorias-ordem`, {
@@ -1579,10 +1569,9 @@ export default function ToledoConfig() {
                           alert('Erro ao salvar.');
                         }
                       }}
-                      className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors"
                     >
                       Salvar Ordem
-                    </button>
+                    </Button>
                   </div>
                   <div className="divide-y divide-outline-variant/20">
                     {categoriasOrdem.map((cat, i) => (
@@ -1592,36 +1581,44 @@ export default function ToledoConfig() {
                         onDragStart={(e) => handleDragStart(e, i)}
                         onDragOver={(e) => handleDragOver(e, i)}
                         onDragEnd={handleDragEnd}
-                        className={`px-6 py-4 flex items-center justify-between hover:bg-surface-variant/20 transition-all duration-150 cursor-grab active:cursor-grabbing border-b border-outline-variant/10 select-none ${
-                          draggedIndex === i ? 'bg-primary/10 border-2 border-dashed border-primary/40 rounded-xl opacity-50 scale-[0.98]' : ''
+                        className={`px-4 py-3 flex items-center justify-between hover:bg-surface-container transition-all cursor-grab active:cursor-grabbing border-b border-outline-variant/10 select-none ${
+                          draggedIndex === i ? 'bg-primary/5 border-2 border-dashed border-primary/30 rounded-md opacity-50 scale-[0.98]' : ''
                         }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="material-symbols-outlined text-ink-secondary/40">drag_indicator</span>
-                          <span className="bg-primary/10 text-primary font-black text-xs w-7 h-7 flex items-center justify-center rounded-lg">{i + 1}</span>
-                          <span className="font-bold text-ink">{categoriasLista.find(c => c.nome === cat)?.emoji || '📦'} {cat}</span>
+                        <div className="flex items-center gap-2.5">
+                          <GripVertical className="h-4 w-4 text-ink-variant/40" />
+                          <span className="bg-primary/10 text-primary font-bold text-xs w-6 h-6 flex items-center justify-center rounded-sm">{i + 1}</span>
+                          <span className="font-bold text-ink text-sm">{categoriasLista.find(c => c.nome === cat)?.emoji || '📦'} {cat}</span>
                         </div>
                         <div className="flex gap-1">
-                          <button
+                          <Button
                             disabled={i === 0}
+                            size="sm"
+                            variant="ghost"
+                            className="px-2"
                             onClick={(e) => {
                               e.stopPropagation();
                               const arr = [...categoriasOrdem];
                               [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]];
                               setCategoriasOrdem(arr);
                             }}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-surface-variant text-ink-secondary hover:text-primary disabled:opacity-20 transition-colors"
-                          >▲</button>
-                          <button
+                          >
+                            ▲
+                          </Button>
+                          <Button
                             disabled={i === categoriasOrdem.length - 1}
+                            size="sm"
+                            variant="ghost"
+                            className="px-2"
                             onClick={(e) => {
                               e.stopPropagation();
                               const arr = [...categoriasOrdem];
                               [arr[i], arr[i + 1]] = [arr[i + 1], arr[i]];
                               setCategoriasOrdem(arr);
                             }}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-surface-variant text-ink-secondary hover:text-primary disabled:opacity-20 transition-colors"
-                          >▼</button>
+                          >
+                            ▼
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -1632,30 +1629,30 @@ export default function ToledoConfig() {
 
             {/* Logs Tab */}
             {activeTab === 'logs' && (
-              <div className="bg-surface rounded-2xl border border-outline-variant/50 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 bg-surface-variant/30 border-b border-outline-variant/30">
-                  <h3 className="font-bold text-sm text-ink tracking-widest">Histórico de processamento</h3>
+              <div className="bg-surface rounded-md border border-outline-variant shadow-sm overflow-hidden">
+                <div className="px-4 py-3 bg-surface-container-low border-b border-outline-variant">
+                  <h3 className="font-bold text-xs text-ink tracking-wider uppercase">Histórico de processamento</h3>
                 </div>
                 {logs.length === 0 ? (
-                  <div className="p-8 text-center text-ink-secondary">
-                    <p className="font-bold uppercase tracking-widest">Nenhum log registrado</p>
+                  <div className="p-8 text-center text-ink-variant">
+                    <p className="font-semibold text-sm">Nenhum log registrado</p>
                   </div>
                 ) : (
                   <div className="divide-y divide-outline-variant/20">
                     {logs.map(log => (
-                      <div key={log.id} className="px-6 py-3 flex items-center gap-6 hover:bg-surface-variant/20 transition-colors">
-                        <span className={`material-symbols-outlined text-lg ${
-                          log.mensagem?.startsWith('ERRO') ? 'text-error' : 'text-success'
-                        }`}>
-                          {log.mensagem?.startsWith('ERRO') ? 'error' : 'check_circle'}
-                        </span>
+                      <div key={log.id} className="px-4 py-3 flex items-center gap-4 hover:bg-surface-container transition-colors">
+                        {log.mensagem?.startsWith('ERRO') ? (
+                          <AlertCircle className="h-5 w-5 text-error shrink-0" />
+                        ) : (
+                          <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
+                        )}
                         <div className="flex-1 min-w-0">
                           <p className="text-ink font-semibold text-sm truncate">{log.mensagem}</p>
-                          <p className="text-[10px] text-ink-secondary font-bold uppercase tracking-widest mt-0.5">
+                          <p className="text-[10px] text-ink-variant font-bold uppercase tracking-wider mt-0.5">
                             {log.itens_processados} itens • {log.precos_atualizados} atualizados
                           </p>
                         </div>
-                        <span className="text-xs text-ink-secondary font-mono shrink-0">
+                        <span className="text-xs text-ink-variant font-mono shrink-0">
                           {formatDate(log.criado_em)}
                         </span>
                       </div>

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { CheckCircle2, Clock, Users, PlusCircle } from 'lucide-react';
 import { getApiUrl } from '../shared/apiConfig';
+import { Button } from '../shared/components/Button';
 
 export default function Confirmacao() {
   const navigate = useNavigate();
@@ -62,17 +64,15 @@ export default function Confirmacao() {
 
   return (
     <div className="bg-background h-screen w-screen flex flex-col items-center justify-center p-4 overflow-hidden fixed inset-0">
-      <main className="w-full max-w-[650px] bg-surface rounded-[32px] shadow-[0_10px_40px_rgba(0,0,0,0.08)] p-6 flex flex-col items-center text-center border-b-[6px] border-outline-variant/20 overflow-hidden animate-pop-in-card">
+      <main className="w-full max-w-[650px] bg-surface rounded-lg shadow-[0_10px_40px_rgba(0,0,0,0.08)] p-6 flex flex-col items-center text-center border-b-[6px] border-outline-variant/20 overflow-hidden animate-pop-in-card">
         <div className="bg-success/10 text-success w-16 h-16 rounded-full flex items-center justify-center mb-4 shrink-0 animate-bounce-check">
-          <span className="material-symbols-outlined text-[3rem]" data-weight="fill">
-            check_circle
-          </span>
+          <CheckCircle2 className="h-12 w-12 text-success" />
         </div>
         
         <h1 className="font-sans text-3xl font-bold text-ink mb-1 uppercase tracking-tight shrink-0">Senha Emitida</h1>
-        <p className="font-sans text-lg text-ink-secondary mb-4 font-medium shrink-0">Retire seu ticket e aguarde.</p>
+        <p className="font-sans text-lg text-ink-variant mb-4 font-medium shrink-0">Retire seu ticket e aguarde.</p>
         
-        <div className="bg-surface-variant/20 w-full rounded-[32px] py-6 px-4 mb-6 border-2 border-outline-variant/20 relative overflow-hidden flex flex-col items-center justify-center shrink-0">
+        <div className="bg-surface-variant/20 w-full rounded-md py-6 px-4 mb-6 border-2 border-outline-variant/20 relative overflow-hidden flex flex-col items-center justify-center shrink-0">
           <span className="font-sans text-base font-bold tracking-[0.2em] text-primary uppercase mb-1">
             Sua Senha
           </span>
@@ -82,31 +82,31 @@ export default function Confirmacao() {
         </div>
         
         <div className="w-full grid grid-cols-2 gap-4 mb-6 border-t border-outline-variant/20 pt-4 shrink-0">
-          <div className="flex flex-col items-center bg-surface-variant/10 rounded-[24px] py-3">
-            <span className="font-sans text-xs font-bold text-ink-secondary uppercase mb-1">Horário</span>
+          <div className="flex flex-col items-center bg-surface-variant/10 rounded-md py-3">
+            <span className="font-sans text-xs font-bold text-ink-variant uppercase mb-1">Horário</span>
             <div className="flex items-center gap-2 font-sans text-xl font-bold text-ink">
-              <span className="material-symbols-outlined text-[1.2rem] text-primary">schedule</span>
+              <Clock className="h-5 w-5 text-primary" />
               <span id="display-hora">
                 {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
           </div>
-          <div className="flex flex-col items-center bg-surface-variant/10 rounded-[24px] py-3">
-            <span className="font-sans text-xs font-bold text-ink-secondary uppercase mb-1">Na Frente</span>
+          <div className="flex flex-col items-center bg-surface-variant/10 rounded-md py-3">
+            <span className="font-sans text-xs font-bold text-ink-variant uppercase mb-1">Na Frente</span>
             <div className="flex items-center gap-2 font-sans text-xl font-bold text-ink">
-              <span className="material-symbols-outlined text-[1.2rem] text-warning">group</span>
+              <Users className="h-5 w-5 text-warning-ink" />
               <span>{pessoasNaFrente}</span>
             </div>
           </div>
         </div>
         
-        <button 
+        <Button 
           onClick={voltarTelaInicial}
-          className="w-full bg-primary text-white font-sans text-2xl font-bold py-6 rounded-[24px] hover:bg-primary-hover active:scale-95 transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-4 uppercase tracking-widest shrink-0"
+          className="w-full py-6 text-2xl font-bold uppercase tracking-widest shrink-0"
+          icon={<PlusCircle className="h-6 w-6" />}
         >
-          <span className="material-symbols-outlined text-[2rem]">add_circle</span>
           Retirar Nova Senha
-        </button>
+        </Button>
       </main>
 
       {/* Calha da Impressora Física Simulada */}
@@ -126,7 +126,7 @@ export default function Confirmacao() {
       </div>
       
       <footer className="mt-6 text-center opacity-30 shrink-0">
-        <p className="font-sans text-base text-ink-secondary font-medium tracking-widest uppercase">ChamaAí</p>
+        <p className="font-sans text-base text-ink-variant font-medium tracking-widest uppercase">ChamaAí</p>
       </footer>
     </div>
   );

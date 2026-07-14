@@ -1,6 +1,21 @@
 import { useState, useEffect } from 'react';
+import { 
+  Tv, 
+  Radio, 
+  DownloadCloud, 
+  Settings, 
+  Pointer, 
+  CheckCircle2, 
+  XCircle, 
+  Megaphone, 
+  RefreshCw, 
+  Undo2, 
+  RotateCw 
+} from 'lucide-react';
 import { getApiUrl } from '../shared/apiConfig';
 import { useSSE } from '../shared/useSSE';
+import { Button } from '../shared/components/Button';
+import { Input } from '../shared/components/Input';
 
 export default function MobileOperador() {
   const [fila, setFila] = useState<any[]>([]);
@@ -182,48 +197,42 @@ export default function MobileOperador() {
 
   if (error || showConfig) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white p-8 flex flex-col items-center justify-center font-sans">
-        <div className="w-full max-w-sm space-y-8 animate-fade-in">
+      <div className="min-h-screen bg-background text-ink p-6 flex flex-col items-center justify-center font-sans">
+        <div className="w-full max-w-sm space-y-6">
           <div className="text-center">
-            <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="material-symbols-outlined text-blue-500 text-4xl">settings_remote</span>
+            <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <Tv className="text-primary h-8 w-8" />
             </div>
-            <h2 className="text-3xl font-sans font-bold uppercase tracking-widest">Configuração Mobile</h2>
-            <p className="text-slate-400 mt-2">Conecte seu dispositivo ao servidor principal.</p>
+            <h2 className="text-2xl font-display font-bold uppercase tracking-wider">Configuração Mobile</h2>
+            <p className="text-ink-variant text-sm mt-1">Conecte seu dispositivo ao servidor principal.</p>
           </div>
 
-          <div className="space-y-6 bg-slate-800/50 p-8 rounded-[2rem] border border-slate-700/50">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-2">IP do Servidor (Telão)</label>
-              <input 
-                type="text" 
-                value={tempIp}
-                onChange={(e) => setTempIp(e.target.value)}
-                placeholder="Ex: 192.168.1.100"
-                className="w-full bg-slate-900 border border-slate-700 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-500 font-bold text-xl text-blue-400 placeholder:text-slate-700"
-              />
-            </div>
+          <div className="space-y-4 bg-surface p-6 rounded-md border border-outline-variant shadow-sm">
+            <Input 
+              type="text" 
+              label="IP do Servidor (Telão)"
+              value={tempIp}
+              onChange={e => setTempIp(e.target.value)}
+              placeholder="Ex: 192.168.1.100"
+            />
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-2">Seu Número de Balcão</label>
-              <input 
-                type="number" 
-                value={guiche}
-                onChange={(e) => setGuiche(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-500 font-bold text-xl text-blue-400"
-              />
-            </div>
+            <Input 
+              type="number" 
+              label="Seu Número de Balcão"
+              value={guiche}
+              onChange={e => setGuiche(e.target.value)}
+            />
 
-            <button 
+            <Button 
               onClick={handleSaveConfig}
-              className="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-2xl font-bold uppercase tracking-widest shadow-xl shadow-blue-900/20 transition-all active:scale-95"
+              className="w-full pt-1"
             >
               Salvar e Conectar
-            </button>
+            </Button>
           </div>
 
           {error && !showConfig && (
-            <p className="text-rose-500 text-center font-bold animate-pulse uppercase text-xs tracking-widest">
+            <p className="text-error-ink text-center font-bold uppercase text-xs tracking-wider animate-pulse">
               Não foi possível conectar ao servidor.
             </p>
           )}
@@ -236,139 +245,148 @@ export default function MobileOperador() {
   const prefCount = fila.filter(s => s.preferencial === 1).length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none overflow-hidden touch-none">
+    <div className="min-h-screen bg-background text-ink flex flex-col font-sans select-none overflow-hidden touch-none">
       {/* Header Mobile/Tablet */}
-      <header className="px-6 py-8 md:px-12 md:py-10 flex items-center justify-between bg-slate-900/50 border-b border-slate-800 shrink-0">
-        <div className="flex items-center gap-3 md:gap-6">
-          <div className="w-10 h-10 md:w-16 md:h-16 bg-blue-600 rounded-xl md:rounded-2xl flex items-center justify-center">
-            <span className="material-symbols-outlined text-white text-2xl md:text-4xl">sensors</span>
+      <header className="px-6 py-4 flex items-center justify-between bg-surface border-b border-outline-variant shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-primary rounded-sm flex items-center justify-center">
+            <Radio className="text-on-primary h-5 w-5" />
           </div>
           <div>
-            <h1 className="font-sans text-xl md:text-3xl font-bold uppercase tracking-wider leading-none">Balcão {guiche}</h1>
-            <div className="flex items-center gap-1.5 md:gap-2 mt-1 md:mt-2">
-              <span className="w-2 h-2 md:w-3 md:h-3 bg-emerald-500 rounded-full animate-pulse"></span>
-              <span className="text-[10px] md:text-sm font-bold text-emerald-500 uppercase tracking-widest">Online</span>
+            <h1 className="font-sans text-base font-bold uppercase tracking-wider leading-none">Balcão {guiche}</h1>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="w-2 h-2 bg-success rounded-full animate-pulse"></span>
+              <span className="text-[10px] font-bold text-success-ink uppercase tracking-widest">Online</span>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {deferredPrompt && (
-            <button 
+            <Button 
               onClick={handleInstallClick}
-              className="w-12 h-12 bg-blue-600/20 text-blue-500 rounded-2xl flex items-center justify-center active:bg-blue-600/30"
+              variant="ghost"
+              className="w-10 h-10 p-0 border border-outline-variant"
               title="Instalar App"
             >
-              <span className="material-symbols-outlined">download</span>
-            </button>
+              <DownloadCloud className="h-5 w-5 text-success-ink" />
+            </Button>
           )}
-          <button 
+          <Button 
             onClick={() => setShowConfig(true)}
-            className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center text-slate-400 active:bg-slate-700"
+            variant="ghost"
+            className="w-10 h-10 p-0 border border-outline-variant"
           >
-            <span className="material-symbols-outlined">settings</span>
-          </button>
+            <Settings className="h-5 w-5 text-ink-variant" />
+          </Button>
         </div>
       </header>
 
       {/* Stats Cards */}
-      <div className="p-6 md:p-12 md:pb-6 grid grid-cols-2 gap-4 md:gap-8 shrink-0 max-w-4xl mx-auto w-full">
-        <div className="bg-slate-900 border border-slate-800 p-5 md:py-10 rounded-[2rem] md:rounded-[3rem] flex flex-col items-center justify-center">
-          <span className="text-4xl md:text-7xl font-black text-white">{aguardandoCount}</span>
-          <span className="text-[10px] md:text-base font-bold text-slate-500 uppercase tracking-widest mt-1 md:mt-3">Total na Fila</span>
+      <div className="p-4 grid grid-cols-2 gap-4 shrink-0 max-w-4xl mx-auto w-full">
+        <div className="bg-surface border border-outline-variant p-4 rounded-sm flex flex-col items-center justify-center shadow-sm">
+          <span className="text-4xl font-mono font-bold text-ink">{aguardandoCount}</span>
+          <span className="text-[10px] font-bold text-ink-variant uppercase tracking-wider mt-1">Total na Fila</span>
         </div>
-        <div className="bg-slate-900 border border-slate-800 p-5 md:py-10 rounded-[2rem] md:rounded-[3rem] flex flex-col items-center justify-center">
-          <span className="text-4xl md:text-7xl font-black text-amber-500">{prefCount}</span>
-          <span className="text-[10px] md:text-base font-bold text-slate-500 uppercase tracking-widest mt-1 md:mt-3">Preferencial</span>
+        <div className="bg-surface border border-outline-variant p-4 rounded-sm flex flex-col items-center justify-center shadow-sm">
+          <span className="text-4xl font-mono font-bold text-warning-ink">{prefCount}</span>
+          <span className="text-[10px] font-bold text-ink-variant uppercase tracking-wider mt-1">Preferencial</span>
         </div>
       </div>
 
       {/* Main Focus Area: Current Ticket */}
-      <div className="flex-1 px-6 md:px-12 flex flex-col justify-center items-center">
-        <div className="w-full max-w-4xl aspect-square md:aspect-video bg-slate-900 rounded-[3rem] md:rounded-[4rem] border-2 border-slate-800 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden group">
-          <div className="absolute top-0 left-0 w-full h-1 md:h-2 bg-blue-600/30"></div>
+      <div className="flex-1 px-4 flex flex-col justify-center items-center">
+        <div className="w-full max-w-sm aspect-square bg-surface rounded-md border border-outline-variant flex flex-col items-center justify-center shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-primary/20"></div>
           {senhaAtual ? (
             <>
-              <span className="text-xs md:text-2xl font-bold text-slate-500 uppercase tracking-[0.4em] mb-6 md:mb-10">Chamada Atual</span>
-              <span className="font-sans text-[10rem] md:text-[18rem] font-black text-blue-500 leading-none">
+              <span className="text-xs font-bold text-ink-variant uppercase tracking-wider mb-4">Chamada Atual</span>
+              <span className="font-display text-8xl font-bold text-primary leading-none">
                 {String(senhaAtual.numero).padStart(3, '0')}
               </span>
-              <div className={`mt-8 md:mt-12 px-5 py-2 md:px-8 md:py-4 rounded-full text-[10px] md:text-base font-bold uppercase tracking-widest ${senhaAtual.preferencial ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'}`}>
+              <div className={`mt-6 px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                senhaAtual.preferencial 
+                  ? 'bg-warning-container text-warning-ink border-warning/20' 
+                  : 'bg-primary/5 text-primary border-primary/20'
+              }`}>
                 {senhaAtual.preferencial ? 'Atendimento Prioritário' : 'Atendimento Normal'}
               </div>
             </>
           ) : (
-            <div className="flex flex-col items-center opacity-20">
-              <span className="material-symbols-outlined text-[6rem] md:text-[10rem] mb-4 md:mb-8">touch_app</span>
-              <span className="font-sans text-2xl md:text-5xl uppercase tracking-widest">Toque para chamar</span>
+            <div className="flex flex-col items-center opacity-40 text-outline">
+              <Pointer className="h-12 w-12 mb-3" />
+              <span className="text-sm font-bold uppercase tracking-wider">Toque para chamar</span>
             </div>
           )}
         </div>
       </div>
 
       {/* Floating Action Buttons */}
-      <div className="p-8 pb-12 md:p-12 md:pb-16 flex flex-col gap-6 md:gap-8 shrink-0 bg-gradient-to-t from-slate-950 to-transparent">
+      <div className="p-4 pb-6 flex flex-col gap-4 shrink-0 bg-surface border-t border-outline-variant">
         {senhaAtual && (config.painel_habilitar_concluir !== '0' || config.painel_habilitar_nao_compareceu !== '0') && (
-          <div className="flex gap-4 md:gap-8 max-w-4xl mx-auto w-full animate-fade-in">
+          <div className="flex gap-4 max-w-4xl mx-auto w-full animate-fade-in">
             {config.painel_habilitar_concluir !== '0' && (
-              <button 
+              <Button 
                 onClick={concluirAtendimento}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all text-white font-sans text-xl md:text-4xl font-bold uppercase tracking-wider cursor-pointer"
+                className="flex-1 bg-success hover:brightness-95 text-white py-4 font-bold"
+                icon={<CheckCircle2 className="h-5 w-5" />}
               >
-                <span className="material-symbols-outlined text-2xl md:text-5xl">check_circle</span>
-                <span>Concluir</span>
-              </button>
+                Concluir
+              </Button>
             )}
             
             {config.painel_habilitar_nao_compareceu !== '0' && (
-              <button 
+              <Button 
                 onClick={naoCompareceu}
-                className="flex-1 bg-rose-600 hover:bg-rose-500 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all text-white font-sans text-xl md:text-4xl font-bold uppercase tracking-wider cursor-pointer"
+                variant="danger"
+                className="flex-1 py-4 font-bold"
+                icon={<XCircle className="h-5 w-5" />}
               >
-                <span className="material-symbols-outlined text-2xl md:text-5xl">cancel</span>
-                <span>Não Comp.</span>
-              </button>
+                Não Comp.
+              </Button>
             )}
           </div>
         )}
 
-        <button 
+        <Button 
           onClick={chamarProxima}
           disabled={aguardandoCount === 0}
-          className={`w-full max-w-4xl mx-auto py-8 md:py-14 rounded-[2.5rem] md:rounded-[4rem] flex md:flex-row flex-col items-center justify-center gap-2 md:gap-6 transition-all active:scale-95 shadow-2xl ${aguardandoCount > 0 ? 'bg-blue-600 text-white shadow-blue-600/20 md:hover:bg-blue-500' : 'bg-slate-800 text-slate-600 grayscale'}`}
+          className="w-full max-w-4xl mx-auto py-5 bg-success hover:brightness-95 active:brightness-90 text-white font-bold text-lg tracking-wider"
+          icon={<Megaphone className="h-6 w-6" />}
         >
-          <span className="material-symbols-outlined text-5xl md:text-[5rem]">campaign</span>
-          <span className="font-sans text-4xl md:text-7xl font-bold uppercase tracking-[0.1em]">Chamar Próximo</span>
-        </button>
+          Chamar Próximo
+        </Button>
 
-        <div className="flex gap-4 md:gap-8 max-w-4xl mx-auto w-full">
+        <div className="flex gap-4 max-w-4xl mx-auto w-full">
           {config.painel_habilitar_repetir !== '0' && (
-            <button 
+            <Button 
               onClick={repetirChamada}
               disabled={!senhaAtual}
-              className="flex-1 bg-slate-800 hover:bg-slate-700 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all border border-slate-700 disabled:opacity-20"
+              variant="secondary"
+              className="flex-1 py-3 border border-outline-variant"
+              icon={<RefreshCw className="h-4 w-4" />}
             >
-              <span className="material-symbols-outlined text-2xl md:text-5xl">refresh</span>
-              <span className="font-sans text-xl md:text-4xl font-bold uppercase tracking-wider">Repetir</span>
-            </button>
+              Repetir
+            </Button>
           )}
           
           {config.painel_habilitar_devolver !== '0' && (
-            <button 
+            <Button 
               onClick={estornar}
               disabled={!senhaAtual}
-              className="flex-1 bg-amber-600/20 hover:bg-amber-600/40 py-6 md:py-10 rounded-3xl md:rounded-[3rem] flex items-center justify-center gap-3 md:gap-6 active:scale-95 transition-all border-2 border-amber-500/50 text-amber-500 disabled:opacity-20"
+              variant="secondary"
+              className="flex-1 py-3 border border-warning/30 text-warning-ink hover:bg-warning-container/30"
+              icon={<Undo2 className="h-4 w-4 text-warning-ink" />}
             >
-              <span className="material-symbols-outlined text-2xl md:text-5xl">undo</span>
-              <span className="font-sans text-xl md:text-4xl font-bold uppercase tracking-wider">Devolver</span>
-            </button>
+              Devolver
+            </Button>
           )}
 
-          <button 
+          <Button 
             onClick={() => window.location.reload()}
-            className="w-20 md:w-28 bg-slate-800 hover:bg-slate-700 rounded-3xl md:rounded-[3rem] flex items-center justify-center active:scale-95 transition-all border border-slate-700"
-          >
-            <span className="material-symbols-outlined md:text-[3rem]">sync</span>
-          </button>
+            variant="secondary"
+            className="w-12 p-0 border border-outline-variant"
+            icon={<RotateCw className="h-4 w-4" />}
+          />
         </div>
       </div>
     </div>

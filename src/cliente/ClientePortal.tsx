@@ -2,9 +2,20 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getApiUrl } from '../shared/apiConfig';
 import { gerarPDFLista } from '../shared/gerarPDF';
-import { ShoppingCart, Search, FileText, AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import { 
+  ShoppingCart, 
+  Search, 
+  FileText, 
+  AlertTriangle, 
+  Plus, 
+  Trash2, 
+  Bell, 
+  Volume2,
+  Store,
+  Edit2,
+  CheckCircle2
+} from 'lucide-react';
 import { playNotificationSound, preLoadCustomAudio } from '../shared/sounds';
-import { Bell, Volume2 } from 'lucide-react';
 import { fetchPortalSummary, fetchTicketStatus, fetchPortalProducts } from './portalApi';
 
 interface Produto {
@@ -537,7 +548,7 @@ export default function ClientePortal() {
             <img src={`${API_URL}${config.logo_cliente}`} alt="Logo" className="h-10 w-auto rounded object-contain max-w-[120px]" />
           ) : (
             <div className="bg-primary/10 w-10 h-10 rounded flex items-center justify-center">
-              <span className="material-symbols-outlined text-primary font-bold">storefront</span>
+              <Store className="h-5 w-5 text-primary" />
             </div>
           )}
           <h1 className="font-sans text-lg font-bold text-ink uppercase tracking-widest leading-none">
@@ -558,7 +569,7 @@ export default function ClientePortal() {
               placeholder="Pesquisar produto ou código PLU..."
               value={busca}
               onChange={e => setBusca(e.target.value)}
-              className="w-full bg-surface-variant border border-outline-variant rounded-xl py-3 pl-10 pr-4 text-sm font-medium outline-none focus:border-primary transition-colors"
+              className="w-full bg-surface-variant border border-outline-variant rounded-xl py-3 pl-10 pr-4 text-sm font-medium outline-none focus:border-primary transition-colors text-ink"
             />
           </div>
         </div>
@@ -713,7 +724,7 @@ export default function ClientePortal() {
                       <div className="shrink-0 ml-2">
                         {isSelected ? (
                           <div className="bg-primary text-on-primary w-10 h-10 rounded-full flex items-center justify-center shadow-md shadow-primary/20">
-                            <span className="material-symbols-outlined text-lg font-bold">edit</span>
+                            <Edit2 className="h-5 w-5 text-on-primary" />
                           </div>
                         ) : (
                           <div className="bg-primary/10 text-primary transition-colors w-10 h-10 rounded-full flex items-center justify-center">
@@ -942,7 +953,7 @@ export default function ClientePortal() {
                 onClick={() => handleSaveItem(selectedProduct)}
                 className="w-full bg-primary hover:bg-primary-hover text-on-primary py-4 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-primary/10 active:scale-95 transition-transform"
               >
-                <span className="material-symbols-outlined text-lg">check_circle</span>
+                <CheckCircle2 className="h-5 w-5 text-on-primary" />
                 {carrinho[selectedProduct.id] ? 'Atualizar na Lista' : 'Confirmar e Adicionar'}
               </button>
               
@@ -1019,9 +1030,9 @@ export default function ClientePortal() {
                               setDrawerInputManual(item.quantidade.toString());
                               setShowCarrinho(false);
                             }}
-                            className="p-2 text-primary hover:bg-primary/5 rounded-lg border border-primary/20"
+                            className="p-2 text-primary hover:bg-primary/5 rounded-lg border border-primary/20 flex items-center justify-center"
                           >
-                            <span className="material-symbols-outlined text-base">edit</span>
+                            <Edit2 className="h-4 w-4 text-primary" />
                           </button>
                           <button
                             type="button"

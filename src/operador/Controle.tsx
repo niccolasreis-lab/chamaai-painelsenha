@@ -1,9 +1,23 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { 
+  ArrowLeft, 
+  Store, 
+  Settings2, 
+  Moon, 
+  Sun, 
+  Database, 
+  CheckCircle2, 
+  XCircle, 
+  RefreshCw, 
+  Undo2, 
+  Megaphone 
+} from 'lucide-react';
 import { getApiUrl, setServerIp } from '../shared/apiConfig';
 import { useSSE } from '../shared/useSSE';
-
-
+import { Button } from '../shared/components/Button';
+import { Input } from '../shared/components/Input';
+import { Dialog } from '../shared/components/Dialog';
 
 export default function Controle() {
   const [fila, setFila] = useState<any[]>([]);
@@ -180,119 +194,166 @@ export default function Controle() {
   const normalCount = fila.filter(s => s.preferencial === 0).length;
   const priorityCount = fila.filter(s => s.preferencial === 1).length;
 
+  const isDark = theme === 'dark';
+
   return (
-    <div className={`min-h-screen w-full font-sans flex justify-center transition-colors duration-300
-      ${theme === 'dark' ? 'bg-[#020617] text-white' : 'bg-[#f8fafc] text-slate-900'}`}>
+    <div className={`min-h-screen w-full font-sans flex justify-center transition-colors duration-normal
+      ${isDark ? 'bg-inverse-surface text-inverse-on-surface' : 'bg-background text-ink'}`}>
       
       <div className="w-full max-w-[500px] h-screen flex flex-col p-4 gap-4 overflow-y-auto overflow-x-hidden">
         
         {/* Header Superior */}
-        <div className={`flex items-center justify-between p-4 rounded-3xl border shadow-sm transition-all
-          ${theme === 'dark' ? 'bg-slate-800/50 border-white/10' : 'bg-white border-slate-200'}`}>
+        <div className={`flex items-center justify-between p-4 rounded-sm border shadow-sm transition-all
+          ${isDark ? 'bg-surface/5 border-outline-variant/30' : 'bg-surface border-outline-variant'}`}>
           <div className="flex items-center gap-3">
-            <Link to="/" onClick={() => localStorage.removeItem('app_mode')} className="p-2 rounded-full hover:bg-slate-500/10 text-slate-500 flex items-center justify-center outline-none" title="Voltar ao Menu Principal">
-              <span className="material-symbols-outlined text-xl">arrow_back</span>
+            <Link 
+              to="/" 
+              onClick={() => localStorage.removeItem('app_mode')} 
+              className={`p-2 rounded-sm transition-colors flex items-center justify-center outline-none ${isDark ? 'hover:bg-white/10 text-inverse-on-surface/60' : 'hover:bg-surface-container-low text-ink-variant'}`}
+              title="Voltar ao Menu Principal"
+            >
+              <ArrowLeft className="h-5 w-5" />
             </Link>
-            <span className={`material-symbols-outlined text-xl ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>storefront</span>
-            <span className="font-sans text-lg font-bold uppercase tracking-wide">{guiche}</span>
+            <Store className={`h-5 w-5 ${isDark ? 'text-inverse-primary' : 'text-primary'}`} />
+            <span className="font-sans text-sm font-bold uppercase tracking-wider">{guiche}</span>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => {
-              setTempIp(API_URL.replace('http://', '').split(':')[0]);
-              setShowIpConfig(true);
-            }} className="p-2 rounded-full bg-slate-500/10 text-slate-500">
-              <span className="material-symbols-outlined">settings_ethernet</span>
-            </button>
-            <button onClick={toggleTheme} className="p-2 rounded-full bg-blue-500/10 text-blue-500">
-              <span className="material-symbols-outlined">{theme === 'light' ? 'dark_mode' : 'light_mode'}</span>
-            </button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="px-2"
+              onClick={() => {
+                setTempIp(API_URL.replace('http://', '').split(':')[0]);
+                setShowIpConfig(true);
+              }}
+            >
+              <Settings2 className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="px-2"
+              onClick={toggleTheme}
+            >
+              {isDark ? <Sun className="h-4 w-4 text-warning" /> : <Moon className="h-4 w-4" />}
+            </Button>
           </div>
         </div>
 
         {/* Modal de Configuração de IP */}
         {showIpConfig && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div className={`w-full max-w-sm rounded-[32px] p-8 shadow-2xl animate-scale-in ${theme === 'dark' ? 'bg-slate-900 border border-white/10' : 'bg-white'}`}>
-              <h3 className="font-sans text-2xl font-bold uppercase mb-2">Conectar ao Servidor</h3>
-              <p className="text-sm text-slate-500 font-semibold mb-6 uppercase tracking-wider">Digite o IP do computador principal</p>
+          <Dialog
+            open={showIpConfig}
+            onClose={() => setShowIpConfig(false)}
+            title="Conectar ao Servidor"
+            maxWidth="max-w-sm"
+          >
+            <div className="space-y-4">
+              <p className="text-xs text-ink-variant font-medium uppercase tracking-wider">Digite o IP do computador principal</p>
               
-              <div className="space-y-4">
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-blue-500/50">dns</span>
-                  <input 
-                    type="text" 
-                    value={tempIp}
-                    onChange={(e) => setTempIp(e.target.value)}
-                    placeholder="Ex: 192.168.3.89"
-                    className={`w-full py-4 pl-12 pr-4 rounded-2xl font-bold border outline-none transition-all ${theme === 'dark' ? 'bg-slate-800 border-white/10 text-white focus:border-blue-500' : 'bg-slate-100 border-slate-200 focus:border-blue-500'}`}
-                  />
-                </div>
-                
-                <div className="flex gap-3 pt-4">
-                  <button onClick={() => setShowIpConfig(false)} className="flex-1 py-3 font-bold uppercase tracking-widest text-sm opacity-50">Cancelar</button>
-                  <button onClick={() => setServerIp(tempIp)} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold uppercase tracking-widest text-sm shadow-lg shadow-blue-500/20">Salvar</button>
-                </div>
-                
-                <button 
-                  onClick={() => setServerIp('')} 
-                  className="w-full text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-4"
+              <Input 
+                label="Endereço de IP"
+                value={tempIp}
+                onChange={e => setTempIp(e.target.value)}
+                placeholder="Ex: 192.168.3.89"
+                leadingIcon={<Database className="h-4 w-4 text-outline" />}
+              />
+
+              <div className="flex gap-3 pt-2">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setShowIpConfig(false)}
+                  className="flex-1"
                 >
-                  Resetar para automático
-                </button>
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={() => {
+                    setServerIp(tempIp);
+                    setShowIpConfig(false);
+                  }}
+                  className="flex-1"
+                >
+                  Salvar
+                </Button>
               </div>
+              
+              <button 
+                type="button"
+                onClick={() => {
+                  setServerIp('');
+                  setShowIpConfig(false);
+                }} 
+                className="w-full text-[10px] font-bold text-outline uppercase tracking-widest mt-2 text-center"
+              >
+                Resetar para automático
+              </button>
             </div>
-          </div>
+          </Dialog>
         )}
 
         {/* Visor Principal */}
-        <div className={`flex-1 flex flex-col items-center justify-center rounded-[40px] border relative overflow-hidden transition-all
-          ${theme === 'dark' ? 'bg-slate-800/30 border-white/5' : 'bg-white border-slate-200 shadow-xl shadow-blue-500/5'}`}>
+        <div className={`flex-1 flex flex-col items-center justify-center rounded-lg border relative overflow-hidden transition-all p-6
+          ${isDark ? 'bg-surface/5 border-outline-variant/30' : 'bg-surface border-outline-variant shadow-sm'}`}>
           
-          <div className="absolute top-0 left-0 w-full h-1 bg-blue-500/20"></div>
-          <span className="text-[11px] font-bold tracking-[5px] uppercase opacity-40 mb-2">Senha em Atendimento</span>
+          <div className="absolute top-0 left-0 w-full h-1 bg-primary/20"></div>
+          <span className="text-[10px] font-bold tracking-[4px] uppercase opacity-50 mb-2">Senha em Atendimento</span>
           
-          <div className={`font-sans text-[120px] font-bold leading-none tracking-tighter drop-shadow-2xl transition-all
-            ${senhaAtual ? 'text-blue-500 scale-110' : 'opacity-10'}`}>
+          <div className={`font-display text-[96px] font-bold leading-none tracking-tighter drop-shadow-md transition-all
+            ${senhaAtual ? 'text-primary scale-105' : 'opacity-15'}`}>
             {senhaAtual ? String(senhaAtual.numero).padStart(3, '0') : '---'}
           </div>
           
-          <div className="mt-4 px-6 py-2 rounded-full bg-blue-500/5 text-blue-500 font-bold text-xs uppercase tracking-widest border border-blue-500/10">
+          <div className={`mt-6 px-4 py-1.5 rounded-full font-bold text-xs uppercase tracking-wider border ${
+            senhaAtual 
+              ? senhaAtual.preferencial 
+                ? 'bg-warning-container text-warning-ink border-warning/20' 
+                : 'bg-primary/5 text-primary border-primary/20' 
+              : 'bg-outline-variant/20 text-outline border-transparent'
+          }`}>
             {senhaAtual ? (senhaAtual.preferencial ? 'Prioritário' : 'Normal') : 'Aguardando'}
           </div>
         </div>
 
         {/* Status da Fila */}
         <div className="grid grid-cols-3 gap-3">
-          <div className={`p-4 rounded-3xl border text-center transition-all ${theme === 'dark' ? 'bg-slate-800/50 border-white/10' : 'bg-white border-slate-200'}`}>
-            <div className="text-2xl font-sans font-bold text-blue-500">{normalCount}</div>
+          <div className={`p-4 rounded-sm border text-center transition-all ${isDark ? 'bg-surface/5 border-outline-variant/30' : 'bg-surface border-outline-variant shadow-sm'}`}>
+            <div className="text-2xl font-bold text-primary font-mono">{normalCount}</div>
             <div className="text-[10px] font-bold uppercase opacity-50">Geral</div>
           </div>
-          <div className={`p-4 rounded-3xl border text-center border-t-4 border-t-amber-500 transition-all ${theme === 'dark' ? 'bg-slate-800/50 border-white/10' : 'bg-white border-slate-200'}`}>
-            <div className="text-2xl font-sans font-bold text-amber-500">{priorityCount}</div>
+          <div className={`p-4 rounded-sm border text-center border-t-4 border-t-warning transition-all ${isDark ? 'bg-surface/5 border-outline-variant/30' : 'bg-surface border-outline-variant shadow-sm'}`}>
+            <div className="text-2xl font-bold text-warning font-mono">{priorityCount}</div>
             <div className="text-[10px] font-bold uppercase opacity-50">Prioritário</div>
           </div>
-          <div className={`p-4 rounded-3xl border text-center transition-all ${theme === 'dark' ? 'bg-slate-800/50 border-white/10' : 'bg-white border-slate-200'}`}>
-            <div className="text-2xl font-sans font-bold">{fila.length}</div>
+          <div className={`p-4 rounded-sm border text-center transition-all ${isDark ? 'bg-surface/5 border-outline-variant/30' : 'bg-surface border-outline-variant shadow-sm'}`}>
+            <div className="text-2xl font-bold font-mono">{fila.length}</div>
             <div className="text-[10px] font-bold uppercase opacity-50">Total</div>
           </div>
         </div>
+
         {/* Botões de Ação */}
         <div className="flex flex-col gap-3 pb-4">
           {senhaAtual && (_config.painel_habilitar_concluir !== '0' || _config.painel_habilitar_nao_compareceu !== '0') && (
             <div className={`grid ${_config.painel_habilitar_concluir !== '0' && _config.painel_habilitar_nao_compareceu !== '0' ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
               {_config.painel_habilitar_concluir !== '0' && (
-                <button 
+                <Button 
                   onClick={concluirAtendimento}
-                  className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-3xl font-bold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
-                  <span className="material-symbols-outlined text-base">check_circle</span> Concluir
-                </button>
+                  variant="primary"
+                  className="bg-success text-white py-6"
+                  icon={<CheckCircle2 className="h-4 w-4" />}
+                >
+                  Concluir
+                </Button>
               )}
               {_config.painel_habilitar_nao_compareceu !== '0' && (
-                <button 
+                <Button 
                   onClick={naoCompareceu}
-                  className="py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-3xl font-bold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
-                  <span className="material-symbols-outlined text-base">cancel</span> Não Compareceu
-                </button>
+                  variant="danger"
+                  className="py-6"
+                  icon={<XCircle className="h-4 w-4" />}
+                >
+                  Não Compareceu
+                </Button>
               )}
             </div>
           )}
@@ -300,28 +361,36 @@ export default function Controle() {
           {senhaAtual && (_config.painel_habilitar_repetir !== '0' || _config.painel_habilitar_devolver !== '0') && (
             <div className={`grid ${_config.painel_habilitar_repetir !== '0' && _config.painel_habilitar_devolver !== '0' ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
               {_config.painel_habilitar_repetir !== '0' && (
-                <button 
+                <Button 
                   onClick={repetirChamada}
-                  className="py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-3xl font-bold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
-                  <span className="material-symbols-outlined text-base">refresh</span> Repetir
-                </button>
+                  variant="primary"
+                  className="py-5"
+                  icon={<RefreshCw className="h-4 w-4" />}
+                >
+                  Repetir
+                </Button>
               )}
               {_config.painel_habilitar_devolver !== '0' && (
-                <button 
+                <Button 
                   onClick={estornar}
-                  className={`py-3 rounded-3xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.95] border-2 uppercase tracking-wider
-                    ${theme === 'dark' ? 'bg-amber-600/20 border-amber-500/50 text-amber-500' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
-                  <span className="material-symbols-outlined text-base">undo</span> Devolver
-                </button>
+                  variant="secondary"
+                  className={`py-5 ${isDark ? 'border-warning/50 text-warning hover:bg-warning/10' : 'border-warning-ink text-warning-ink hover:bg-warning-container'}`}
+                  icon={<Undo2 className="h-4 w-4" />}
+                >
+                  Devolver
+                </Button>
               )}
             </div>
           )}
           
-          <button 
+          <Button 
             onClick={chamarProxima}
-            className="py-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[32px] font-black text-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-4 uppercase tracking-widest">
-            <span className="material-symbols-outlined text-4xl">campaign</span> Próximo
-          </button>
+            variant="primary"
+            className="py-8 text-xl font-bold bg-success hover:brightness-95 active:brightness-90 text-white rounded-md uppercase tracking-wider"
+            icon={<Megaphone className="h-6 w-6" />}
+          >
+            Próximo
+          </Button>
         </div>
 
       </div>

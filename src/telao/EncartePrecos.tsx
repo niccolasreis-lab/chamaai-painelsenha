@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Activity } from 'lucide-react';
 import { getApiUrl } from '../shared/apiConfig';
 import type { ProdutoToledo, Categoria, TemaEncarte, EstablishmentConfig } from '../shared/types';
 
@@ -301,7 +302,7 @@ export default function EncartePrecos({
                 {config?.logo_cliente ? (
                   <img src={`${API_URL}${config.logo_cliente}`} alt="Logo" className="w-full h-full object-contain p-1" />
                 ) : (
-                  <span className="material-symbols-outlined text-white text-[2rem] font-bold">monitoring</span>
+                  <Activity className="text-white h-8 w-8" />
                 )}
               </div>
             </div>
@@ -339,7 +340,7 @@ export default function EncartePrecos({
                   {/* Category header */}
                   <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl ${style.bg} border ${style.border} mb-3.5 break-inside-avoid shadow-sm ${style.isPulse ? 'animate-pulse ring-4 ring-red-500/30 scale-[1.02] shadow-red-500/20' : ''}`}>
                     <span className="text-2xl flex items-center shrink-0">{style.icon}</span>
-                    <h2 className="font-black uppercase tracking-wider text-base truncate text-white" style={{ fontFamily: 'Playfair Display, serif' }}>
+                    <h2 className="font-black uppercase tracking-wider text-base truncate text-white" style={{ fontFamily: 'var(--font-display), sans-serif' }}>
                       {group.nome}
                     </h2>
                     <span className="font-bold uppercase tracking-widest text-white opacity-60 ml-auto text-[10px] shrink-0">
