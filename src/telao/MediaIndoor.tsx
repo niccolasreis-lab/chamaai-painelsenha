@@ -434,13 +434,12 @@ export default function MediaIndoor() {
   }, [sseConnected, telaoCode]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Watch unified SSE events (pairing events + queue/calling events)
+  // Watch unified SSE events (pairing events + queue/calling events) via window events
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (!telaoSseEvent) return;
-
-    if (telaoSseEvent.event === 'NOVA_SENHA_CHAMADA') {
-      const payload = telaoSseEvent.data;
+    const handleNovaSenhaChamada = (e: Event) => {
+      const payload = (e as CustomEvent).detail as RecentCall;
+      console.log('[TELAO] Evento NOVA_SENHA_CHAMADA recebido via Window Event:', payload);
       
       // PASSO 1: Atualizar o estado React imediatamente (agenda o re-render)
       setUltimaSenha(payload);
@@ -465,6 +464,7 @@ export default function MediaIndoor() {
           clearTimeout(repeticaoTimerRef.current);
         }
       }
+
       // PASSO 2: Aguardar o próximo frame de pintura para disparar o áudio
       // Garante que o DOM já foi atualizado antes do som tocar
       requestAnimationFrame(() => {
@@ -492,10 +492,8 @@ export default function MediaIndoor() {
           const pitch = parseFloat(config.telao_tts_tom || '1.0');
           const vozGenero = config.telao_tts_voz || 'Feminina';
 
-          falarSenha(textToSpeak, rate, pitch, vozGenero).then((sucesso) => {
-            if (!sucesso && isMountedRef.current) {
-              playAudio('campainha', (config.volume_audio || 80) / 100);
-            }
+          falarSenha(textToSpeak, rate, pitch, vozGenero).catch(err => {
+            console.error('[TTS] Erro na fala do sintetizador:', err);
           });
         };
 
@@ -547,8 +545,6 @@ export default function MediaIndoor() {
               playMp3Tts('tipo3', num, () => {
                 if (ttsModo === 'ambos') {
                   speakTtsSynthesizer();
-                } else {
-                  playAudio('campainha', (config.volume_audio || 80) / 100);
                 }
               });
             });
@@ -557,8 +553,6 @@ export default function MediaIndoor() {
               playMp3Tts('tipo1', num, () => {
                 if (ttsModo === 'ambos') {
                   speakTtsSynthesizer();
-                } else {
-                  playAudio('campainha', (config.volume_audio || 80) / 100);
                 }
               });
             });
@@ -571,25 +565,28 @@ export default function MediaIndoor() {
             playMp3Tts('tipo1', num, () => {
               if (ttsModo === 'ambos') {
                 speakTtsSynthesizer();
-              } else {
-                playAudio('campainha', (config.volume_audio || 80) / 100);
               }
             });
           });
         };
 
+        // 🔔 Tocar campainha imediatamente em todas as chamadas
+        playAudio('campainha', (config.volume_audio || 80) / 100);
+
+        // Se TTS estiver ativo, fala/toca MP3 após 1.5 segundos
         if (ttsModo !== 'desativado' && !temSomPersonalizado) {
-          if (ttsModo === 'sintetizador') {
-            speakTtsSynthesizer();
-          } else {
-            if (payload.repeticao) {
-              playRecallMp3();
+          setTimeout(() => {
+            if (!isMountedRef.current) return;
+            if (ttsModo === 'sintetizador') {
+              speakTtsSynthesizer();
             } else {
-              playFirstCallMp3();
+              if (payload.repeticao) {
+                playRecallMp3();
+              } else {
+                playFirstCallMp3();
+              }
             }
-          }
-        } else {
-          playAudio('campainha', (config.volume_audio || 80) / 100);
+          }, 1500);
         }
       });
 
@@ -601,52 +598,67 @@ export default function MediaIndoor() {
       (window as unknown as { _mediaTimer?: ReturnType<typeof setTimeout> })._mediaTimer = setTimeout(() => {
         setShowMedia(true);
       }, 6000);
+    };
 
-    } else if (telaoSseEvent.event === 'NOVA_SENHA_EMITIDA' || telaoSseEvent.event === 'SENHA_ESTORNADA') {
+    const handleSenhaEstornada = (e: Event) => {
+      const data = (e as CustomEvent).detail;
       fetchAguardando();
-      if (telaoSseEvent.event === 'SENHA_ESTORNADA') {
-        const estornadaId = telaoSseEvent.data?.id;
-        setHistorico(prev => {
-          const newHistory = prev.filter(s => s.id !== estornadaId);
-          setUltimaSenha(currentActive => {
-            if (currentActive && currentActive.id === estornadaId) {
-              return newHistory.length > 0 ? newHistory[0] : null;
-            }
-            return currentActive;
-          });
-          return newHistory;
-        });
+      const estornadaId = data?.id;
+      setHistorico(prev => {
+        const newHistory = prev.filter(s => s.id !== estornadaId);
         setUltimaSenha(currentActive => {
           if (currentActive && currentActive.id === estornadaId) {
-            setIsRepeticao(false);
-            if (repeticaoTimerRef.current) {
-              clearTimeout(repeticaoTimerRef.current);
-            }
+            return newHistory.length > 0 ? newHistory[0] : null;
           }
           return currentActive;
         });
-      }
-    } else if (telaoSseEvent.event === 'queue-update') {
-      const { geral, preferencial } = telaoSseEvent.data || {};
+        return newHistory;
+      });
+      setUltimaSenha(currentActive => {
+        if (currentActive && currentActive.id === estornadaId) {
+          setIsRepeticao(false);
+          if (repeticaoTimerRef.current) {
+            clearTimeout(repeticaoTimerRef.current);
+          }
+        }
+        return currentActive;
+      });
+    };
+
+    const handleQueueUpdate = (e: Event) => {
+      const data = (e as CustomEvent).detail;
+      const { geral, preferencial } = data || {};
       setPessoasAguardando((geral || 0) + (preferencial || 0));
-    } else if (telaoSseEvent.event === 'CONFIG_ATUALIZADA') {
+    };
+
+    const handleConfigAtualizada = () => {
       autoRecoverAttemptsRef.current = 0;
       fetchConfig();
       refreshEncarteData('SSE: CONFIG_ATUALIZADA');
-    } else if (telaoSseEvent.event === 'MEDIA_SETTINGS_UPDATED') {
+    };
+
+    const handleMediaSettingsUpdated = () => {
       autoRecoverAttemptsRef.current = 0;
       fetchSmartMediaSettings();
       refreshEncarteData('SSE: MEDIA_SETTINGS_UPDATED');
-    } else if (telaoSseEvent.event === 'MEDIA_THEME_UPDATED') {
+    };
+
+    const handleMediaThemeUpdated = () => {
       autoRecoverAttemptsRef.current = 0;
       refreshEncarteData('SSE: MEDIA_THEME_UPDATED');
-    } else if (telaoSseEvent.event === 'MIDIAS_ATUALIZADAS') {
+    };
+
+    const handleMidiasAtualizadas = () => {
       fetchMidias();
-    } else if (telaoSseEvent.event === 'TOLEDO_PRECOS_ATUALIZADOS') {
+    };
+
+    const handleToledoPrecosAtualizados = () => {
       autoRecoverAttemptsRef.current = 0;
       setEncarteRefreshKey(prev => prev + 1);
       refreshEncarteData('SSE: TOLEDO_PRECOS_ATUALIZADOS');
-    } else if (telaoSseEvent.event === 'SISTEMA_RESETADO') {
+    };
+
+    const handleSistemaResetado = () => {
       setUltimaSenha(null);
       setHistorico([]);
       setShowMedia(true);
@@ -655,8 +667,10 @@ export default function MediaIndoor() {
         clearTimeout(repeticaoTimerRef.current);
       }
       fetchAguardando();
-    } else if (telaoSseEvent.event === 'TELAO_VINCULADO' || telaoSseEvent.event === 'TELAO_ATUALIZADO') {
-      const data = telaoSseEvent.data;
+    };
+
+    const handleTelaoVinculado = (e: Event) => {
+      const data = (e as CustomEvent).detail;
       setPerfil(data);
       
       const modules: string[] = [];
@@ -665,12 +679,16 @@ export default function MediaIndoor() {
       if (data.modulo_midia) modules.push('midia');
       setActiveModules(modules);
       setShowingEncarte(modules.includes('encarte') && !modules.includes('midia'));
-    } else if (telaoSseEvent.event === 'TELAO_DESVINCULADO') {
+    };
+
+    const handleTelaoDesvinculado = () => {
       localStorage.removeItem('telao_code');
       setTelaoCode(null);
       setPerfil(null);
       setActiveModules([]);
-    } else if (telaoSseEvent.event === 'DIA_RESETADO') {
+    };
+
+    const handleDiaResetado = () => {
       setUltimaSenha(null);
       setHistorico([]);
       setShowMedia(true);
@@ -681,11 +699,45 @@ export default function MediaIndoor() {
       fetchAguardando();
       fetchRecentCalls();
       refreshEncarteData('SSE: DIA_RESETADO');
-      console.log('[ChamaAí] Dia resetado — estado recarregado');
-    } else if (telaoSseEvent.event === 'RECARREGAR_PAGINA') {
+      console.log('[ChamaAí] Dia resetado — estado recarregado via Window Event');
+    };
+
+    const handleRecarregarPagina = () => {
       window.location.reload();
-    }
-  }, [telaoSseEvent, refreshEncarteData]);
+    };
+
+    window.addEventListener('NOVA_SENHA_CHAMADA', handleNovaSenhaChamada);
+    window.addEventListener('SENHA_ESTORNADA', handleSenhaEstornada);
+    window.addEventListener('queue-update', handleQueueUpdate);
+    window.addEventListener('CONFIG_ATUALIZADA', handleConfigAtualizada);
+    window.addEventListener('MEDIA_SETTINGS_UPDATED', handleMediaSettingsUpdated);
+    window.addEventListener('MEDIA_THEME_UPDATED', handleMediaThemeUpdated);
+    window.addEventListener('MIDIAS_ATUALIZADAS', handleMidiasAtualizadas);
+    window.addEventListener('TOLEDO_PRECOS_ATUALIZADOS', handleToledoPrecosAtualizados);
+    window.addEventListener('SISTEMA_RESETADO', handleSistemaResetado);
+    window.addEventListener('TELAO_VINCULADO', handleTelaoVinculado);
+    window.addEventListener('TELAO_ATUALIZADO', handleTelaoVinculado);
+    window.addEventListener('TELAO_DESVINCULADO', handleTelaoDesvinculado);
+    window.addEventListener('DIA_RESETADO', handleDiaResetado);
+    window.addEventListener('RECARREGAR_PAGINA', handleRecarregarPagina);
+
+    return () => {
+      window.removeEventListener('NOVA_SENHA_CHAMADA', handleNovaSenhaChamada);
+      window.removeEventListener('SENHA_ESTORNADA', handleSenhaEstornada);
+      window.removeEventListener('queue-update', handleQueueUpdate);
+      window.removeEventListener('CONFIG_ATUALIZADA', handleConfigAtualizada);
+      window.removeEventListener('MEDIA_SETTINGS_UPDATED', handleMediaSettingsUpdated);
+      window.removeEventListener('MEDIA_THEME_UPDATED', handleMediaThemeUpdated);
+      window.removeEventListener('MIDIAS_ATUALIZADAS', handleMidiasAtualizadas);
+      window.removeEventListener('TOLEDO_PRECOS_ATUALIZADOS', handleToledoPrecosAtualizados);
+      window.removeEventListener('SISTEMA_RESETADO', handleSistemaResetado);
+      window.removeEventListener('TELAO_VINCULADO', handleTelaoVinculado);
+      window.removeEventListener('TELAO_ATUALIZADO', handleTelaoVinculado);
+      window.removeEventListener('TELAO_DESVINCULADO', handleTelaoDesvinculado);
+      window.removeEventListener('DIA_RESETADO', handleDiaResetado);
+      window.removeEventListener('RECARREGAR_PAGINA', handleRecarregarPagina);
+    };
+  }, [config, refreshEncarteData]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Rotate between media and active modules
