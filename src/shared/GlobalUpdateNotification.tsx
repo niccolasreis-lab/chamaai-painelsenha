@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { CheckCircle2, X, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Button } from './components';
 
 export default function GlobalUpdateNotification() {
   const [updateState, setUpdateState] = useState<'idle' | 'available' | 'downloading' | 'downloaded' | 'error'>('idle');
@@ -117,13 +119,11 @@ export default function GlobalUpdateNotification() {
   // Exibe o card de sucesso de atualização primeiro, se aplicável
   if (showSuccessCard && justUpdatedInfo) {
     return (
-      <div className="fixed bottom-6 right-6 z-[9999] max-w-sm w-full bg-surface/95 backdrop-blur-md border border-success/30 rounded-3xl p-5 shadow-2xl animate-scale-in flex flex-col gap-4 font-sans text-ink">
+      <div className="fixed bottom-6 right-6 z-[9999] max-w-sm w-full bg-surface/95 backdrop-blur-md border border-success/30 rounded-3xl p-5 shadow-lg animate-scale-in flex flex-col gap-4 font-sans text-ink">
         <div className="flex items-start justify-between gap-3">
           <div className="flex gap-3">
             <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-success/15 text-success">
-              <span className="material-symbols-outlined font-black">
-                verified
-              </span>
+              <CheckCircle2 className="h-6 w-6" strokeWidth={2.5} />
             </div>
             <div>
               <h4 className="font-bold text-sm uppercase tracking-wider text-success">
@@ -143,7 +143,7 @@ export default function GlobalUpdateNotification() {
             onClick={() => setShowSuccessCard(false)} 
             className="text-ink-secondary/60 hover:text-ink hover:bg-outline-variant/40 w-6 h-6 rounded-full flex items-center justify-center transition-all shrink-0"
           >
-            <span className="material-symbols-outlined text-[18px]">close</span>
+            <X className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -153,17 +153,16 @@ export default function GlobalUpdateNotification() {
   if (updateState === 'idle' || dismissed) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] max-w-sm w-full bg-surface/95 backdrop-blur-md border border-outline-variant/60 rounded-3xl p-5 shadow-2xl animate-scale-in flex flex-col gap-4 font-sans text-ink">
+    <div className="fixed bottom-6 right-6 z-[9999] max-w-sm w-full bg-surface/95 backdrop-blur-md border border-outline-variant/60 rounded-3xl p-5 shadow-lg animate-scale-in flex flex-col gap-4 font-sans text-ink">
       <div className="flex items-start justify-between gap-3">
         <div className="flex gap-3">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
             updateState === 'downloaded' ? 'bg-success/15 text-success' :
-            updateState === 'error' ? 'bg-error/15 text-error' : 'bg-primary/15 text-primary'
+            updateState === 'error' ? 'bg-error-container text-error' : 'bg-primary/15 text-primary'
           }`}>
-            <span className="material-symbols-outlined font-black">
-              {updateState === 'downloaded' ? 'check_circle' :
-               updateState === 'error' ? 'warning' : 'update'}
-            </span>
+            {updateState === 'downloaded' ? <CheckCircle2 className="h-6 w-6" strokeWidth={2.5} /> :
+             updateState === 'error' ? <AlertTriangle className="h-6 w-6" strokeWidth={2.5} /> : 
+             <RefreshCw className="h-6 w-6" strokeWidth={2.5} />}
           </div>
           <div>
             <h4 className="font-bold text-sm uppercase tracking-wider">
@@ -184,14 +183,14 @@ export default function GlobalUpdateNotification() {
           onClick={() => setDismissed(true)} 
           className="text-ink-secondary/60 hover:text-ink hover:bg-outline-variant/40 w-6 h-6 rounded-full flex items-center justify-center transition-all shrink-0"
         >
-          <span className="material-symbols-outlined text-[18px]">close</span>
+          <X className="h-4 w-4" />
         </button>
       </div>
 
       {updateState === 'downloading' && (
         <div className="w-full bg-outline-variant/30 h-2.5 rounded-full overflow-hidden">
           <div 
-            className="bg-primary h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(59,130,246,0.5)]" 
+            className="bg-primary h-full rounded-full transition-all duration-300 ease-out shadow-sm" 
             style={{ width: `${progress}%` }}
           ></div>
         </div>
@@ -199,18 +198,19 @@ export default function GlobalUpdateNotification() {
 
       {updateState === 'downloaded' && (
         <div className="flex gap-3">
-          <button 
+          <Button 
+            variant="ghost"
             onClick={() => setDismissed(true)}
-            className="flex-1 py-2.5 bg-surface-variant hover:bg-outline-variant/50 text-ink rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all"
+            className="flex-1 text-[10px] tracking-widest font-bold uppercase"
           >
             Depois
-          </button>
-          <button 
+          </Button>
+          <Button 
             onClick={handleInstall}
-            className="flex-1 py-2.5 bg-success hover:bg-success-hover text-white rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-success/20 active:scale-95 transition-all"
+            className="flex-1 text-[10px] tracking-widest font-bold uppercase bg-success text-white hover:bg-success/90 border-transparent shadow-md"
           >
             Instalar Agora
-          </button>
+          </Button>
         </div>
       )}
     </div>

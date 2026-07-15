@@ -25,6 +25,8 @@ import Login from './Login';
 import ClientePortal from './cliente/ClientePortal';
 import LicenseGate from './shared/LicenseGate';
 import GlobalUpdateNotification from './shared/GlobalUpdateNotification';
+import { Ticket, Monitor, User, Tablet, Shield, Network, Loader2 } from 'lucide-react';
+import { Dialog, Input, Button } from './shared/components';
 
 function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) {
   const [checking, setChecking] = useState(true);
@@ -96,8 +98,8 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
 
   if (checking) {
     return (
-      <div className="h-screen w-full flex flex-col gap-4 items-center justify-center font-sans text-slate-400 bg-slate-950 font-bold uppercase tracking-widest text-xs">
-        <span className="material-symbols-outlined animate-spin text-4xl text-blue-500">refresh</span>
+      <div className="h-screen w-full flex flex-col gap-4 items-center justify-center font-sans text-ink-variant bg-background font-bold uppercase tracking-widest text-xs">
+        <Loader2 className="animate-spin text-primary h-10 w-10" />
         Verificando credenciais...
       </div>
     );
@@ -179,62 +181,62 @@ function Home() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl w-full">
         {/* Totem */}
-        <Link to="/totem" className="group p-10 bg-surface rounded-[32px] shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex flex-col items-center text-center">
-          <div className="w-20 h-20 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-            <span className="material-symbols-outlined text-[40px]">confirmation_number</span>
+        <Link to="/totem" className="group p-8 bg-surface rounded-3xl shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex flex-col items-center text-center hover:shadow-md">
+          <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+            <Ticket className="h-8 w-8" strokeWidth={2.5} />
           </div>
-          <h2 className="font-sans text-2xl font-bold text-ink mb-2 uppercase tracking-wide">Totem</h2>
-          <p className="text-sm text-ink-secondary font-semibold uppercase tracking-widest">Emissão de senhas para clientes.</p>
+          <h2 className="font-sans text-xl font-bold text-ink mb-2 uppercase tracking-wide">Totem</h2>
+          <p className="text-xs text-ink-secondary font-semibold uppercase tracking-widest">Emissão de senhas para clientes.</p>
         </Link>
         
         {/* Telão */}
-        <Link to="/telao" className="group p-10 bg-surface rounded-[32px] shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex flex-col items-center text-center">
-          <div className="w-20 h-20 rounded-full bg-success/10 text-success flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-            <span className="material-symbols-outlined text-[40px]">desktop_windows</span>
+        <Link to="/telao" className="group p-8 bg-surface rounded-3xl shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex flex-col items-center text-center hover:shadow-md">
+          <div className="w-16 h-16 rounded-full bg-success/10 text-success flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+            <Monitor className="h-8 w-8" strokeWidth={2.5} />
           </div>
-          <h2 className="font-sans text-2xl font-bold text-ink mb-2 uppercase tracking-wide">Telão</h2>
-          <p className="text-sm text-ink-secondary font-semibold uppercase tracking-widest">Mídia indoor e chamadas.</p>
+          <h2 className="font-sans text-xl font-bold text-ink mb-2 uppercase tracking-wide">Telão</h2>
+          <p className="text-xs text-ink-secondary font-semibold uppercase tracking-widest">Mídia indoor e chamadas.</p>
         </Link>
         
         {/* Operador */}
         <div className="flex flex-col gap-4">
-          <Link to="/operador" className="group flex-1 p-10 bg-surface rounded-[32px] shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex flex-col items-center text-center">
-            <div className="w-20 h-20 rounded-full bg-ink/5 text-ink flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-              <span className="material-symbols-outlined text-[40px]">person</span>
+          <Link to="/operador" className="group flex-1 p-8 bg-surface rounded-3xl shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex flex-col items-center text-center hover:shadow-md">
+            <div className="w-16 h-16 rounded-full bg-ink/5 text-ink flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <User className="h-8 w-8" strokeWidth={2.5} />
             </div>
-            <h2 className="font-sans text-2xl font-bold text-ink mb-2 uppercase tracking-wide">Operador</h2>
-            <p className="text-sm text-ink-secondary font-semibold uppercase tracking-widest">Painel Padrão (Vertical)</p>
+            <h2 className="font-sans text-xl font-bold text-ink mb-2 uppercase tracking-wide">Operador</h2>
+            <p className="text-xs text-ink-secondary font-semibold uppercase tracking-widest">Painel Padrão (Vertical)</p>
           </Link>
           <Link 
             to="/operador-touch" 
             onClick={() => localStorage.setItem('app_mode', 'touch')}
-            className="group p-4 bg-surface rounded-[24px] shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex items-center justify-center gap-3"
+            className="group p-4 bg-surface rounded-2xl shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex items-center justify-center gap-3 hover:shadow-md"
           >
-            <span className="material-symbols-outlined text-primary">tablet_landscape</span>
-            <span className="font-sans text-sm font-bold text-ink uppercase tracking-wider">Painel Touch (TV)</span>
+            <Tablet className="h-5 w-5 text-primary" strokeWidth={2.5} />
+            <span className="font-sans text-xs font-bold text-ink uppercase tracking-wider">Painel Touch (TV)</span>
           </Link>
 
         </div>
         
         {/* Admin */}
-        <Link to="/admin" className="group p-10 bg-surface rounded-[32px] shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex flex-col items-center text-center">
-          <div className="w-20 h-20 rounded-full bg-primary text-white flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-primary/20">
-            <span className="material-symbols-outlined text-[40px]">admin_panel_settings</span>
+        <Link to="/admin" className="group p-8 bg-surface rounded-3xl shadow-sm border border-outline-variant/50 hover:border-primary transition-all flex flex-col items-center text-center hover:shadow-md">
+          <div className="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-primary/20">
+            <Shield className="h-8 w-8" strokeWidth={2.5} />
           </div>
-          <h2 className="font-sans text-2xl font-bold text-ink mb-2 uppercase tracking-wide">Admin</h2>
-          <p className="text-sm text-ink-secondary font-semibold uppercase tracking-widest">Gestão e configurações.</p>
+          <h2 className="font-sans text-xl font-bold text-ink mb-2 uppercase tracking-wide">Admin</h2>
+          <p className="text-xs text-ink-secondary font-semibold uppercase tracking-widest">Gestão e configurações.</p>
         </Link>
       </div>
 
       <div className="mt-16 flex flex-col items-center gap-4 w-full max-w-lg">
-        <div className="w-full h-[1px] bg-outline-variant/30"></div>
+        <div className="w-full h-px bg-outline-variant/30"></div>
         <button 
           onClick={() => setShowModal(true)}
-          className="group relative flex flex-col items-center gap-2 p-6 rounded-[24px] border border-outline-variant/30 hover:border-primary/50 hover:bg-primary/5 transition-all w-full"
+          className="group relative flex flex-col items-center gap-2 p-6 rounded-3xl border border-outline-variant/50 hover:border-primary/50 hover:bg-primary/5 transition-all w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           <div className="flex items-center gap-3 text-primary">
-            <span className="material-symbols-outlined font-bold">hub</span>
-            <span className="font-sans text-sm font-bold uppercase tracking-[0.2em]">Configuração de Conexão</span>
+            <Network className="h-5 w-5" strokeWidth={2.5} />
+            <span className="font-sans text-xs font-bold uppercase tracking-[0.2em]">Configuração de Conexão</span>
           </div>
           
           <div className="text-center">
@@ -249,52 +251,43 @@ function Home() {
           <span className="absolute top-2 right-4 text-[10px] font-bold text-ink-secondary/20 group-hover:text-primary/40 transition-colors uppercase tracking-tighter">Clique para alterar</span>
         </button>
         
-        <p className="text-[10px] text-ink-secondary/50 font-bold uppercase tracking-[0.2em] text-center leading-relaxed">
+        <p className="text-[10px] text-ink-secondary/70 font-bold uppercase tracking-[0.2em] text-center leading-relaxed max-w-sm">
           Para terminais clientes (Totem/Operador), aponte para o IP do Telão.<br/>
           O IP deve ser fixo no roteador para evitar desconexões.
         </p>
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-surface rounded-3xl p-8 max-w-md w-full shadow-2xl border border-outline-variant/30 flex flex-col gap-6">
-            <div>
-              <h3 className="font-sans text-2xl font-bold text-ink uppercase mb-2">Configuração de Rede</h3>
-              <p className="text-sm font-sans text-ink-secondary font-medium">
-                Digite o IP ou Nome do Computador Principal (Telão) para que este terminal se conecte a ele.
-              </p>
-            </div>
-            <div>
-              <label className="block font-bold tracking-widest text-ink-secondary uppercase mb-2 text-xs">IP DO SERVIDOR</label>
-              <input 
-                type="text" 
-                value={tempIp}
-                onChange={(e) => setTempIp(e.target.value)}
-                placeholder="Ex: 192.168.1.100 (Deixe em branco para este PC ser o Servidor)"
-                className="w-full bg-surface-variant border border-outline-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-ink font-bold text-lg"
-                autoFocus
-              />
-              <p className="text-[10px] text-ink-secondary/60 mt-2 font-semibold uppercase tracking-wider">
-                Deixe o campo vazio para que este computador atue como o Servidor Principal (Localhost).
-              </p>
-            </div>
-            <div className="flex gap-4">
-              <button 
-                onClick={() => setShowModal(false)}
-                className="flex-1 py-4 bg-surface-variant text-ink rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-outline-variant/50 transition-all"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleSaveConnection}
-                className="flex-1 py-4 bg-primary text-white rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-primary-hover active:scale-95 transition-all"
-              >
-                Salvar
-              </button>
-            </div>
-          </div>
+      <Dialog
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        title="Configuração de Rede"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveConnection}>
+              Salvar
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-ink-variant">
+            Digite o IP ou Nome do Computador Principal (Telão) para que este terminal se conecte a ele.
+          </p>
+          
+          <Input
+            label="IP DO SERVIDOR"
+            type="text"
+            value={tempIp}
+            onChange={(e) => setTempIp(e.target.value)}
+            placeholder="Ex: 192.168.1.100 (Vazio para Localhost)"
+            helper="Deixe o campo vazio para que este computador atue como o Servidor Principal (Localhost)."
+            autoFocus
+          />
         </div>
-      )}
+      </Dialog>
 
       <div className="mt-8 text-ink-secondary text-xs opacity-50 font-bold uppercase tracking-widest">
         ChamaAí v1.0.115

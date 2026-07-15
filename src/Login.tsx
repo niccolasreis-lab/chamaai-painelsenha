@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getApiUrl } from './shared/apiConfig';
 import Logo from './shared/Logo';
+import { User, Lock, Loader2, ArrowRight, Network, KeyRound } from 'lucide-react';
+import { Input, Button, Dialog } from './shared/components';
 
 export default function Login() {
   const [login, setLogin] = useState('');
@@ -63,7 +65,6 @@ export default function Login() {
     };
     checkLogged();
   }, []);
-
 
   const handleSaveConnection = () => {
     if (tempIp.trim() === '') {
@@ -177,84 +178,76 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center font-sans relative overflow-hidden p-4">
-      {/* Background Decorativo */}
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none"></div>
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center font-sans relative overflow-hidden p-4">
+      {/* Background Decorativo - usando variáveis do design system e menos blur agressivo */}
+      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-primary/20 rounded-full blur-[100px] pointer-events-none"></div>
+      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-secondary/20 rounded-full blur-[100px] pointer-events-none"></div>
 
-      <div className="w-full max-w-md bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-[2rem] p-10 shadow-2xl relative z-10">
-        <div className="flex flex-col items-center mb-10">
-          <Logo variant="vertical" darkMode={true} size={80} />
-          <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-[10px] mt-3 text-center">Controle de Acesso</p>
+      <div className="w-full max-w-md bg-surface border border-outline-variant rounded-2xl p-10 shadow-lg relative z-10">
+        <div className="flex flex-col items-center mb-8">
+          <Logo variant="vertical" darkMode={false} size={80} />
+          <p className="text-ink-variant font-bold uppercase tracking-[0.2em] text-[10px] mt-4 text-center">Controle de Acesso</p>
         </div>
 
-        <form onSubmit={handleLogin} className="flex flex-col gap-6">
+        <form onSubmit={handleLogin} className="flex flex-col gap-5">
           {error && (
-            <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold p-4 rounded-xl text-center uppercase tracking-wider leading-relaxed">
+            <div className="bg-error-container text-error text-xs font-bold p-3 rounded-md text-center uppercase tracking-wider leading-relaxed">
               {error}
             </div>
           )}
 
-          <div>
-            <label className="block text-slate-400 text-xs font-bold uppercase tracking-widest mb-2 ml-1">Usuário</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-500">person</span>
-              <input
-                type="text"
-                value={login}
-                onChange={(e) => setLogin(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-4 pl-12 pr-4 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="Digite seu usuário"
-                required
-                autoFocus
-              />
-            </div>
-          </div>
+          <Input
+            label="Usuário"
+            type="text"
+            value={login}
+            onChange={(e) => setLogin(e.target.value)}
+            placeholder="Digite seu usuário"
+            leadingIcon={<User className="h-5 w-5" />}
+            required
+            autoFocus
+          />
 
-          <div>
-            <label className="block text-slate-400 text-xs font-bold uppercase tracking-widest mb-2 ml-1">Senha</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-500">lock</span>
-              <input
-                type="password"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-4 pl-12 pr-4 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="Digite sua senha"
-                required
-              />
-            </div>
-          </div>
+          <Input
+            label="Senha"
+            type="password"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            placeholder="Digite sua senha"
+            leadingIcon={<Lock className="h-5 w-5" />}
+            required
+          />
 
-          <button
+          <Button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-sans text-xl font-bold uppercase tracking-widest py-4 rounded-xl mt-4 transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 flex justify-center items-center gap-2"
+            className="w-full mt-4 text-sm tracking-widest font-bold uppercase flex justify-center items-center h-12"
           >
             {loading ? (
-              <span className="material-symbols-outlined animate-spin">refresh</span>
+              <Loader2 className="animate-spin h-5 w-5" />
             ) : (
               <>
                 Entrar
-                <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                <ArrowRight className="h-5 w-5 ml-2" />
               </>
             )}
-          </button>
+          </Button>
         </form>
 
         <div className="mt-8 flex flex-col items-center gap-4">
-          <div className="w-full h-[1px] bg-slate-800/60"></div>
-          <button 
-            type="button"
-            onClick={() => setShowSettingsModal(true)}
-            className="w-full py-3 bg-slate-950 hover:bg-slate-800 text-blue-400 border border-blue-900/30 rounded-xl font-bold uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2"
-          >
-            <span className="material-symbols-outlined text-sm font-bold">hub</span>
-            Configurar IP do Servidor
-          </button>
+          <div className="w-full h-px bg-outline-variant/50"></div>
           
-          <div className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-relaxed">
-            Status: <span className={localStorage.getItem('server_ip_override') ? 'text-emerald-400' : 'text-slate-400'}>
+          <Button 
+            variant="secondary"
+            onClick={() => setShowSettingsModal(true)}
+            className="w-full text-xs tracking-widest uppercase font-bold"
+          >
+            <Network className="h-4 w-4 mr-2" />
+            Configurar IP do Servidor
+          </Button>
+          
+          <div className="text-center text-[10px] font-bold uppercase tracking-widest leading-relaxed">
+            <span className="text-ink-variant">Status: </span>
+            <span className={localStorage.getItem('server_ip_override') ? 'text-success' : 'text-primary'}>
               {localStorage.getItem('server_ip_override') 
                 ? `Servidor: ${localStorage.getItem('server_ip_override')}` 
                 : 'Localhost (Servidor Principal)'}
@@ -262,119 +255,107 @@ export default function Login() {
           </div>
         </div>
 
-        <button 
+        <Button 
+          variant="ghost"
           onClick={() => navigate('/')}
-          className="w-full mt-6 text-slate-600 hover:text-slate-400 text-xs font-bold uppercase tracking-widest transition-colors"
+          className="w-full mt-6 text-xs uppercase tracking-widest font-bold text-ink-variant hover:text-ink"
         >
           Voltar para Home
-        </button>
+        </Button>
       </div>
 
       {/* Modal de Forçar Troca de Senha no Primeiro Acesso */}
-      {showChangePassword && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[99] flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col gap-6 relative z-50">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mb-4">
-                <span className="material-symbols-outlined text-amber-500 text-3xl animate-pulse">lock_reset</span>
-              </div>
-              <h3 className="font-sans text-2xl font-bold text-white uppercase mb-2">Primeiro Acesso</h3>
-              <p className="text-sm font-sans text-slate-400 font-medium">
-                Por questões cruciais de segurança, é necessário alterar sua senha temporária antes de continuar.
-              </p>
+      <Dialog
+        open={showChangePassword}
+        onClose={() => {
+          // Bloqueia fechamento não intencional
+        }}
+        title="Primeiro Acesso"
+      >
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-warning/10 rounded-full flex items-center justify-center mb-4">
+              <KeyRound className="text-warning h-8 w-8 animate-pulse" />
             </div>
-
-            <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
-              {changeError && (
-                <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold p-3 rounded-xl text-center uppercase tracking-wider">
-                  {changeError}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-slate-400 text-xs font-bold uppercase tracking-widest mb-2 ml-1">Nova Senha</label>
-                <input 
-                  type="password" 
-                  value={novaSenha}
-                  onChange={(e) => setNovaSenha(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 text-white font-bold text-lg placeholder:text-slate-700"
-                  required
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 text-xs font-bold uppercase tracking-widest mb-2 ml-1">Confirmar Nova Senha</label>
-                <input 
-                  type="password" 
-                  value={confirmaNovaSenha}
-                  onChange={(e) => setConfirmaNovaSenha(e.target.value)}
-                  placeholder="Repita a nova senha"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 text-white font-bold text-lg placeholder:text-slate-700"
-                  required
-                />
-              </div>
-
-              <button 
-                type="submit"
-                disabled={changeLoading}
-                className="w-full py-4 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold uppercase tracking-widest text-sm rounded-xl transition-all shadow-lg shadow-amber-900/10 flex justify-center items-center gap-2"
-              >
-                {changeLoading ? (
-                  <span className="material-symbols-outlined animate-spin">refresh</span>
-                ) : (
-                  'Alterar Senha e Entrar'
-                )}
-              </button>
-            </form>
+            <p className="text-sm font-sans text-ink-variant font-medium">
+              Por questões de segurança, é necessário alterar sua senha temporária antes de continuar.
+            </p>
           </div>
+
+          <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
+            {changeError && (
+              <div className="bg-error-container text-error text-xs font-bold p-3 rounded-md text-center uppercase tracking-wider">
+                {changeError}
+              </div>
+            )}
+
+            <Input
+              label="Nova Senha"
+              type="password"
+              value={novaSenha}
+              onChange={(e) => setNovaSenha(e.target.value)}
+              placeholder="Mínimo 6 caracteres"
+              required
+              autoFocus
+            />
+
+            <Input
+              label="Confirmar Nova Senha"
+              type="password"
+              value={confirmaNovaSenha}
+              onChange={(e) => setConfirmaNovaSenha(e.target.value)}
+              placeholder="Repita a nova senha"
+              required
+            />
+
+            <Button
+              type="submit"
+              disabled={changeLoading}
+              className="w-full mt-2 h-12 text-sm tracking-widest uppercase font-bold"
+              style={{ backgroundColor: 'var(--color-warning)', color: '#fff' }}
+            >
+              {changeLoading ? (
+                <Loader2 className="animate-spin h-5 w-5" />
+              ) : (
+                'Alterar Senha e Entrar'
+              )}
+            </Button>
+          </form>
         </div>
-      )}
+      </Dialog>
 
       {/* Modal de Configurar IP do Servidor */}
-      {showSettingsModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col gap-6 relative z-50">
-            <div>
-              <h3 className="font-sans text-2xl font-bold text-white uppercase mb-2">Configurar Servidor</h3>
-              <p className="text-sm font-sans text-slate-400 font-medium">
-                Digite o IP do Computador Principal (Telão) para que este terminal cliente se conecte a ele.
-              </p>
-            </div>
-            <div>
-              <label className="block font-bold tracking-widest text-slate-400 uppercase mb-2 text-xs">IP do Servidor (Telão)</label>
-              <input 
-                type="text" 
-                value={tempIp}
-                onChange={(e) => setTempIp(e.target.value)}
-                placeholder="Ex: 192.168.1.100"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 text-white font-bold text-lg placeholder:text-slate-700"
-                autoFocus
-              />
-              <p className="text-[10px] text-slate-500 mt-2 font-semibold uppercase tracking-wider">
-                Deixe em branco para rodar localmente neste dispositivo (Localhost).
-              </p>
-            </div>
-            <div className="flex gap-4">
-              <button 
-                type="button"
-                onClick={() => setShowSettingsModal(false)}
-                className="flex-1 py-4 bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-800 rounded-xl font-bold uppercase tracking-widest text-sm transition-all"
-              >
-                Cancelar
-              </button>
-              <button 
-                type="button"
-                onClick={handleSaveConnection}
-                className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white rounded-xl font-bold uppercase tracking-widest text-sm transition-all"
-              >
-                Salvar
-              </button>
-            </div>
-          </div>
+      <Dialog
+        open={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        title="Configurar Servidor"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowSettingsModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveConnection}>
+              Salvar
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-ink-variant">
+            Digite o IP do Computador Principal (Telão) para que este terminal cliente se conecte a ele.
+          </p>
+          
+          <Input
+            label="IP do Servidor (Telão)"
+            type="text"
+            value={tempIp}
+            onChange={(e) => setTempIp(e.target.value)}
+            placeholder="Ex: 192.168.1.100"
+            helper="Deixe em branco para rodar localmente neste dispositivo (Localhost)."
+            autoFocus
+          />
         </div>
-      )}
+      </Dialog>
     </div>
   );
 }
