@@ -132,8 +132,8 @@ export default function SenhaChamada({ ultimaSenha = null, config: propConfig }:
           key={`call-${ultimaSenha.id}-${isRepeticao}`}
           className={`font-syne text-[30rem] lg:text-[32rem] font-black leading-none tracking-wide transform scale-105 select-none ${
             isRepeticao
-              ? 'text-orange-500'
-              : 'text-white'
+              ? 'text-orange-500 animate-pulse-orange'
+              : 'text-white animate-pulse-call-once'
           }`}
           style={{
             textShadow: staticShadow,

@@ -605,13 +605,26 @@ export default function MediaIndoor() {
     } else if (telaoSseEvent.event === 'NOVA_SENHA_EMITIDA' || telaoSseEvent.event === 'SENHA_ESTORNADA') {
       fetchAguardando();
       if (telaoSseEvent.event === 'SENHA_ESTORNADA') {
-        setHistorico(prev => prev.filter(s => s.id !== telaoSseEvent.data?.id));
-        if (ultimaSenha && telaoSseEvent.data && ultimaSenha.id === telaoSseEvent.data.id) {
-          setIsRepeticao(false);
-          if (repeticaoTimerRef.current) {
-            clearTimeout(repeticaoTimerRef.current);
+        const estornadaId = telaoSseEvent.data?.id;
+        setHistorico(prev => {
+          const newHistory = prev.filter(s => s.id !== estornadaId);
+          setUltimaSenha(currentActive => {
+            if (currentActive && currentActive.id === estornadaId) {
+              return newHistory.length > 0 ? newHistory[0] : null;
+            }
+            return currentActive;
+          });
+          return newHistory;
+        });
+        setUltimaSenha(currentActive => {
+          if (currentActive && currentActive.id === estornadaId) {
+            setIsRepeticao(false);
+            if (repeticaoTimerRef.current) {
+              clearTimeout(repeticaoTimerRef.current);
+            }
           }
-        }
+          return currentActive;
+        });
       }
     } else if (telaoSseEvent.event === 'queue-update') {
       const { geral, preferencial } = telaoSseEvent.data || {};
