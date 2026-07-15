@@ -808,7 +808,7 @@ export default function MediaIndoor() {
     : (perfil?.template_layout || 'classic');
 
   return (
-    <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-sans text-ink">
+    <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-sans text-ink relative">
       <header className="h-32 bg-white border-b border-outline-variant/30 flex items-center justify-between px-8 shrink-0">
         <div className="flex items-center gap-4">
           <Link 
@@ -1240,8 +1240,8 @@ export default function MediaIndoor() {
         }
       `}</style>
       
-      {/* Fullscreen Call Overlay (Only if ticket calling is enabled in profile modules) */}
-      {!showMedia && ultimaSenha && activeModules.includes('painel') && (
+      {/* Fullscreen Call Overlay */}
+      {!showMedia && ultimaSenha && (
         <div className="absolute inset-0 z-50">
           <SenhaChamada key={`call-${ultimaSenha.id}-${ultimaSenha.repeticao}`} ultimaSenha={ultimaSenha} config={config} />
         </div>
