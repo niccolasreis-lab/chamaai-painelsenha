@@ -221,15 +221,30 @@ export default function MediaIndoor() {
       initAudioContext();
     };
 
+    // Auto-inicializa o áudio se estiver rodando no Electron (telão passivo sem clique)
+    const isElectron = 'api' in window && typeof (window as any).api?.ping === 'function';
+    if (isElectron) {
+      console.log('[TELAO] Electron detectado. Inicializando AudioContext automaticamente.');
+      initAudioContext();
+    }
+
     // Auto-inicializa o áudio se estiver rodando no APK Kiosk
     if ('AndroidKiosk' in window) {
       console.log('[TELAO] Kiosk Android detectado. Inicializando AudioContext automaticamente.');
       initAudioContext();
     }
 
+    // Fallback: se após 2 segundos o AudioContext ainda estiver suspenso
+    // (ex: tela passiva sem interação do usuário), força a inicialização
+    const fallbackTimer = setTimeout(() => {
+      console.log('[TELAO] Fallback: forçando inicialização do AudioContext após 2s.');
+      initAudioContext();
+    }, 2000);
+
     document.addEventListener('click', handleUserInteraction, { once: true });
     document.addEventListener('touchstart', handleUserInteraction, { once: true });
     return () => {
+      clearTimeout(fallbackTimer);
       document.removeEventListener('click', handleUserInteraction);
       document.removeEventListener('touchstart', handleUserInteraction);
     };

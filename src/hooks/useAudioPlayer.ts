@@ -199,43 +199,53 @@ export function useAudioPlayer() {
       return;
     }
 
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
-
     const buffer = audioBuffers.get(key);
     if (!buffer) {
       console.warn(`[AudioPlayer] Audio buffer for key "${key}" not found in cache.`);
       return;
     }
 
-    // Cancel dynamic overlapping source nodes immediately
-    if (activeSourceNode) {
-      try {
-        activeSourceNode.stop();
-      } catch (e) {
-        // Safe catch in case audio already stopped playing
+    const doPlay = () => {
+      // Cancel dynamic overlapping source nodes immediately
+      if (activeSourceNode) {
+        try {
+          activeSourceNode.stop();
+        } catch (e) {
+          // Safe catch in case audio already stopped playing
+        }
+        activeSourceNode = null;
       }
-      activeSourceNode = null;
-    }
 
-    try {
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
+      try {
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
 
-      const gainNode = ctx.createGain();
-      const scaleVolume = volume !== undefined ? volume : 0.75;
-      // Reduz 25% do volume base para evitar clipping nas TVs
-      gainNode.gain.setValueAtTime(scaleVolume * 0.75, ctx.currentTime);
+        const gainNode = ctx.createGain();
+        const scaleVolume = volume !== undefined ? volume : 0.75;
+        // Reduz 25% do volume base para evitar clipping nas TVs
+        gainNode.gain.setValueAtTime(scaleVolume * 0.75, ctx.currentTime);
 
-      source.connect(gainNode);
-      gainNode.connect(ctx.destination);
+        source.connect(gainNode);
+        gainNode.connect(ctx.destination);
 
-      source.start(0);
-      activeSourceNode = source;
-      console.log(`[AudioPlayer] Played key: ${key} (volume: ${scaleVolume})`);
-    } catch (err) {
-      console.error(`[AudioPlayer] Error playing key: ${key}`, err);
+        source.start(0);
+        activeSourceNode = source;
+        console.log(`[AudioPlayer] Played key: ${key} (volume: ${scaleVolume})`);
+      } catch (err) {
+        console.error(`[AudioPlayer] Error playing key: ${key}`, err);
+      }
+    };
+
+    if (ctx.state === 'suspended') {
+      console.log(`[AudioPlayer] AudioContext suspended, resuming before playing "${key}"...`);
+      ctx.resume().then(() => {
+        console.log(`[AudioPlayer] AudioContext resumed. Playing "${key}" now.`);
+        doPlay();
+      }).catch((err) => {
+        console.error('[AudioPlayer] Failed to resume AudioContext:', err);
+      });
+    } else {
+      doPlay();
     }
   };
 
