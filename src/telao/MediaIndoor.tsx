@@ -187,7 +187,7 @@ export default function MediaIndoor() {
   }, [activeModules, encarteCache.loadedAt, encarteCache.loading, encarteCache.produtos, refreshEncarteData]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const { initAudioContext, preloadAudio, preloadSystemSound, playAudio, isInitialized } = useAudioPlayer();
+  const { initAudioContext, preloadAudio, preloadSystemSound, playAudio, playDynamicUrl, isInitialized } = useAudioPlayer();
 
   // Preload configured audio (campainha)
   useEffect(() => {
@@ -530,22 +530,12 @@ export default function MediaIndoor() {
               return;
             }
             const audioUrl = urls[currentUrlIndex];
-            const audio = new Audio(audioUrl);
-            audio.volume = (config.volume_audio || 80) / 100;
-            
-            audio.oncanplaythrough = () => {
-              audio.play().catch((err) => {
-                console.error('[TTS MP3] Erro ao dar play:', err);
+            playDynamicUrl(audioUrl, (config.volume_audio || 80) / 100)
+              .catch((err) => {
+                console.warn('[TTS MP3] Falha ou interrupção ao reproduzir URL:', audioUrl, err);
                 currentUrlIndex++;
                 tryPlay();
               });
-            };
-
-            audio.onerror = () => {
-              console.warn('[TTS MP3] Falha ao carregar áudio:', audioUrl);
-              currentUrlIndex++;
-              tryPlay();
-            };
           };
 
           tryPlay();

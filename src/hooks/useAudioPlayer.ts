@@ -107,6 +107,7 @@ async function renderSystemSound(type: string): Promise<AudioBuffer> {
 }
 
 let activeSourceNode: AudioBufferSourceNode | null = null;
+let currentPlaybackId = 0;
 
 export function useAudioPlayer() {
   const [isInitialized, setIsInitialized] = useState<boolean>(
@@ -199,6 +200,9 @@ export function useAudioPlayer() {
       return;
     }
 
+    // Cancel any pending dynamic loads
+    currentPlaybackId++;
+
     const buffer = audioBuffers.get(key);
     if (!buffer) {
       console.warn(`[AudioPlayer] Audio buffer for key "${key}" not found in cache.`);
@@ -249,5 +253,71 @@ export function useAudioPlayer() {
     }
   };
 
-  return { initAudioContext, preloadAudio, preloadSystemSound, playAudio, isInitialized, audioBuffers };
+  const playDynamicUrl = async (url: string, volume?: number): Promise<void> => {
+    const ctx = getAudioContext();
+    if (!ctx) {
+      throw new Error('AudioContext not initialized.');
+    }
+
+    const myPlayId = ++currentPlaybackId;
+
+    let buffer = audioBuffers.get(url);
+    if (!buffer) {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch dynamic audio file from ${url} (status: ${response.status})`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      buffer = await ctx.decodeAudioData(arrayBuffer);
+      audioBuffers.set(url, buffer);
+      console.log(`[AudioPlayer] Loaded dynamic audio URL: ${url}`);
+    }
+
+    if (myPlayId !== currentPlaybackId) {
+      // Aborta a reprodução se uma nova solicitação iniciou durante o fetch/decode
+      return;
+    }
+
+    const doPlay = () => {
+      if (activeSourceNode) {
+        try {
+          activeSourceNode.stop();
+        } catch (e) {
+          // Safe catch
+        }
+        activeSourceNode = null;
+      }
+
+      try {
+        const source = ctx.createBufferSource();
+        source.buffer = buffer!;
+
+        const gainNode = ctx.createGain();
+        const scaleVolume = volume !== undefined ? volume : 0.75;
+        // Reduz 25% do volume base para evitar clipping nas TVs
+        gainNode.gain.setValueAtTime(scaleVolume * 0.75, ctx.currentTime);
+
+        source.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        source.start(0);
+        activeSourceNode = source;
+        console.log(`[AudioPlayer] Played dynamic URL: ${url} (volume: ${scaleVolume})`);
+      } catch (err) {
+        console.error(`[AudioPlayer] Error playing dynamic URL: ${url}`, err);
+        throw err;
+      }
+    };
+
+    if (ctx.state === 'suspended') {
+      console.log('[AudioPlayer] AudioContext suspended, resuming before playing dynamic URL...');
+      await ctx.resume();
+    }
+
+    if (myPlayId === currentPlaybackId) {
+      doPlay();
+    }
+  };
+
+  return { initAudioContext, preloadAudio, preloadSystemSound, playAudio, playDynamicUrl, isInitialized, audioBuffers };
 }

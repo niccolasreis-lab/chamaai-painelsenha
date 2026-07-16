@@ -419,22 +419,113 @@ ipcMain.handle('check-update-status', async () => {
 
 
 ipcMain.handle('check-for-updates', async () => {
-  const isPackagedOrTesting = app.isPackaged || fs.existsSync(path.join(app.getAppPath(), 'dev-app-update.yml'));
-  if (!isPackagedOrTesting) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
-  try {
-    if (updateDownloadedInfo) {
-      return { success: true, updateDownloaded: true, info: updateDownloadedInfo };
-    }
-    const result = await autoUpdater.checkForUpdates();
-    if (result && result.updateInfo) {
-      if (!isVersionGreater(result.updateInfo.version, app.getVersion())) {
-         return { success: true, message: 'Você já está usando a versão mais recente!', isLatest: true };
+  const isPackaged = app.isPackaged;
+  
+  if (!isPackaged) {
+    // Modo Desenvolvimento / Código-fonte (Git)
+    try {
+      const appPath = app.getAppPath();
+      if (!fs.existsSync(path.join(appPath, '.git'))) {
+        return { success: false, message: 'O aplicativo não está rodando de um repositório Git.' };
       }
-      return { success: true, updateAvailable: true, info: result.updateInfo, message: `A atualização (${result.updateInfo.version}) foi encontrada e está sendo baixada. Clique em Instalar Atualização Agora para aplicá-la quando terminar.` };
+      
+      console.log('[GIT UPDATE] Buscando atualizações no repositório Git remoto...');
+      try {
+        const { execSync } = require('child_process');
+        execSync('git fetch origin main', { cwd: appPath, timeout: 20000 });
+      } catch (fetchErr: any) {
+        console.error('[GIT UPDATE] Erro ao executar git fetch:', fetchErr.message);
+        return { success: false, message: `Falha ao buscar atualizações do Git (git fetch): ${fetchErr.message}` };
+      }
+
+      const { execSync } = require('child_process');
+      const localHash = execSync('git rev-parse HEAD', { cwd: appPath, encoding: 'utf8' }).trim();
+      const remoteHash = execSync('git rev-parse origin/main', { cwd: appPath, encoding: 'utf8' }).trim();
+      
+      if (localHash === remoteHash) {
+        return { success: true, message: 'O código-fonte já está atualizado no commit mais recente!', isLatest: true };
+      }
+      
+      return { 
+        success: true, 
+        updateAvailable: true, 
+        isGitUpdate: true,
+        info: { version: remoteHash.substring(0, 7) }, 
+        message: `Novo commit encontrado no Git (${remoteHash.substring(0, 7)}). Clique em Instalar Atualização Agora para puxar as alterações (git pull) e recompilar.` 
+      };
+    } catch (err: any) {
+      return { success: false, message: `Erro ao verificar atualizações via Git: ${err.message}` };
     }
-    return { success: true, message: 'O sistema já está atualizado.', isLatest: true };
-  } catch (err: any) {
-    return { success: false, message: `Erro ao verificar atualizações: ${err.message}` };
+  } else {
+    // Modo Produção / Executável (.exe)
+    const isPackagedOrTesting = app.isPackaged || fs.existsSync(path.join(app.getAppPath(), 'dev-app-update.yml'));
+    if (!isPackagedOrTesting) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
+    
+    try {
+      if (updateDownloadedInfo) {
+        return { success: true, updateDownloaded: true, info: updateDownloadedInfo };
+      }
+
+      // 1. Tenta ler o arquivo latest.yml local para verificar SHA512 de commits da mesma versão
+      let remoteVersion = '';
+      let remoteSha = '';
+      try {
+        const db = getDb();
+        let localUpdatesDir = 'C:\\ChamaAi_Atualizacoes';
+        const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'update_path'").get() as any;
+        if (row && row.valor) {
+          localUpdatesDir = row.valor;
+        }
+        const latestYmlPath = path.join(localUpdatesDir, 'latest.yml');
+        if (fs.existsSync(latestYmlPath)) {
+          const yamlContent = fs.readFileSync(latestYmlPath, 'utf8');
+          const versionMatch = yamlContent.match(/^version:\s*(.+)$/m);
+          const shaMatch = yamlContent.match(/^sha512:\s*(.+)$/m);
+          if (versionMatch) remoteVersion = versionMatch[1].trim();
+          if (shaMatch) remoteSha = shaMatch[1].trim();
+        }
+      } catch (ymlErr) {
+        console.warn('[AUTO-UPDATE] Não foi possível ler o arquivo latest.yml local:', ymlErr);
+      }
+
+      // 2. Busca o SHA512 da atualização atualmente instalada no SQLite
+      const db = getDb();
+      let installedSha = '';
+      try {
+        const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'installed_update_sha'").get() as any;
+        if (row && row.valor) installedSha = row.valor;
+      } catch (dbErr) {}
+
+      const isGreater = remoteVersion ? isVersionGreater(remoteVersion, app.getVersion()) : false;
+      const isSameVersion = remoteVersion === app.getVersion();
+      const isNewSha = remoteSha && remoteSha !== installedSha;
+
+      const shouldForceUpdate = isGreater || (isSameVersion && isNewSha);
+
+      if (shouldForceUpdate) {
+        // Força o autoUpdater a considerar uma versão local menor (0.0.1) para que ele baixe a atualização da mesma versão
+        try {
+          const semver = require('semver');
+          (autoUpdater as any).currentVersion = typeof semver.SemVer === 'function' 
+            ? new semver.SemVer('0.0.1') 
+            : semver.coerce('0.0.1');
+          console.log('[AUTO-UPDATE] Faked local version to 0.0.1 for autoUpdater.');
+        } catch (fakeErr) {
+          console.error('[AUTO-UPDATE] Falha ao fakar a versão do autoUpdater:', fakeErr);
+        }
+      }
+
+      const result = await autoUpdater.checkForUpdates();
+      if (result && result.updateInfo) {
+        if (!shouldForceUpdate) {
+          return { success: true, message: 'Você já está usando a versão mais recente!', isLatest: true };
+        }
+        return { success: true, updateAvailable: true, info: result.updateInfo, message: `A atualização (${result.updateInfo.version}) foi encontrada e está sendo baixada. Clique em Instalar Atualização Agora para aplicá-la quando terminar.` };
+      }
+      return { success: true, message: 'O sistema já está atualizado.', isLatest: true };
+    } catch (err: any) {
+      return { success: false, message: `Erro ao verificar atualizações: ${err.message}` };
+    }
   }
 });
 
@@ -495,41 +586,137 @@ function getDownloadedInstallerPath(): string | null {
 }
 
 ipcMain.handle('install-update', async () => {
-  const isPackagedOrTesting = app.isPackaged || fs.existsSync(path.join(app.getAppPath(), 'dev-app-update.yml'));
-  if (!isPackagedOrTesting) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
-  try {
-    logUpdate('INFO', 'Iniciando shutdown via Script Separado (Option C)...');
-    
-    // 1. Busca o caminho do instalador físico baixado
-    const installerPath = getDownloadedInstallerPath();
-    if (!installerPath || !fs.existsSync(installerPath)) {
-      logUpdate('ERROR', 'Instalador físico não encontrado no disco.');
-      return { success: false, message: 'Arquivo do instalador não encontrado no disco. Tente verificar atualizações novamente.' };
-    }
-    
-    logUpdate('INFO', `Instalador encontrado em: ${installerPath}`);
-    
-    // 2. Caminho temporário para o arquivo .bat de atualização em C:\ChamaAi
-    const userDataPath = 'C:\\ChamaAi';
-    if (!fs.existsSync(userDataPath)) {
-      fs.mkdirSync(userDataPath, { recursive: true });
-    }
-    const batPath = path.join(userDataPath, 'executar_atualizacao.bat');
-    
-    // 3. Cria o conteúdo do Script Separado de atualização (.bat)
-    // Esse script espera 2s, força o encerramento do ChamaAi por completo e roda o instalador.
-    let restartPath = process.execPath;
-    if (!app.isPackaged) {
-      try {
-        const localAppData = process.env.LOCALAPPDATA || path.join(require('os').homedir(), 'AppData', 'Local');
-        const installedExe = path.join(localAppData, 'Programs', 'chamaai-novo', 'ChamaAi.exe');
-        if (fs.existsSync(installedExe)) {
-          restartPath = installedExe;
-        }
-      } catch (e) {}
-    }
+  const isPackaged = app.isPackaged;
+  
+  if (!isPackaged) {
+    // Modo Desenvolvimento / Código-fonte (Git)
+    try {
+      logUpdate('INFO', 'Iniciando atualização de código-fonte via Git...');
+      
+      const appPath = app.getAppPath();
+      const userDataPath = 'C:\\ChamaAi';
+      if (!fs.existsSync(userDataPath)) {
+        fs.mkdirSync(userDataPath, { recursive: true });
+      }
+      const batPath = path.join(userDataPath, 'executar_atualizacao_git.bat');
+      
+      // Cria o script .bat para fazer git pull, npm install, build e reiniciar
+      const batContent = `@echo off
+title ATUALIZANDO CHAMA_AI VIA GIT...
+echo ======================================================
+echo    CHAMAAI - ATUALIZADOR GIT AUTOMATICO
+echo ======================================================
+echo.
+echo Aguardando encerramento do processo pai...
+timeout /t 3 /nobreak >nul
+echo Forcando encerramento do app e do servidor...
+taskkill /F /IM "ChamaAi.exe" /T >nul 2>&1
+taskkill /F /IM "electron.exe" /T >nul 2>&1
+powershell -Command "Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match 'chamaai' -or $_.CommandLine -match 'start-server' } | Stop-Process -Force" 2>nul
+timeout /t 2 /nobreak >nul
 
-    const batContent = `@echo off
+cd /d "${appPath}"
+echo [*] Executando git pull...
+git pull origin main
+if %errorlevel% neq 0 (
+    echo [ERRO] Falha no git pull! Verifique conflitos ou conexao.
+    pause
+    exit /b 1
+)
+
+echo [*] Atualizando dependencias...
+call npm install
+if %errorlevel% neq 0 (
+    echo [ERRO] Falha no npm install!
+    pause
+    exit /b 1
+)
+
+echo [*] Recompilando modulos nativos...
+call npm run rebuild:native
+
+echo [*] Compilando o projeto...
+call npm run build
+if %errorlevel% neq 0 (
+    echo [ERRO] Falha no npm run build!
+    pause
+    exit /b 1
+)
+
+echo [*] Reiniciando a aplicacao em modo dev...
+start cmd /c "npm run dev"
+echo Limpando script temporario...
+del "%~f0"
+exit
+`;
+      
+      fs.writeFileSync(batPath, batContent, 'utf8');
+      logUpdate('INFO', `Script de atualização Git gravado em: ${batPath}`);
+      
+      // Executa o script
+      const { spawn } = require('child_process');
+      const comspec = process.env.ComSpec || 'cmd.exe';
+      const child = spawn(comspec, ['/c', 'start', '""', batPath], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false
+      });
+      child.unref();
+      
+      app.quit();
+      return { success: true };
+    } catch (err: any) {
+      logUpdate('ERROR', `Erro ao preparar atualização Git: ${err.message}`);
+      return { success: false, message: `Erro ao preparar atualização Git: ${err.message}` };
+    }
+  } else {
+    // Modo Produção / Executável (.exe)
+    const isPackagedOrTesting = app.isPackaged || fs.existsSync(path.join(app.getAppPath(), 'dev-app-update.yml'));
+    if (!isPackagedOrTesting) return { success: false, message: 'Atualizações só funcionam no aplicativo instalado (.exe).' };
+    try {
+      logUpdate('INFO', 'Iniciando shutdown via Script Separado (Option C)...');
+      
+      // Salva o SHA512 da atualização que será instalada para evitar loops
+      const db = getDb();
+      const updateSha = updateDownloadedInfo?.sha512 || (updateDownloadedInfo?.files && updateDownloadedInfo.files[0] ? updateDownloadedInfo.files[0].sha512 : '');
+      if (updateSha) {
+        try {
+          db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('installed_update_sha', ?, datetime('now'))").run(updateSha);
+          logUpdate('INFO', `Gravado installed_update_sha no banco de dados: ${updateSha}`);
+        } catch (dbErr: any) {
+          logUpdate('ERROR', `Erro ao gravar installed_update_sha no banco: ${dbErr.message}`);
+        }
+      }
+
+      // 1. Busca o caminho do instalador físico baixado
+      const installerPath = getDownloadedInstallerPath();
+      if (!installerPath || !fs.existsSync(installerPath)) {
+        logUpdate('ERROR', 'Instalador físico não encontrado no disco.');
+        return { success: false, message: 'Arquivo do instalador não encontrado no disco. Tente verificar atualizações novamente.' };
+      }
+      
+      logUpdate('INFO', `Instalador encontrado em: ${installerPath}`);
+      
+      // 2. Caminho temporário para o arquivo .bat de atualização em C:\ChamaAi
+      const userDataPath = 'C:\\ChamaAi';
+      if (!fs.existsSync(userDataPath)) {
+        fs.mkdirSync(userDataPath, { recursive: true });
+      }
+      const batPath = path.join(userDataPath, 'executar_atualizacao.bat');
+      
+      // 3. Cria o conteúdo do Script Separado de atualização (.bat)
+      let restartPath = process.execPath;
+      if (!app.isPackaged) {
+        try {
+          const localAppData = process.env.LOCALAPPDATA || path.join(require('os').homedir(), 'AppData', 'Local');
+          const installedExe = path.join(localAppData, 'Programs', 'chamaai-novo', 'ChamaAi.exe');
+          if (fs.existsSync(installedExe)) {
+            restartPath = installedExe;
+          }
+        } catch (e) {}
+      }
+
+      const batContent = `@echo off
 title INSTALANDO ATUALIZACAO - CHAMAAI
 echo Aguardando encerramento do processo pai...
 timeout /t 2 /nobreak >nul
@@ -544,29 +731,30 @@ echo Limpando script temporario...
 del "%~f0"
 exit
 `;
-    
-    fs.writeFileSync(batPath, batContent, 'utf8');
-    logUpdate('INFO', `Script de atualização .bat gravado em: ${batPath}`);
-    
-    // 4. Executa o Script Separado via cmd.exe para garantir execução direta na estação
-    const { spawn } = require('child_process');
-    const comspec = process.env.ComSpec || 'cmd.exe';
-    const child = spawn(comspec, ['/c', 'start', '""', batPath], {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: false
-    });
-    child.unref();
-    
-    // 5. Aciona o encerramento seguro e controlado com flags adequadas
-    isUpdating = true;
-    logUpdate('INFO', 'Saindo da aplicação de forma graciosa para liberação de arquivos.');
-    await gracefulShutdown('auto_update');
-    
-    return { success: true };
-  } catch (err: any) {
-    logUpdate('ERROR', `Erro crítico no install-update: ${err.message || err}`);
-    return { success: false, message: `Erro ao preparar atualização: ${err.message}` };
+      
+      fs.writeFileSync(batPath, batContent, 'utf8');
+      logUpdate('INFO', `Script de atualização .bat gravado em: ${batPath}`);
+      
+      // 4. Executa o Script Separado via cmd.exe
+      const { spawn } = require('child_process');
+      const comspec = process.env.ComSpec || 'cmd.exe';
+      const child = spawn(comspec, ['/c', 'start', '""', batPath], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false
+      });
+      child.unref();
+      
+      // 5. Aciona o encerramento seguro
+      isUpdating = true;
+      logUpdate('INFO', 'Saindo da aplicação de forma graciosa para liberação de arquivos.');
+      await gracefulShutdown('auto_update');
+      
+      return { success: true };
+    } catch (err: any) {
+      logUpdate('ERROR', `Erro crítico no install-update: ${err.message || err}`);
+      return { success: false, message: `Erro ao preparar atualização: ${err.message}` };
+    }
   }
 });
 
@@ -704,11 +892,26 @@ if (!gotTheLock) {
         
         autoUpdater.on('checking-for-update', () => autoUpdateLogger.info('Verificando se há atualizações...'));
         autoUpdater.on('update-available', (info) => {
-          if (!isVersionGreater(info.version, app.getVersion())) {
-            autoUpdateLogger.info(`Ignorando versão ${info.version} pois não é mais recente que a atual (${app.getVersion()}).`);
+          const remoteVersion = info.version;
+          const remoteSha = info.sha512 || (info.files && info.files[0] ? info.files[0].sha512 : '');
+
+          const db = getDb();
+          let installedSha = '';
+          try {
+            const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'installed_update_sha'").get() as any;
+            if (row && row.valor) installedSha = row.valor;
+          } catch (e) {}
+
+          const isGreater = isVersionGreater(remoteVersion, app.getVersion());
+          const isSameVersion = remoteVersion === app.getVersion();
+          const isNewSha = remoteSha && remoteSha !== installedSha;
+
+          if (!isGreater && !(isSameVersion && isNewSha)) {
+            autoUpdateLogger.info(`Ignorando versão ${remoteVersion} pois não há alterações relevantes (SHA idêntico ou versão menor).`);
             return;
           }
-          autoUpdateLogger.info(`Atualização disponível: ${info.version}. Iniciando download...`);
+
+          autoUpdateLogger.info(`Atualização disponível: ${remoteVersion} (SHA: ${remoteSha}). Iniciando download...`);
           sendToAllWindows('update-available', info);
           autoUpdater.downloadUpdate();
         });

@@ -35,8 +35,10 @@ import { Button } from '../shared/components/Button';
 import { Input } from '../shared/components/Input';
 import { Dialog } from '../shared/components/Dialog';
 import { StatusBadge } from '../shared/components/StatusBadge';
+import { useAudioPlayer } from '../hooks/useAudioPlayer';
 
 export default function Configuracoes() {
+  const { playDynamicUrl } = useAudioPlayer();
   const [activeTab, setActiveTab] = useState<'geral' | 'telao' | 'totem' | 'sistema' | 'seguranca'>('geral');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -230,20 +232,12 @@ export default function Configuracoes() {
         return;
       }
       const audioUrl = urls[currentUrlIndex];
-      const audio = new Audio(audioUrl);
-      audio.volume = (parseFloat(config.volume_audio || '80')) / 100;
-      
-      audio.oncanplaythrough = () => {
-        audio.play().catch(() => {
+      playDynamicUrl(audioUrl, (parseFloat(config.volume_audio || '80')) / 100)
+        .catch((err) => {
+          console.warn('[TEST TTS MP3] Falha ou interrupção ao testar URL:', audioUrl, err);
           currentUrlIndex++;
           tryPlay();
         });
-      };
-
-      audio.onerror = () => {
-        currentUrlIndex++;
-        tryPlay();
-      };
     };
 
     tryPlay();
