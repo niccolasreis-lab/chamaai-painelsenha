@@ -76,7 +76,7 @@ export default function GlobalUpdateNotification() {
         }
         
         const updateRes = await api.checkForUpdates();
-        if (updateRes && updateRes.updateDownloaded) {
+        if (updateRes && (updateRes.updateDownloaded || updateRes.isGitUpdate)) {
            setVersionInfo(updateRes.info);
            setUpdateState('downloaded');
            setDismissed(false);
@@ -174,7 +174,7 @@ export default function GlobalUpdateNotification() {
             <p className="text-xs text-ink-secondary mt-0.5 leading-relaxed">
               {updateState === 'available' && `Uma nova versão (${versionInfo?.version || ''}) está disponível e o download iniciou.`}
               {updateState === 'downloading' && `Baixando nova versão... ${progress}% concluído.`}
-              {updateState === 'downloaded' && 'A nova versão foi baixada e está pronta. Instale agora para atualizar.'}
+              {updateState === 'downloaded' && (versionInfo?.isGitUpdate ? 'Novo commit detectado no Git. Instale para sincronizar o código-fonte.' : 'A nova versão foi baixada e está pronta. Instale agora para atualizar.')}
               {updateState === 'error' && `Não foi possível atualizar: ${errorMessage}`}
             </p>
           </div>
