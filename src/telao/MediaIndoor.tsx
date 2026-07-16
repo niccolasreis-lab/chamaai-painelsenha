@@ -26,27 +26,26 @@ async function falarSenha(texto: string, rate: number, pitch: number, vozGenero:
     setTimeout(() => resolve([]), 2000); // fallback: 2s timeout
   });
 
-  if (vozes.length === 0) {
-    console.warn('[TTS] Nenhuma voz disponível neste dispositivo. TTS ignorado.');
-    return false; // fallback silencioso — não quebra o fluxo
-  }
-
   window.speechSynthesis.cancel(); // limpa fila acumulada
   const utterance = new SpeechSynthesisUtterance(texto);
 
-  // Selecionar voz em pt-BR
-  const ptVoices = vozes.filter(v => v.lang.toLowerCase().startsWith('pt'));
-  let selectedVoice: SpeechSynthesisVoice | undefined;
-  if (vozGenero === 'Masculina') {
-    selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('masculino') || v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('daniel') || v.name.toLowerCase().includes('google de'));
+  // Selecionar voz em pt-BR se houver vozes disponíveis
+  if (vozes.length > 0) {
+    const ptVoices = vozes.filter(v => v.lang.toLowerCase().startsWith('pt'));
+    let selectedVoice: SpeechSynthesisVoice | undefined;
+    if (vozGenero === 'Masculina') {
+      selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('masculino') || v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('daniel') || v.name.toLowerCase().includes('google de'));
+    } else {
+      selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('feminina') || v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('maria') || v.name.toLowerCase().includes('luciana'));
+    }
+    if (!selectedVoice && ptVoices.length > 0) {
+      selectedVoice = ptVoices[0];
+    }
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
   } else {
-    selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('feminina') || v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('maria') || v.name.toLowerCase().includes('luciana'));
-  }
-  if (!selectedVoice && ptVoices.length > 0) {
-    selectedVoice = ptVoices[0];
-  }
-  if (selectedVoice) {
-    utterance.voice = selectedVoice;
+    console.warn('[TTS] Nenhuma lista de vozes pôde ser carregada a tempo. Utilizando a voz nativa padrão do dispositivo.');
   }
   
   utterance.lang = 'pt-BR';

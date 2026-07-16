@@ -552,36 +552,40 @@ export default function Configuracoes() {
     }
     window.speechSynthesis.cancel();
 
-    const template = config.totem_solicita_nome === '1'
+    const template = (config.totem_solicita_nome === '1'
       ? config.telao_tts_template_nome 
-      : config.telao_tts_template;
+      : config.telao_tts_template) || 'Senha {senha}, dirija-se ao {guiche}.';
       
     const formatMock = template
-      .replace('{senha}', 'A-001')
-      .replace('{nome}', 'Niccolas')
-      .replace('{guiche}', 'Guichê 3')
-      .replace('{balcao}', 'Balcão Geral')
-      .replace('{local}', config.rotulo_local || 'Guichê');
+      .replace(/\{senha\}/gi, 'A-001')
+      .replace(/\{nome\}/gi, 'Niccolas')
+      .replace(/\{guiche\}/gi, 'Guichê 3')
+      .replace(/\{balcao\}/gi, 'Balcão Geral')
+      .replace(/\{local\}/gi, config.rotulo_local || 'Guichê');
 
     const utterance = new SpeechSynthesisUtterance(formatMock);
-    
+    utterance.lang = 'pt-BR';
     utterance.rate = parseFloat(config.telao_tts_velocidade || '0.95');
     utterance.pitch = parseFloat(config.telao_tts_tom || '1.0');
 
     const voices = window.speechSynthesis.getVoices();
     let selectedVoice = null;
     
-    const ptVoices = voices.filter(v => v.lang.startsWith('pt'));
-    if (config.telao_tts_voz === 'Masculina') {
-      selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('masculino') || v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('daniel') || v.name.toLowerCase().includes('google de'));
+    if (voices.length > 0) {
+      const ptVoices = voices.filter(v => v.lang.startsWith('pt'));
+      if (config.telao_tts_voz === 'Masculina') {
+        selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('masculino') || v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('daniel') || v.name.toLowerCase().includes('google de'));
+      } else {
+        selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('feminina') || v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('maria') || v.name.toLowerCase().includes('luciana'));
+      }
+      if (!selectedVoice && ptVoices.length > 0) {
+        selectedVoice = ptVoices[0];
+      }
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
     } else {
-      selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('feminina') || v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('maria') || v.name.toLowerCase().includes('luciana'));
-    }
-    if (!selectedVoice && ptVoices.length > 0) {
-      selectedVoice = ptVoices[0];
-    }
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
+      console.warn('[TEST TTS] Nenhuma lista de vozes carregada previamente. Usando voz padrão do navegador.');
     }
     
     window.speechSynthesis.speak(utterance);
