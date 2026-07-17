@@ -1090,6 +1090,35 @@ export default function Configuracoes() {
                         </select>
                       </div>
 
+                      <div className="p-4 bg-surface-container-low border border-outline-variant/50 rounded-sm">
+                        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                          <div className="flex-1">
+                            <label className="block font-medium text-xs text-ink mb-1.5 uppercase">
+                              Campainha antes da chamada
+                            </label>
+                            <select
+                              name="tipo_som"
+                              value={config.tipo_som || 'bell'}
+                              onChange={handleChange}
+                              className="w-full bg-surface border border-outline-variant rounded-sm px-3 h-11 text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary focus:border-primary"
+                            >
+                              {SOUND_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.label}</option>)}
+                            </select>
+                          </div>
+                          <Button
+                            variant="secondary"
+                            onClick={handleTestSound}
+                            className="px-3 h-11"
+                            icon={<Volume2 className="h-4 w-4" />}
+                          >
+                            Testar campainha
+                          </Button>
+                        </div>
+                        <p className="text-[10px] text-ink-variant mt-2 leading-relaxed">
+                          Esta é a campainha original do telão. Ela toca primeiro e, ao terminar, inicia o MP3 ou o sintetizador configurado como fallback.
+                        </p>
+                      </div>
+
                       {(config.telao_tts_modo === 'sintetizador' || config.telao_tts_modo === 'ambos') && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-surface-container-low border border-outline-variant/50 rounded-sm animate-fade-in">
                           <div className="col-span-2 font-bold text-ink text-sm border-b border-outline-variant/30 pb-2">
@@ -1889,25 +1918,6 @@ export default function Configuracoes() {
                       min="1"
                     />
 
-                    <div>
-                      <label className="block font-medium text-xs text-ink mb-1.5 uppercase">Som do chamado</label>
-                      <div className="flex gap-2">
-                        <select
-                          name="tipo_som"
-                          value={config.tipo_som || 'bell'}
-                          onChange={handleChange}
-                          className="flex-grow bg-surface border border-outline-variant rounded-sm px-3 h-11 text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary focus:border-primary"
-                        >
-                          {SOUND_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.label}</option>)}
-                        </select>
-                        <Button
-                          variant="secondary"
-                          onClick={handleTestSound}
-                          className="px-3"
-                          icon={<Volume2 className="h-4 w-4" />}
-                        />
-                      </div>
-                    </div>
                   </div>
                 </div>
 

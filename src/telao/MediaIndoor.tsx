@@ -550,14 +550,7 @@ export default function MediaIndoor() {
         const volume = Number.isFinite(configuredVolume)
           ? Math.min(100, Math.max(0, configuredVolume)) / 100
           : 0.8;
-        const chimeType = config.tipo_som || 'bell';
-        const customSound = chimeType === 'custom' ? config.som_personalizado : null;
-        const customSoundUrl = customSound && /^(?:data:|blob:|https?:\/\/)/i.test(customSound)
-          ? customSound
-          : customSound
-            ? `${API_URL}${customSound.startsWith('/') ? '' : '/'}${customSound}`
-            : null;
-        const chimeSource = customSoundUrl ? 'custom' : chimeType;
+        const chimeSource = plan.chime.customUrl ? 'custom' : plan.chime.type;
 
         const numericSetting = (
           value: string | null | undefined,
@@ -573,9 +566,9 @@ export default function MediaIndoor() {
 
         void executeAudioCall(plan, {
           isCurrent,
-          playChime: () => customSoundUrl
-            ? playDynamicUrl(customSoundUrl, volume)
-            : playSystemSound(chimeType === 'custom' ? 'bell' : chimeType, volume),
+          playChime: () => plan.chime.customUrl
+            ? playDynamicUrl(plan.chime.customUrl, volume)
+            : playSystemSound(plan.chime.type, volume),
           playMp3: (url) => playDynamicUrl(url, volume),
           speak: () => falarSenha(
             buildSpeechText(payload, config),
