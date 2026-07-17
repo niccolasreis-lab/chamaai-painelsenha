@@ -9,51 +9,104 @@ import SmartMediaLayer from './SmartMediaLayer';
 import { useSSE } from '../shared/useSSE';
 import { getApiUrl } from '../shared/apiConfig';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import {
+  buildSpeechText,
+  createAudioCallPlan,
+  executeAudioCall,
+  type AudioCallPhase,
+  type PlaybackResult,
+} from './audioCallFlow';
 import { ArrowLeft, Users, History, Ticket, Megaphone, Volume2, Clock } from 'lucide-react';
 import type { ProdutoToledo, Categoria, TemaEncarte, EstablishmentConfig, PerfilTelao, MediaItem, RecentCall, SmartMediaSettings } from '../shared/types';
 
-async function falarSenha(texto: string, rate: number, pitch: number, vozGenero: string): Promise<boolean> {
+async function falarSenha(
+  texto: string,
+  rate: number,
+  pitch: number,
+  vozGenero: string,
+  isCurrent: () => boolean,
+): Promise<PlaybackResult> {
   if (!('speechSynthesis' in window)) {
-    console.warn('[TTS] speechSynthesis não suportado neste dispositivo.');
-    return false;
+    throw new Error('speechSynthesis não é suportado neste dispositivo.');
   }
 
-  // Aguarda vozes carregarem (necessário em Android/Chrome)
   const vozes = await new Promise<SpeechSynthesisVoice[]>((resolve) => {
+    let timeout: ReturnType<typeof setTimeout>;
+    let settled = false;
+    const handleVoicesChanged = () => finish(window.speechSynthesis.getVoices());
+    const finish = (voices: SpeechSynthesisVoice[]) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
+      resolve(voices);
+    };
     const lista = window.speechSynthesis.getVoices();
-    if (lista.length > 0) return resolve(lista);
-    window.speechSynthesis.onvoiceschanged = () => resolve(window.speechSynthesis.getVoices());
-    setTimeout(() => resolve([]), 2000); // fallback: 2s timeout
+    if (lista.length > 0) {
+      resolve(lista);
+      return;
+    }
+    timeout = setTimeout(() => finish([]), 2000);
+    window.speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged, { once: true });
   });
 
-  window.speechSynthesis.cancel(); // limpa fila acumulada
+  if (!isCurrent()) return 'interrupted';
+
+  window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(texto);
 
-  // Selecionar voz em pt-BR se houver vozes disponíveis
+  let selectedVoice: SpeechSynthesisVoice | undefined;
   if (vozes.length > 0) {
-    const ptVoices = vozes.filter(v => v.lang.toLowerCase().startsWith('pt'));
-    let selectedVoice: SpeechSynthesisVoice | undefined;
+    const ptVoices = vozes.filter((voice) => voice.lang.toLowerCase().startsWith('pt'));
     if (vozGenero === 'Masculina') {
-      selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('masculino') || v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('daniel') || v.name.toLowerCase().includes('google de'));
+      selectedVoice = ptVoices.find((voice) => /masculino|male|daniel|google de/i.test(voice.name));
     } else {
-      selectedVoice = ptVoices.find(v => v.name.toLowerCase().includes('feminina') || v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('maria') || v.name.toLowerCase().includes('luciana'));
+      selectedVoice = ptVoices.find((voice) => /feminina|female|maria|luciana/i.test(voice.name));
     }
-    if (!selectedVoice && ptVoices.length > 0) {
-      selectedVoice = ptVoices[0];
-    }
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
-    }
+    selectedVoice ||= ptVoices[0] || vozes[0];
   } else {
-    console.warn('[TTS] Nenhuma lista de vozes pôde ser carregada a tempo. Utilizando a voz nativa padrão do dispositivo.');
+    console.warn('[TTS] Lista de vozes indisponível; usando a voz padrão do dispositivo.');
   }
-  
+  if (selectedVoice) utterance.voice = selectedVoice;
   utterance.lang = 'pt-BR';
   utterance.rate = rate;
   utterance.pitch = pitch;
 
-  window.speechSynthesis.speak(utterance);
-  return true;
+  return new Promise<PlaybackResult>((resolve, reject) => {
+    utterance.onend = () => resolve('completed');
+    utterance.onerror = (event) => {
+      if (event.error === 'canceled' || event.error === 'interrupted') {
+        resolve('interrupted');
+        return;
+      }
+      reject(new Error(`Falha no sintetizador: ${event.error}`));
+    };
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
+function logAudioPhase(
+  callId: string | number,
+  sequence: number,
+  phase: AudioCallPhase | 'event_received',
+  details: Record<string, unknown> = {},
+): void {
+  const safeDetails = Object.fromEntries(Object.entries(details).map(([key, value]) => {
+    if (key === 'error') return [key, value instanceof Error ? value.message : String(value)];
+    if (key === 'url' && typeof value === 'string') {
+      if (value.startsWith('data:')) return [key, '[data-url omitida]'];
+      try {
+        return [key, new URL(value, window.location.href).pathname];
+      } catch {
+        return [key, '[url inválida]'];
+      }
+    }
+    return [key, value];
+  }));
+  const payload = { callId, sequence, phase, ...safeDetails };
+  if (phase.endsWith('_error')) console.error('[TELAO_AUDIO]', payload);
+  else if (phase === 'call_interrupted') console.warn('[TELAO_AUDIO]', payload);
+  else console.info('[TELAO_AUDIO]', payload);
 }
 
 export default function MediaIndoor() {
@@ -108,6 +161,7 @@ export default function MediaIndoor() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const isMountedRef = useRef(true);
+  const audioSequenceRef = useRef(0);
   const autoRecoverAttemptsRef = useRef(0);
 
   const refreshEncarteData = useCallback(async (reason: string) => {
@@ -186,25 +240,21 @@ export default function MediaIndoor() {
   }, [activeModules, encarteCache.loadedAt, encarteCache.loading, encarteCache.produtos, refreshEncarteData]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const { initAudioContext, preloadAudio, preloadSystemSound, playAudio, playDynamicUrl, isInitialized } = useAudioPlayer();
-
-  // Preload configured audio (campainha)
-  useEffect(() => {
-    if (config.tipo_som) {
-      if (config.tipo_som === 'custom' && config.som_personalizado) {
-        preloadAudio('campainha', `${API_URL}${config.som_personalizado}`);
-      } else {
-        preloadSystemSound('campainha', config.tipo_som);
-      }
-    } else {
-      preloadSystemSound('campainha', 'bell');
-    }
-  }, [config.tipo_som, config.som_personalizado, API_URL]);
+  const {
+    initAudioContext,
+    playSystemSound,
+    playDynamicUrl,
+    stopAudio,
+    isInitialized,
+  } = useAudioPlayer();
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      audioSequenceRef.current += 1;
+      stopAudio();
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       if (repeticaoTimerRef.current) {
         clearTimeout(repeticaoTimerRef.current);
       }
@@ -212,7 +262,7 @@ export default function MediaIndoor() {
         abortControllerRef.current.abort();
       }
     };
-  }, []);
+  }, [stopAudio]);
 
   // Handle user interaction to unlock AudioContext
   useEffect(() => {
@@ -453,7 +503,14 @@ export default function MediaIndoor() {
   useEffect(() => {
     const handleNovaSenhaChamada = (e: Event) => {
       const payload = (e as CustomEvent).detail as RecentCall;
-      console.log('[TELAO] Evento NOVA_SENHA_CHAMADA recebido via Window Event:', payload);
+      const sequence = ++audioSequenceRef.current;
+      const plan = createAudioCallPlan(payload, config, API_URL);
+      stopAudio();
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      logAudioPhase(payload.id, sequence, 'event_received', {
+        mode: plan.mode,
+        repeat: payload.repeticao === true,
+      });
       
       // PASSO 1: Atualizar o estado React imediatamente (agenda o re-render)
       setUltimaSenha(payload);
@@ -479,119 +536,61 @@ export default function MediaIndoor() {
         }
       }
 
-      // PASSO 2: Aguardar o próximo frame de pintura para disparar o áudio
-      // Garante que o DOM já foi atualizado antes do som tocar
+      // Aguarda a pintura da senha antes de iniciar a sequência sonora.
       requestAnimationFrame(() => {
-        if (!isMountedRef.current) return;
-        const temSomPersonalizado = (config.tipo_som === 'custom' && !!config.som_personalizado) || !!config.portal_som_sua_vez;
-        const ttsModo = config.telao_tts_modo || (config.telao_tts_ativo === '1' ? 'sintetizador' : 'desativado');
-
-        const speakTtsSynthesizer = () => {
-          const template = (payload.nome_cliente && config.telao_tts_template_nome)
-            ? config.telao_tts_template_nome
-            : (config.telao_tts_template || 'Senha {senha}, dirija-se ao {guiche}.');
-            
-          const pref = payload.preferencial === 1 ? 'P' : 'A';
-          const prefixo = payload.prefixo_senha || pref;
-          const formattedNum = `${prefixo}-${String(payload.numero).padStart(3, '0')}`;
-          
-          const textToSpeak = template
-            .replace(/\{senha\}/gi, formattedNum)
-            .replace(/\{nome\}/gi, payload.nome_cliente || '')
-            .replace(/\{guiche\}/gi, payload.guiche || '')
-            .replace(/\{balcao\}/gi, payload.balcao_nome || '')
-            .replace(/\{local\}/gi, config.rotulo_local || 'Guichê');
-          
-          const rate = parseFloat(config.telao_tts_velocidade || '0.95');
-          const pitch = parseFloat(config.telao_tts_tom || '1.0');
-          const vozGenero = config.telao_tts_voz || 'Feminina';
-
-          falarSenha(textToSpeak, rate, pitch, vozGenero).catch(err => {
-            console.error('[TTS] Erro na fala do sintetizador:', err);
-          });
-        };
-
-        const playMp3Tts = (tipoPasta: 'tipo1' | 'tipo2' | 'tipo3', num: number, onFail: () => void) => {
-          const urls: string[] = [];
-          if (tipoPasta === 'tipo1') {
-            urls.push(`${getApiUrl()}/tts/tipo1/Senha_${num}_1.mp3`);
-          } else if (tipoPasta === 'tipo2') {
-            urls.push(`${getApiUrl()}/tts/tipo2/Senha_${num}_2_chamada.mp3`);
-            urls.push(`${getApiUrl()}/tts/tipo2/Senha_${num}_2.mp3`);
-          } else if (tipoPasta === 'tipo3') {
-            urls.push(`${getApiUrl()}/tts/tipo3/Senha_${num}_3.mp3`);
-          }
-
-          let currentUrlIndex = 0;
-          const tryPlay = () => {
-            if (currentUrlIndex >= urls.length) {
-              onFail();
-              return;
-            }
-            const audioUrl = urls[currentUrlIndex];
-            playDynamicUrl(audioUrl, (config.volume_audio || 80) / 100)
-              .catch((err) => {
-                console.warn('[TTS MP3] Falha ou interrupção ao reproduzir URL:', audioUrl, err);
-                currentUrlIndex++;
-                tryPlay();
-              });
-          };
-
-          tryPlay();
-        };
-
-        const playFirstCallMp3 = () => {
-          const escolherTipo1 = Math.random() < 0.5;
-          const num = Number(payload.numero);
-
-          if (escolherTipo1) {
-            playMp3Tts('tipo1', num, () => {
-              playMp3Tts('tipo3', num, () => {
-                if (ttsModo === 'ambos') {
-                  speakTtsSynthesizer();
-                }
-              });
-            });
-          } else {
-            playMp3Tts('tipo3', num, () => {
-              playMp3Tts('tipo1', num, () => {
-                if (ttsModo === 'ambos') {
-                  speakTtsSynthesizer();
-                }
-              });
-            });
-          }
-        };
-
-        const playRecallMp3 = () => {
-          const num = Number(payload.numero);
-          playMp3Tts('tipo2', num, () => {
-            playMp3Tts('tipo1', num, () => {
-              if (ttsModo === 'ambos') {
-                speakTtsSynthesizer();
-              }
-            });
-          });
-        };
-
-        // 🔔 Tocar campainha imediatamente em todas as chamadas
-        playAudio('campainha', (config.volume_audio || 80) / 100);
-
-        // Se TTS estiver ativo, fala/toca MP3 após 1.5 segundos
-        if (ttsModo !== 'desativado' && !temSomPersonalizado) {
-          setTimeout(() => {
-            if (!isMountedRef.current) return;
-            if (ttsModo === 'sintetizador') {
-              speakTtsSynthesizer();
-            } else {
-              if (payload.repeticao) {
-                playRecallMp3();
-              } else {
-                playFirstCallMp3();
-              }
-            }
-          }, 1500);
+        const isCurrent = () => (
+          isMountedRef.current && audioSequenceRef.current === sequence
+        );
+        if (!isCurrent()) {
+          logAudioPhase(payload.id, sequence, 'call_interrupted');
+          return;
         }
+
+        const configuredVolume = Number(config.volume_audio ?? 80);
+        const volume = Number.isFinite(configuredVolume)
+          ? Math.min(100, Math.max(0, configuredVolume)) / 100
+          : 0.8;
+        const chimeType = config.tipo_som || 'bell';
+        const customSound = chimeType === 'custom' ? config.som_personalizado : null;
+        const customSoundUrl = customSound && /^(?:data:|blob:|https?:\/\/)/i.test(customSound)
+          ? customSound
+          : customSound
+            ? `${API_URL}${customSound.startsWith('/') ? '' : '/'}${customSound}`
+            : null;
+        const chimeSource = customSoundUrl ? 'custom' : chimeType;
+
+        const numericSetting = (
+          value: string | null | undefined,
+          fallback: number,
+          minimum: number,
+          maximum: number,
+        ) => {
+          const parsed = Number(value);
+          return Number.isFinite(parsed)
+            ? Math.min(maximum, Math.max(minimum, parsed))
+            : fallback;
+        };
+
+        void executeAudioCall(plan, {
+          isCurrent,
+          playChime: () => customSoundUrl
+            ? playDynamicUrl(customSoundUrl, volume)
+            : playSystemSound(chimeType === 'custom' ? 'bell' : chimeType, volume),
+          playMp3: (url) => playDynamicUrl(url, volume),
+          speak: () => falarSenha(
+            buildSpeechText(payload, config),
+            numericSetting(config.telao_tts_velocidade, 0.95, 0.1, 10),
+            numericSetting(config.telao_tts_tom, 1, 0, 2),
+            config.telao_tts_voz || 'Feminina',
+            isCurrent,
+          ),
+          onPhase: (phase, details) => logAudioPhase(payload.id, sequence, phase, {
+            ...details,
+            ...(phase.startsWith('chime_') ? { source: chimeSource } : {}),
+          }),
+        }).catch((error) => {
+          logAudioPhase(payload.id, sequence, 'call_error', { error });
+        });
       });
 
       fetchAguardando();
@@ -741,7 +740,7 @@ export default function MediaIndoor() {
       window.removeEventListener('DIA_RESETADO', handleDiaResetado);
       window.removeEventListener('RECARREGAR_PAGINA', handleRecarregarPagina);
     };
-  }, [config, refreshEncarteData]);
+  }, [API_URL, config, playDynamicUrl, playSystemSound, refreshEncarteData, stopAudio]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Rotate between media and active modules

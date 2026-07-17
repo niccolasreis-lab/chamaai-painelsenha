@@ -17,6 +17,7 @@
     "android:sync": "vite build && npx cap sync",
     "android:open": "npx cap open android",
     "lint": "eslint .",
+    "test:tts": "tsx --test tests/audioCallFlow.test.ts",
     "preview": "vite preview"
   },
   "build": {

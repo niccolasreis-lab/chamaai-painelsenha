@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import type { PlaybackResult } from '../telao/audioCallFlow';
 
 let globalAudioContext: AudioContext | null = null;
 const audioBuffers = new Map<string, AudioBuffer>();
@@ -6,18 +7,14 @@ const stateChangeListeners = new Set<(state: AudioContextState) => void>();
 
 function getAudioContext(): AudioContext | null {
   if (!globalAudioContext) {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioContextClass = window.AudioContext || (window as typeof window & {
+      webkitAudioContext?: typeof AudioContext;
+    }).webkitAudioContext;
     if (AudioContextClass) {
       globalAudioContext = new AudioContextClass();
       globalAudioContext.addEventListener('statechange', () => {
-        stateChangeListeners.forEach(listener => listener(globalAudioContext!.state));
+        stateChangeListeners.forEach((listener) => listener(globalAudioContext!.state));
       });
-      // Emite o estado inicial assim que criado
-      setTimeout(() => {
-        if (globalAudioContext) {
-          stateChangeListeners.forEach(listener => listener(globalAudioContext!.state));
-        }
-      }, 0);
     }
   }
   return globalAudioContext;
@@ -25,299 +22,259 @@ function getAudioContext(): AudioContext | null {
 
 async function renderSystemSound(type: string): Promise<AudioBuffer> {
   const sampleRate = 44100;
-  const duration = type === 'chime' ? 1.5 : (type === 'bell' ? 1.2 : 0.8);
-  const offlineCtx = new (window.OfflineAudioContext || (window as any).webkitOfflineAudioContext)(
-    1,
-    Math.ceil(sampleRate * duration),
-    sampleRate
-  );
+  const duration = type === 'chime' ? 1.5 : type === 'bell' ? 1.2 : 0.8;
+  const OfflineContext = window.OfflineAudioContext || (window as typeof window & {
+    webkitOfflineAudioContext?: typeof OfflineAudioContext;
+  }).webkitOfflineAudioContext;
+  if (!OfflineContext) throw new Error('OfflineAudioContext não é suportado.');
 
+  const offlineCtx = new OfflineContext(1, Math.ceil(sampleRate * duration), sampleRate);
   const compressor = offlineCtx.createDynamicsCompressor();
   compressor.connect(offlineCtx.destination);
 
-  if (type === 'ding') {
-    const osc = offlineCtx.createOscillator();
+  const addTone = (
+    frequency: number,
+    start: number,
+    end: number,
+    volume: number,
+    wave: OscillatorType = 'sine',
+  ) => {
+    const oscillator = offlineCtx.createOscillator();
     const gain = offlineCtx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(1000, 0);
-    osc.frequency.exponentialRampToValueAtTime(700, 0.3);
-    gain.gain.setValueAtTime(0.7, 0);
-    gain.gain.exponentialRampToValueAtTime(0.001, 0.8);
-    osc.connect(gain);
+    oscillator.type = wave;
+    oscillator.frequency.setValueAtTime(frequency, start);
+    gain.gain.setValueAtTime(0, 0);
+    gain.gain.setValueAtTime(volume, start);
+    gain.gain.exponentialRampToValueAtTime(0.001, end);
+    oscillator.connect(gain);
     gain.connect(compressor);
-    osc.start(0);
-    osc.stop(0.8);
+    oscillator.start(start);
+    oscillator.stop(end);
+    return { oscillator, gain };
+  };
+
+  if (type === 'ding') {
+    const { oscillator } = addTone(1000, 0, 0.8, 0.7);
+    oscillator.frequency.exponentialRampToValueAtTime(700, 0.3);
   } else if (type === 'bell') {
-    // Primeiro toque
-    const osc1 = offlineCtx.createOscillator();
-    const gain1 = offlineCtx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(800, 0);
-    gain1.gain.setValueAtTime(0.7, 0);
-    gain1.gain.exponentialRampToValueAtTime(0.001, 0.5);
-    osc1.connect(gain1);
-    gain1.connect(compressor);
-    osc1.start(0);
-    osc1.stop(0.5);
-    
-    // Segundo toque (mais grave)
-    const osc2 = offlineCtx.createOscillator();
-    const gain2 = offlineCtx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(600, 0.3);
-    gain2.gain.setValueAtTime(0, 0);
-    gain2.gain.setValueAtTime(0.7, 0.3);
-    gain2.gain.exponentialRampToValueAtTime(0.001, 0.9);
-    osc2.connect(gain2);
-    gain2.connect(compressor);
-    osc2.start(0.3);
-    osc2.stop(0.9);
+    addTone(800, 0, 0.5, 0.7);
+    addTone(600, 0.3, 0.9, 0.7);
   } else if (type === 'chime') {
-    const freqs = [523, 659, 784];
-    freqs.forEach((freq, i) => {
-      const osc = offlineCtx.createOscillator();
-      const gain = offlineCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, i * 0.15);
-      gain.gain.setValueAtTime(0, 0);
-      gain.gain.setValueAtTime(0.6, i * 0.15);
-      gain.gain.exponentialRampToValueAtTime(0.001, i * 0.15 + 0.6);
-      osc.connect(gain);
-      gain.connect(compressor);
-      osc.start(i * 0.15);
-      osc.stop(i * 0.15 + 0.6);
+    [523, 659, 784].forEach((frequency, index) => {
+      const start = index * 0.15;
+      addTone(frequency, start, start + 0.6, 0.6);
     });
   } else if (type === 'bip') {
-    for (let i = 0; i < 2; i++) {
-      const osc = offlineCtx.createOscillator();
-      const gain = offlineCtx.createGain();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(900, i * 0.2);
-      gain.gain.setValueAtTime(0, 0);
-      gain.gain.setValueAtTime(0.35, i * 0.2);
-      gain.gain.exponentialRampToValueAtTime(0.001, i * 0.2 + 0.12);
-      osc.connect(gain);
-      gain.connect(compressor);
-      osc.start(i * 0.2);
-      osc.stop(i * 0.2 + 0.12);
+    for (let index = 0; index < 2; index += 1) {
+      const start = index * 0.2;
+      addTone(900, start, start + 0.12, 0.35, 'square');
     }
+  } else {
+    addTone(800, 0, 0.5, 0.7);
+    addTone(600, 0.3, 0.9, 0.7);
   }
 
-  return await offlineCtx.startRendering();
+  return offlineCtx.startRendering();
 }
 
-let activeSourceNode: AudioBufferSourceNode | null = null;
+type ActivePlayback = {
+  id: number;
+  source: AudioBufferSourceNode;
+  resolve: (result: PlaybackResult) => void;
+};
+
+let activePlayback: ActivePlayback | null = null;
 let currentPlaybackId = 0;
 
+function interruptActivePlayback(): void {
+  const playback = activePlayback;
+  if (!playback) return;
+  activePlayback = null;
+  playback.source.onended = null;
+  try {
+    playback.source.stop();
+  } catch {
+    // A fonte pode já ter terminado entre a checagem e o stop.
+  }
+  playback.resolve('interrupted');
+}
+
+function beginPlaybackRequest(): number {
+  currentPlaybackId += 1;
+  interruptActivePlayback();
+  return currentPlaybackId;
+}
+
+async function ensureReadyAudioContext(): Promise<AudioContext> {
+  const ctx = getAudioContext();
+  if (!ctx) throw new Error('AudioContext não é suportado neste dispositivo.');
+  if (ctx.state === 'suspended') await ctx.resume();
+  return ctx;
+}
+
+async function decodeSource(ctx: AudioContext, source: string): Promise<AudioBuffer> {
+  let arrayBuffer: ArrayBuffer;
+  if (source.startsWith('data:')) {
+    const base64Data = source.split(',')[1] || source;
+    const binaryString = window.atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let index = 0; index < binaryString.length; index += 1) {
+      bytes[index] = binaryString.charCodeAt(index);
+    }
+    arrayBuffer = bytes.buffer;
+  } else {
+    const response = await fetch(source);
+    if (!response.ok) throw new Error(`Falha ao carregar áudio (HTTP ${response.status}).`);
+    arrayBuffer = await response.arrayBuffer();
+  }
+  return ctx.decodeAudioData(arrayBuffer);
+}
+
+function playBuffer(
+  ctx: AudioContext,
+  buffer: AudioBuffer,
+  playbackId: number,
+  volume = 0.75,
+): Promise<PlaybackResult> {
+  if (playbackId !== currentPlaybackId) return Promise.resolve('interrupted');
+
+  return new Promise<PlaybackResult>((resolve, reject) => {
+    try {
+      const source = ctx.createBufferSource();
+      const gainNode = ctx.createGain();
+      source.buffer = buffer;
+      gainNode.gain.setValueAtTime(volume * 0.75, ctx.currentTime);
+      source.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      const finish = (result: PlaybackResult) => {
+        if (activePlayback?.id === playbackId) activePlayback = null;
+        resolve(result);
+      };
+      source.onended = () => {
+        finish(playbackId === currentPlaybackId ? 'completed' : 'interrupted');
+      };
+      activePlayback = { id: playbackId, source, resolve: finish };
+      source.start(0);
+    } catch (error) {
+      if (activePlayback?.id === playbackId) activePlayback = null;
+      reject(error);
+    }
+  });
+}
+
 export function useAudioPlayer() {
-  const [isInitialized, setIsInitialized] = useState<boolean>(
-    !!globalAudioContext && globalAudioContext.state !== 'suspended'
+  const [isInitialized, setIsInitialized] = useState(
+    !!globalAudioContext && globalAudioContext.state !== 'suspended',
   );
 
   useEffect(() => {
-    const listener = (state: AudioContextState) => {
-      setIsInitialized(state !== 'suspended');
-    };
+    const listener = (state: AudioContextState) => setIsInitialized(state !== 'suspended');
     stateChangeListeners.add(listener);
-    if (globalAudioContext) {
-      setIsInitialized(globalAudioContext.state !== 'suspended');
-    }
+    if (globalAudioContext) listener(globalAudioContext.state);
     return () => {
       stateChangeListeners.delete(listener);
     };
   }, []);
 
-  const initAudioContext = () => {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    if (ctx.state === 'suspended') {
-      ctx.resume().then(() => {
-        setIsInitialized(true);
-        console.log('[AudioPlayer] AudioContext resumed.');
-      }).catch(err => {
-        console.warn('[AudioPlayer] Failed to resume AudioContext:', err);
-      });
-    } else {
-      setIsInitialized(true);
-    }
-  };
-
-  const preloadAudio = async (key: string, base64OrUrl: string): Promise<void> => {
-    if (audioBuffers.has(key)) {
-      return;
-    }
-    const ctx = getAudioContext();
-    if (!ctx) return;
-
-    if (ctx.state !== 'suspended') {
-      setIsInitialized(true);
-    }
-
+  const initAudioContext = useCallback(async (): Promise<void> => {
     try {
-      let arrayBuffer: ArrayBuffer;
-      if (base64OrUrl.startsWith('data:')) {
-        const base64Data = base64OrUrl.split(',')[1] || base64OrUrl;
-        const binaryString = window.atob(base64Data);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        arrayBuffer = bytes.buffer;
-      } else {
-        const response = await fetch(base64OrUrl);
-        arrayBuffer = await response.arrayBuffer();
+      await ensureReadyAudioContext();
+      setIsInitialized(true);
+    } catch (error) {
+      console.warn('[AudioPlayer] Não foi possível inicializar o áudio:', error);
+    }
+  }, []);
+
+  const stopAudio = useCallback((): void => {
+    currentPlaybackId += 1;
+    interruptActivePlayback();
+  }, []);
+
+  const preloadAudio = useCallback(async (key: string, source: string): Promise<void> => {
+    if (audioBuffers.has(key)) return;
+    try {
+      const ctx = await ensureReadyAudioContext();
+      audioBuffers.set(key, await decodeSource(ctx, source));
+      setIsInitialized(true);
+      console.log(`[AudioPlayer] Áudio carregado: ${key}`);
+    } catch (error) {
+      console.warn(`[AudioPlayer] Falha ao carregar: ${key}`, error);
+    }
+  }, []);
+
+  const preloadSystemSound = useCallback(async (key: string, type: string): Promise<void> => {
+    try {
+      const cacheKey = `system:${type}`;
+      let buffer = audioBuffers.get(cacheKey);
+      if (!buffer) {
+        buffer = await renderSystemSound(type);
+        audioBuffers.set(cacheKey, buffer);
       }
-      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-      audioBuffers.set(key, audioBuffer);
-      console.log(`[AudioPlayer] Loaded key: ${key}`);
-    } catch (err) {
-      console.warn(`[AudioPlayer] Error preloading key: ${key}`, err);
-    }
-  };
-
-  const preloadSystemSound = async (key: string, type: string) => {
-    if (audioBuffers.has(key)) {
-      return;
-    }
-    const ctx = getAudioContext();
-    if (ctx && ctx.state !== 'suspended') {
-      setIsInitialized(true);
-    }
-    try {
-      const buffer = await renderSystemSound(type);
       audioBuffers.set(key, buffer);
-      console.log(`[AudioPlayer] Loaded system sound: ${type} as key: ${key}`);
-    } catch (err) {
-      console.warn(`[AudioPlayer] Failed to load system sound: ${type}`, err);
+      console.log(`[AudioPlayer] Som de sistema carregado: ${type}`);
+    } catch (error) {
+      console.warn(`[AudioPlayer] Falha ao criar som de sistema: ${type}`, error);
     }
-  };
+  }, []);
 
-  const playAudio = (key: string, volume?: number) => {
-    const ctx = getAudioContext();
-    if (!ctx) {
-      console.warn('[AudioPlayer] AudioContext not initialized.');
-      return;
-    }
-
-    // Cancel any pending dynamic loads
-    currentPlaybackId++;
-
+  const playAudio = useCallback(async (key: string, volume?: number): Promise<PlaybackResult> => {
+    const playbackId = beginPlaybackRequest();
+    const ctx = await ensureReadyAudioContext();
+    setIsInitialized(true);
     const buffer = audioBuffers.get(key);
+    if (!buffer) throw new Error(`Áudio não encontrado no cache: ${key}`);
+    console.log(`[AudioPlayer] Reproduzindo cache: ${key}`);
+    return playBuffer(ctx, buffer, playbackId, volume);
+  }, []);
+
+  const playSystemSound = useCallback(async (
+    type: string,
+    volume?: number,
+  ): Promise<PlaybackResult> => {
+    const playbackId = beginPlaybackRequest();
+    const ctx = await ensureReadyAudioContext();
+    setIsInitialized(true);
+    const cacheKey = `system:${type}`;
+    let buffer = audioBuffers.get(cacheKey);
     if (!buffer) {
-      console.warn(`[AudioPlayer] Audio buffer for key "${key}" not found in cache.`);
-      return;
+      buffer = await renderSystemSound(type);
+      audioBuffers.set(cacheKey, buffer);
     }
+    if (playbackId !== currentPlaybackId) return 'interrupted';
+    console.log(`[AudioPlayer] Reproduzindo som de sistema: ${type}`);
+    return playBuffer(ctx, buffer, playbackId, volume);
+  }, []);
 
-    const doPlay = () => {
-      // Cancel dynamic overlapping source nodes immediately
-      if (activeSourceNode) {
-        try {
-          activeSourceNode.stop();
-        } catch (e) {
-          // Safe catch in case audio already stopped playing
-        }
-        activeSourceNode = null;
-      }
-
-      try {
-        const source = ctx.createBufferSource();
-        source.buffer = buffer;
-
-        const gainNode = ctx.createGain();
-        const scaleVolume = volume !== undefined ? volume : 0.75;
-        // Reduz 25% do volume base para evitar clipping nas TVs
-        gainNode.gain.setValueAtTime(scaleVolume * 0.75, ctx.currentTime);
-
-        source.connect(gainNode);
-        gainNode.connect(ctx.destination);
-
-        source.start(0);
-        activeSourceNode = source;
-        console.log(`[AudioPlayer] Played key: ${key} (volume: ${scaleVolume})`);
-      } catch (err) {
-        console.error(`[AudioPlayer] Error playing key: ${key}`, err);
-      }
-    };
-
-    if (ctx.state === 'suspended') {
-      console.log(`[AudioPlayer] AudioContext suspended, resuming before playing "${key}"...`);
-      ctx.resume().then(() => {
-        console.log(`[AudioPlayer] AudioContext resumed. Playing "${key}" now.`);
-        doPlay();
-      }).catch((err) => {
-        console.error('[AudioPlayer] Failed to resume AudioContext:', err);
-      });
-    } else {
-      doPlay();
-    }
-  };
-
-  const playDynamicUrl = async (url: string, volume?: number): Promise<void> => {
-    const ctx = getAudioContext();
-    if (!ctx) {
-      throw new Error('AudioContext not initialized.');
-    }
-
-    const myPlayId = ++currentPlaybackId;
-
+  const playDynamicUrl = useCallback(async (
+    url: string,
+    volume?: number,
+  ): Promise<PlaybackResult> => {
+    const playbackId = beginPlaybackRequest();
+    const ctx = await ensureReadyAudioContext();
+    setIsInitialized(true);
     let buffer = audioBuffers.get(url);
     if (!buffer) {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch dynamic audio file from ${url} (status: ${response.status})`);
-      }
-      const arrayBuffer = await response.arrayBuffer();
-      buffer = await ctx.decodeAudioData(arrayBuffer);
+      buffer = await decodeSource(ctx, url);
       audioBuffers.set(url, buffer);
-      console.log(`[AudioPlayer] Loaded dynamic audio URL: ${url}`);
     }
+    if (playbackId !== currentPlaybackId) return 'interrupted';
+    const safeSource = url.startsWith('data:')
+      ? '[data-url omitida]'
+      : new URL(url, window.location.href).pathname;
+    console.log(`[AudioPlayer] Reproduzindo URL: ${safeSource}`);
+    return playBuffer(ctx, buffer, playbackId, volume);
+  }, []);
 
-    if (myPlayId !== currentPlaybackId) {
-      // Aborta a reprodução se uma nova solicitação iniciou durante o fetch/decode
-      return;
-    }
-
-    const doPlay = () => {
-      if (activeSourceNode) {
-        try {
-          activeSourceNode.stop();
-        } catch (e) {
-          // Safe catch
-        }
-        activeSourceNode = null;
-      }
-
-      try {
-        const source = ctx.createBufferSource();
-        source.buffer = buffer!;
-
-        const gainNode = ctx.createGain();
-        const scaleVolume = volume !== undefined ? volume : 0.75;
-        // Reduz 25% do volume base para evitar clipping nas TVs
-        gainNode.gain.setValueAtTime(scaleVolume * 0.75, ctx.currentTime);
-
-        source.connect(gainNode);
-        gainNode.connect(ctx.destination);
-
-        source.start(0);
-        activeSourceNode = source;
-        console.log(`[AudioPlayer] Played dynamic URL: ${url} (volume: ${scaleVolume})`);
-      } catch (err) {
-        console.error(`[AudioPlayer] Error playing dynamic URL: ${url}`, err);
-        throw err;
-      }
-    };
-
-    if (ctx.state === 'suspended') {
-      console.log('[AudioPlayer] AudioContext suspended, resuming before playing dynamic URL...');
-      await ctx.resume();
-    }
-
-    if (myPlayId === currentPlaybackId) {
-      doPlay();
-    }
+  return {
+    initAudioContext,
+    preloadAudio,
+    preloadSystemSound,
+    playAudio,
+    playSystemSound,
+    playDynamicUrl,
+    stopAudio,
+    isInitialized,
+    audioBuffers,
   };
-
-  return { initAudioContext, preloadAudio, preloadSystemSound, playAudio, playDynamicUrl, isInitialized, audioBuffers };
 }
