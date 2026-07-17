@@ -135,6 +135,7 @@ function playBuffer(
   buffer: AudioBuffer,
   playbackId: number,
   volume = 0.75,
+  outputScale = 0.75,
 ): Promise<PlaybackResult> {
   if (playbackId !== currentPlaybackId) return Promise.resolve('interrupted');
 
@@ -143,7 +144,7 @@ function playBuffer(
       const source = ctx.createBufferSource();
       const gainNode = ctx.createGain();
       source.buffer = buffer;
-      gainNode.gain.setValueAtTime(volume * 0.75, ctx.currentTime);
+      gainNode.gain.setValueAtTime(volume * outputScale, ctx.currentTime);
       source.connect(gainNode);
       gainNode.connect(ctx.destination);
 
@@ -243,7 +244,9 @@ export function useAudioPlayer() {
     }
     if (playbackId !== currentPlaybackId) return 'interrupted';
     console.log(`[AudioPlayer] Reproduzindo som de sistema: ${type}`);
-    return playBuffer(ctx, buffer, playbackId, volume);
+    // Os sons de sistema já carregam a mesma curva de ganho da campainha
+    // original; não aplique novamente o redutor usado em arquivos externos.
+    return playBuffer(ctx, buffer, playbackId, volume, 1);
   }, []);
 
   const playDynamicUrl = useCallback(async (

@@ -27,6 +27,10 @@ export type AudioCallPhase =
 
 export type AudioCallPlan = {
   mode: TelaoTtsMode;
+  chime: {
+    type: 'ding' | 'bell' | 'chime' | 'bip';
+    customUrl: string | null;
+  };
   mp3Candidates: string[];
 };
 
@@ -115,9 +119,28 @@ export function createAudioCallPlan(
   apiUrl: string,
 ): AudioCallPlan {
   const mode = normalizeTtsMode(config.telao_tts_modo);
+  const configuredChime = config.tipo_som || 'bell';
+  const systemChime = configuredChime === 'ding'
+    || configuredChime === 'bell'
+    || configuredChime === 'chime'
+    || configuredChime === 'bip'
+    ? configuredChime
+    : 'bell';
+  const customSound = configuredChime === 'custom'
+    ? config.som_personalizado?.trim()
+    : '';
+  const customUrl = customSound
+    ? /^(?:data:|blob:|https?:\/\/)/i.test(customSound)
+      ? customSound
+      : `${apiUrl.replace(/\/$/, '')}${customSound.startsWith('/') ? '' : '/'}${customSound}`
+    : null;
 
   return {
     mode,
+    chime: {
+      type: systemChime,
+      customUrl,
+    },
     mp3Candidates: mode === 'mp3' || mode === 'ambos'
       ? buildMp3Candidates(apiUrl, payload.numero, payload.repeticao === true)
       : [],

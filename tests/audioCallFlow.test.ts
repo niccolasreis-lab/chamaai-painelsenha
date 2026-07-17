@@ -96,6 +96,40 @@ test('som do portal não interfere na decisão de voz do telão', () => {
   assert.equal(plan.mp3Candidates.length, 2);
 });
 
+test('associa a campainha existente ao plano de voz e ao fallback', () => {
+  const plan = createAudioCallPlan(
+    { id: 7, numero: 7, guiche: '2' },
+    { telao_tts_modo: 'ambos', tipo_som: 'chime' },
+    'http://localhost:3000',
+  );
+
+  assert.equal(plan.mode, 'ambos');
+  assert.deepEqual(plan.chime, { type: 'chime', customUrl: null });
+});
+
+test('mantém som personalizado como campainha e usa bell quando ele estiver ausente', () => {
+  const custom = createAudioCallPlan(
+    { id: 7, numero: 7, guiche: '2' },
+    {
+      telao_tts_modo: 'sintetizador',
+      tipo_som: 'custom',
+      som_personalizado: '/uploads/campainha.mp3',
+    },
+    'http://localhost:3000/',
+  );
+  const missing = createAudioCallPlan(
+    { id: 8, numero: 8, guiche: '2' },
+    { telao_tts_modo: 'ambos', tipo_som: 'custom', som_personalizado: '' },
+    'http://localhost:3000',
+  );
+
+  assert.deepEqual(custom.chime, {
+    type: 'bell',
+    customUrl: 'http://localhost:3000/uploads/campainha.mp3',
+  });
+  assert.deepEqual(missing.chime, { type: 'bell', customUrl: null });
+});
+
 test('aguarda campainha e tenta MP3 na ordem até o primeiro sucesso', async () => {
   const events: string[] = [];
   const plan = createAudioCallPlan(
