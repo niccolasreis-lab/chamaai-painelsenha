@@ -66,6 +66,53 @@ export type MediaItem = {
   is_active?: boolean | number;
 };
 
+export type IsoWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export type VignetteFile = {
+  id: number;
+  folder_id: number;
+  original_name: string;
+  local_path: string;
+  mime_type: 'audio/mpeg';
+  size_bytes: number;
+  created_at: string;
+};
+
+export type VignetteFolder = {
+  id: number;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  files: VignetteFile[];
+};
+
+export type VignetteSchedule = {
+  id: number;
+  name: string;
+  folder_id: number;
+  folder_name?: string;
+  weekdays: IsoWeekday[];
+  start_time: string;
+  end_time: string;
+  interval_minutes: number;
+  is_active: boolean;
+  last_triggered_slot?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type VignetteOccurrence = {
+  occurrence_id: string;
+  schedule_id: number;
+  schedule_name: string;
+  folder_id: number;
+  folder_name: string;
+  file_id: number;
+  file_name: string;
+  file_url: string;
+  scheduled_for: string;
+};
+
 export type EstablishmentConfig = {
   id?: string | number;
   tipo_som?: string | null;

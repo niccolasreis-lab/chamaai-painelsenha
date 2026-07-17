@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import AdminLayout from './AdminLayout';
 import { getApiUrl } from '../shared/apiConfig';
 import {
   Settings,
   Image as ImageIcon,
   Megaphone,
+  Music2,
   Palette,
   Sidebar,
   Layout,
@@ -23,6 +24,7 @@ import { Button } from '../shared/components/Button';
 import { Input } from '../shared/components/Input';
 import { Dialog } from '../shared/components/Dialog';
 import { StatusBadge } from '../shared/components/StatusBadge';
+import VignetteSchedulerAdmin from './VignetteSchedulerAdmin';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface MediaItem {
@@ -39,7 +41,7 @@ interface MediaItem {
   weekdays?: string;
   campaign_id?: number | null;
   priority: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 interface Campaign {
@@ -93,7 +95,7 @@ function TabConfig({ API_URL }: { API_URL: string }) {
       .then(r => r.json())
       .then(setSettings)
       .catch(console.error);
-  }, []);
+  }, [API_URL]);
 
   const save = async (next: typeof settings) => {
     setSaving(true);
@@ -194,15 +196,22 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
   const fileRef = useRef<HTMLInputElement>(null);
   const confirm = useConfirm();
 
-  const fetchItems = () => {
+  const fetchItems = useCallback(() => {
     setLoading(true);
-    fetch(`${API_URL}/api/media/items`)
-      .then(r => r.json())
-      .then(d => { setItems(Array.isArray(d) ? d : []); setLoading(false); })
+    fetch(API_URL + '/api/media/items')
+      .then((response) => response.json())
+      .then((data) => {
+        setItems(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
-  };
+  }, [API_URL]);
 
-  useEffect(fetchItems, []);
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -214,6 +223,7 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
   const handleSave = async () => {
     if (!form.title.trim()) { alert('Informe um título.'); return; }
     setSaving(true);
+    let submissionForm = { ...form };
     try {
       if (uploadFile && (form.type === 'image' || form.type === 'video')) {
         const fd = new FormData();
@@ -222,9 +232,12 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
         fd.append('duracao', String(form.duration_seconds));
         const up = await fetch(`${API_URL}/api/midias`, { method: 'POST', body: fd });
         if (!up.ok) throw new Error('Falha no upload');
-        const upData = await up.json();
-        form.local_path = upData.caminho || upData.path || '';
-        form.source_url = '';
+        const upData = await up.json() as { caminho?: string; path?: string };
+        submissionForm = {
+          ...submissionForm,
+          local_path: upData.caminho || upData.path || '',
+          source_url: '',
+        };
       }
 
       const method = editing ? 'PUT' : 'POST';
@@ -232,14 +245,14 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(submissionForm),
       });
       if (!res.ok) throw new Error('Falha ao salvar');
       showToast(editing ? 'Item atualizado!' : 'Item criado!');
       setShowForm(false);
       fetchItems();
-    } catch (e: any) {
-      showToast('Erro: ' + (e.message || 'desconhecido'));
+    } catch (error: unknown) {
+      showToast('Erro: ' + (error instanceof Error ? error.message : 'desconhecido'));
     } finally {
       setSaving(false);
     }
@@ -253,7 +266,9 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
         body: JSON.stringify({ ...item, is_active: !item.is_active }),
       });
       fetchItems();
-    } catch {}
+    } catch (error) {
+      console.error('[MÍDIA INDOOR] Falha ao alternar conteúdo:', error);
+    }
   };
 
   const deleteItem = async (item: MediaItem) => {
@@ -367,7 +382,7 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
                   <button 
                     key={k} 
                     type="button"
-                    onClick={() => setForm(f => ({ ...f, type: k as any, source_url: '', local_path: '' }))}
+                    onClick={() => setForm(f => ({ ...f, type: k as MediaItem['type'], source_url: '', local_path: '' }))}
                     className={`flex items-center gap-2 px-3 py-2 rounded-md border text-xs font-bold transition-all ${
                       form.type === k 
                         ? 'border-primary bg-primary/5 text-primary' 
@@ -520,14 +535,24 @@ function TabCampaigns({ API_URL, themes, onCampaignsChange }: { API_URL: string;
   const [toast, setToast] = useState('');
   const confirm = useConfirm();
 
-  const fetch_ = () => {
+  const fetch_ = useCallback(() => {
     setLoading(true);
-    fetch(`${API_URL}/api/media/campaigns`)
-      .then(r => r.json())
-      .then(d => { const arr = Array.isArray(d) ? d : []; setCampaigns(arr); onCampaignsChange(arr); setLoading(false); })
+    fetch(API_URL + '/api/media/campaigns')
+      .then((response) => response.json())
+      .then((data) => {
+        const nextCampaigns = Array.isArray(data) ? data : [];
+        setCampaigns(nextCampaigns);
+        onCampaignsChange(nextCampaigns);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
-  };
-  useEffect(fetch_, []);
+  }, [API_URL, onCampaignsChange]);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    fetch_();
+  }, [fetch_]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -742,14 +767,24 @@ function TabThemes({ API_URL, onThemesChange }: { API_URL: string; onThemesChang
   const [toast, setToast] = useState('');
   const confirm = useConfirm();
 
-  const fetch_ = () => {
+  const fetch_ = useCallback(() => {
     setLoading(true);
-    fetch(`${API_URL}/api/media/themes`)
-      .then(r => r.json())
-      .then(d => { const arr = Array.isArray(d) ? d : []; setThemes(arr); onThemesChange(arr); setLoading(false); })
+    fetch(API_URL + '/api/media/themes')
+      .then((response) => response.json())
+      .then((data) => {
+        const nextThemes = Array.isArray(data) ? data : [];
+        setThemes(nextThemes);
+        onThemesChange(nextThemes);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
-  };
-  useEffect(fetch_, []);
+  }, [API_URL, onThemesChange]);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    fetch_();
+  }, [fetch_]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
   const openCreate = () => { setForm(BLANK_THEME); setEditing(null); setShowForm(true); };
@@ -950,7 +985,7 @@ function TabThemes({ API_URL, onThemesChange }: { API_URL: string; onThemesChang
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROOT COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
-type TabId = 'config' | 'items' | 'campaigns' | 'themes';
+type TabId = 'config' | 'items' | 'vignettes' | 'campaigns' | 'themes';
 
 export default function MediaIndoorAdmin() {
   const [activeTab, setActiveTab] = useState<TabId>('config');
@@ -961,6 +996,7 @@ export default function MediaIndoorAdmin() {
   const TABS = [
     { id: 'config' as const,    label: 'Configurações', icon: <Settings className="h-4 w-4" /> },
     { id: 'items' as const,     label: 'Conteúdo',      icon: <ImageIcon className="h-4 w-4" /> },
+    { id: 'vignettes' as const, label: 'Vinhetas',       icon: <Music2 className="h-4 w-4" /> },
     { id: 'campaigns' as const, label: 'Campanhas',     icon: <Megaphone className="h-4 w-4" /> },
     { id: 'themes' as const,    label: 'Temas',         icon: <Palette className="h-4 w-4" /> },
   ];
@@ -985,7 +1021,7 @@ export default function MediaIndoorAdmin() {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-3 font-bold text-sm border-b-2 transition-all outline-none whitespace-nowrap ${
+              className={`flex min-h-11 items-center gap-2 px-5 py-3 font-bold text-sm border-b-2 transition-all outline-none whitespace-nowrap focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${
                 activeTab === tab.id
                   ? 'border-primary text-primary bg-primary/5'
                   : 'border-transparent text-ink-variant hover:text-ink hover:bg-surface-container-low'
@@ -1001,6 +1037,7 @@ export default function MediaIndoorAdmin() {
         <div className="bg-surface p-6 rounded-md border border-outline-variant shadow-sm min-h-[350px]">
           {activeTab === 'config' && <TabConfig API_URL={API_URL} />}
           {activeTab === 'items' && <TabItems API_URL={API_URL} campaigns={campaigns} />}
+          {activeTab === 'vignettes' && <VignetteSchedulerAdmin API_URL={API_URL} />}
           {activeTab === 'campaigns' && <TabCampaigns API_URL={API_URL} themes={themes} onCampaignsChange={setCampaigns} />}
           {activeTab === 'themes' && <TabThemes API_URL={API_URL} onThemesChange={setThemes} />}
         </div>

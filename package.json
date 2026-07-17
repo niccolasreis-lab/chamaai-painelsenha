@@ -18,6 +18,7 @@
     "android:open": "npx cap open android",
     "lint": "eslint .",
     "test:tts": "tsx --test tests/audioCallFlow.test.ts",
+    "test:vignettes": "tsx --test tests/vignette*.test.ts",
     "preview": "vite preview"
   },
   "build": {

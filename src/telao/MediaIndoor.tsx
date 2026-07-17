@@ -9,6 +9,7 @@ import SmartMediaLayer from './SmartMediaLayer';
 import { useSSE } from '../shared/useSSE';
 import { getApiUrl } from '../shared/apiConfig';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import { VignetteAudioCoordinator } from './vignetteAudioCoordinator';
 import {
   buildSpeechText,
   createAudioCallPlan,
@@ -17,7 +18,17 @@ import {
   type PlaybackResult,
 } from './audioCallFlow';
 import { ArrowLeft, Users, History, Ticket, Megaphone, Volume2, Clock } from 'lucide-react';
-import type { ProdutoToledo, Categoria, TemaEncarte, EstablishmentConfig, PerfilTelao, MediaItem, RecentCall, SmartMediaSettings } from '../shared/types';
+import type {
+  ProdutoToledo,
+  Categoria,
+  TemaEncarte,
+  EstablishmentConfig,
+  PerfilTelao,
+  MediaItem,
+  RecentCall,
+  SmartMediaSettings,
+  VignetteOccurrence,
+} from '../shared/types';
 
 async function falarSenha(
   texto: string,
@@ -31,7 +42,6 @@ async function falarSenha(
   }
 
   const vozes = await new Promise<SpeechSynthesisVoice[]>((resolve) => {
-    let timeout: ReturnType<typeof setTimeout>;
     let settled = false;
     const handleVoicesChanged = () => finish(window.speechSynthesis.getVoices());
     const finish = (voices: SpeechSynthesisVoice[]) => {
@@ -41,12 +51,12 @@ async function falarSenha(
       window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
       resolve(voices);
     };
+    const timeout = setTimeout(() => finish([]), 2000);
     const lista = window.speechSynthesis.getVoices();
     if (lista.length > 0) {
-      resolve(lista);
+      finish(lista);
       return;
     }
-    timeout = setTimeout(() => finish([]), 2000);
     window.speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged, { once: true });
   });
 
@@ -107,6 +117,20 @@ function logAudioPhase(
   if (phase.endsWith('_error')) console.error('[TELAO_AUDIO]', payload);
   else if (phase === 'call_interrupted') console.warn('[TELAO_AUDIO]', payload);
   else console.info('[TELAO_AUDIO]', payload);
+}
+
+type VignetteAudioRuntime = {
+  apiUrl: string;
+  volume: number;
+  playDynamicUrl: (url: string, volume?: number) => Promise<PlaybackResult>;
+  stopAudio: () => void;
+};
+
+function normalizeAudioVolume(value: unknown): number {
+  const configuredVolume = Number(value ?? 80);
+  return Number.isFinite(configuredVolume)
+    ? Math.min(100, Math.max(0, configuredVolume)) / 100
+    : 0.8;
 }
 
 export default function MediaIndoor() {
@@ -248,13 +272,42 @@ export default function MediaIndoor() {
     isInitialized,
   } = useAudioPlayer();
 
+  const vignetteRuntimeRef = useRef<VignetteAudioRuntime | null>(null);
+  const vignetteCoordinatorRef = useRef<VignetteAudioCoordinator | null>(null);
+
+  useEffect(() => {
+    vignetteRuntimeRef.current = {
+      apiUrl: API_URL,
+      volume: normalizeAudioVolume(config.volume_audio),
+      playDynamicUrl,
+      stopAudio,
+    };
+  }, [API_URL, config.volume_audio, playDynamicUrl, stopAudio]);
+
   useEffect(() => {
     isMountedRef.current = true;
+    const coordinator = new VignetteAudioCoordinator({
+      playVignette: (occurrence) => {
+        const runtime = vignetteRuntimeRef.current;
+        if (!runtime) return Promise.resolve('interrupted');
+        const baseUrl = runtime.apiUrl || window.location.origin;
+        const absoluteUrl = new URL(occurrence.file_url, baseUrl).toString();
+        return runtime.playDynamicUrl(absoluteUrl, runtime.volume);
+      },
+      interruptAudio: () => {
+        vignetteRuntimeRef.current?.stopAudio();
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      },
+    });
+    vignetteCoordinatorRef.current = coordinator;
+
     return () => {
       isMountedRef.current = false;
       audioSequenceRef.current += 1;
-      stopAudio();
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      coordinator.destroy();
+      if (vignetteCoordinatorRef.current === coordinator) {
+        vignetteCoordinatorRef.current = null;
+      }
       if (repeticaoTimerRef.current) {
         clearTimeout(repeticaoTimerRef.current);
       }
@@ -262,7 +315,7 @@ export default function MediaIndoor() {
         abortControllerRef.current.abort();
       }
     };
-  }, [stopAudio]);
+  }, []);
 
   // Handle user interaction to unlock AudioContext
   useEffect(() => {
@@ -271,7 +324,10 @@ export default function MediaIndoor() {
     };
 
     // Auto-inicializa o áudio se estiver rodando no Electron (telão passivo sem clique)
-    const isElectron = 'api' in window && typeof (window as any).api?.ping === 'function';
+    const electronWindow = window as typeof window & {
+      api?: { ping?: () => unknown };
+    };
+    const isElectron = typeof electronWindow.api?.ping === 'function';
     if (isElectron) {
       console.log('[TELAO] Electron detectado. Inicializando AudioContext automaticamente.');
       initAudioContext();
@@ -451,7 +507,7 @@ export default function MediaIndoor() {
     }
   };
 
-  /* eslint-disable react-hooks/set-state-in-effect */
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
     const hoje = new Date().toDateString();
     const ultimaData = localStorage.getItem('chamaaai_ultima_data');
@@ -482,31 +538,29 @@ export default function MediaIndoor() {
       clearInterval(queueTimer);
     };
   }, [telaoCode]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   // Connect only to paired screen SSE channel (which receives all pairing + queue events)
   const sseUrl = telaoCode ? `${API_URL}/api/telao/sse/${telaoCode}` : null;
   const { data: telaoSseEvent, connected: sseConnected } = useSSE(sseUrl);
 
   // Buscar perfil atualizado sempre que o telão se reconectar
-  /* eslint-disable react-hooks/set-state-in-effect */
+  /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
   useEffect(() => {
     if (sseConnected && telaoCode) {
       console.log('[TELAO] SSE reconectado. Sincronizando perfil...');
       fetchPerfil(telaoCode);
     }
   }, [sseConnected, telaoCode]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  /* eslint-enable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 
   // Watch unified SSE events (pairing events + queue/calling events) via window events
-  /* eslint-disable react-hooks/set-state-in-effect */
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     const handleNovaSenhaChamada = (e: Event) => {
       const payload = (e as CustomEvent).detail as RecentCall;
       const sequence = ++audioSequenceRef.current;
       const plan = createAudioCallPlan(payload, config, API_URL);
-      stopAudio();
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       logAudioPhase(payload.id, sequence, 'event_received', {
         mode: plan.mode,
         repeat: payload.repeticao === true,
@@ -536,56 +590,61 @@ export default function MediaIndoor() {
         }
       }
 
-      // Aguarda a pintura da senha antes de iniciar a sequência sonora.
-      requestAnimationFrame(() => {
-        const isCurrent = () => (
-          isMountedRef.current && audioSequenceRef.current === sequence
-        );
-        if (!isCurrent()) {
-          logAudioPhase(payload.id, sequence, 'call_interrupted');
-          return;
-        }
+      // A chamada completa possui prioridade sobre qualquer vinheta.
+      const coordinator = vignetteCoordinatorRef.current;
+      if (!coordinator) {
+        logAudioPhase(payload.id, sequence, 'call_error', {
+          error: 'Coordenador de áudio indisponível.',
+        });
+      } else {
+        void coordinator.startCall(async () => {
+          await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => resolve());
+          });
+          const isCurrent = () => (
+            isMountedRef.current && audioSequenceRef.current === sequence
+          );
+          if (!isCurrent()) {
+            logAudioPhase(payload.id, sequence, 'call_interrupted');
+            return;
+          }
 
-        const configuredVolume = Number(config.volume_audio ?? 80);
-        const volume = Number.isFinite(configuredVolume)
-          ? Math.min(100, Math.max(0, configuredVolume)) / 100
-          : 0.8;
-        const chimeSource = plan.chime.customUrl ? 'custom' : plan.chime.type;
+          const volume = normalizeAudioVolume(config.volume_audio);
+          const chimeSource = plan.chime.customUrl ? 'custom' : plan.chime.type;
+          const numericSetting = (
+            value: string | null | undefined,
+            fallback: number,
+            minimum: number,
+            maximum: number,
+          ) => {
+            const parsed = Number(value);
+            return Number.isFinite(parsed)
+              ? Math.min(maximum, Math.max(minimum, parsed))
+              : fallback;
+          };
 
-        const numericSetting = (
-          value: string | null | undefined,
-          fallback: number,
-          minimum: number,
-          maximum: number,
-        ) => {
-          const parsed = Number(value);
-          return Number.isFinite(parsed)
-            ? Math.min(maximum, Math.max(minimum, parsed))
-            : fallback;
-        };
-
-        void executeAudioCall(plan, {
-          isCurrent,
-          playChime: () => plan.chime.customUrl
-            ? playDynamicUrl(plan.chime.customUrl, volume)
-            : playSystemSound(plan.chime.type, volume),
-          playMp3: (url) => playDynamicUrl(url, volume),
-          speak: () => falarSenha(
-            buildSpeechText(payload, config),
-            numericSetting(config.telao_tts_velocidade, 0.95, 0.1, 10),
-            numericSetting(config.telao_tts_tom, 1, 0, 2),
-            config.telao_tts_voz || 'Feminina',
+          await executeAudioCall(plan, {
             isCurrent,
-          ),
-          onPhase: (phase, details) => logAudioPhase(payload.id, sequence, phase, {
-            ...details,
-            ...(phase.startsWith('chime_') ? { source: chimeSource } : {}),
-          }),
+            playChime: () => plan.chime.customUrl
+              ? playDynamicUrl(plan.chime.customUrl, volume)
+              : playSystemSound(plan.chime.type, volume),
+            playMp3: (url) => playDynamicUrl(url, volume),
+            speak: () => falarSenha(
+              buildSpeechText(payload, config),
+              numericSetting(config.telao_tts_velocidade, 0.95, 0.1, 10),
+              numericSetting(config.telao_tts_tom, 1, 0, 2),
+              config.telao_tts_voz || 'Feminina',
+              isCurrent,
+            ),
+            onPhase: (phase, details) => logAudioPhase(payload.id, sequence, phase, {
+              ...details,
+              ...(phase.startsWith('chime_') ? { source: chimeSource } : {}),
+            }),
+          });
         }).catch((error) => {
           logAudioPhase(payload.id, sequence, 'call_error', { error });
         });
-      });
-
+      }
       fetchAguardando();
       
       const existingTimer = (window as unknown as { _mediaTimer?: ReturnType<typeof setTimeout> })._mediaTimer;
@@ -594,6 +653,18 @@ export default function MediaIndoor() {
       (window as unknown as { _mediaTimer?: ReturnType<typeof setTimeout> })._mediaTimer = setTimeout(() => {
         setShowMedia(true);
       }, 6000);
+    };
+
+    const handleVinhetaAgendada = (e: Event) => {
+      const occurrence = (e as CustomEvent).detail as VignetteOccurrence | undefined;
+      if (!occurrence
+        || !Number.isInteger(occurrence.schedule_id)
+        || typeof occurrence.file_url !== 'string'
+        || typeof occurrence.scheduled_for !== 'string') {
+        console.warn('[VINHETAS] Ocorrência SSE inválida ignorada.');
+        return;
+      }
+      vignetteCoordinatorRef.current?.enqueue(occurrence);
     };
 
     const handleSenhaEstornada = (e: Event) => {
@@ -703,6 +774,7 @@ export default function MediaIndoor() {
     };
 
     window.addEventListener('NOVA_SENHA_CHAMADA', handleNovaSenhaChamada);
+    window.addEventListener('VINHETA_AGENDADA', handleVinhetaAgendada);
     window.addEventListener('SENHA_ESTORNADA', handleSenhaEstornada);
     window.addEventListener('queue-update', handleQueueUpdate);
     window.addEventListener('CONFIG_ATUALIZADA', handleConfigAtualizada);
@@ -719,6 +791,7 @@ export default function MediaIndoor() {
 
     return () => {
       window.removeEventListener('NOVA_SENHA_CHAMADA', handleNovaSenhaChamada);
+      window.removeEventListener('VINHETA_AGENDADA', handleVinhetaAgendada);
       window.removeEventListener('SENHA_ESTORNADA', handleSenhaEstornada);
       window.removeEventListener('queue-update', handleQueueUpdate);
       window.removeEventListener('CONFIG_ATUALIZADA', handleConfigAtualizada);
@@ -733,8 +806,8 @@ export default function MediaIndoor() {
       window.removeEventListener('DIA_RESETADO', handleDiaResetado);
       window.removeEventListener('RECARREGAR_PAGINA', handleRecarregarPagina);
     };
-  }, [API_URL, config, playDynamicUrl, playSystemSound, refreshEncarteData, stopAudio]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  }, [API_URL, config, playDynamicUrl, playSystemSound, refreshEncarteData]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Rotate between media and active modules
   const nextMedia = useCallback(() => {
@@ -790,7 +863,7 @@ export default function MediaIndoor() {
       const timer = setTimeout(() => setShowingEncarte(true), 2000);
       return () => clearTimeout(timer);
     }
-  }, [activeMidiaIndex, midias, showMedia, showingEncarte, activeModules, nextMedia]);
+  }, [activeMidiaIndex, midias, showMedia, showingEncarte, activeModules, nextMedia, smartMediaSettings.midia_indoor_ativa]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Ensure video element reloads and plays when src changes or when recovering from senha overlay

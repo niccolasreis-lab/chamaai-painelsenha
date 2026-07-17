@@ -17,6 +17,11 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { setupMediaIndoorRoutes } from './media-indoor';
+import {
+  setupVignetteRoutes,
+  startVignetteScheduler,
+  stopVignetteScheduler,
+} from './services/vignette-scheduler.service';
 import { isTelaoTtsMode, TELAO_TTS_MODES } from '../src/shared/ttsMode';
 
 const app = express();
@@ -4025,6 +4030,7 @@ export function startServer() {
   // ═══════════════════════════════════════════════════════════════════
   
   setupMediaIndoorRoutes(app, broadcastEvent, requireMaster);
+  setupVignetteRoutes(app, broadcastEvent, requireMaster);
 
   // Catch-all 404 handler for API
   
@@ -4295,6 +4301,12 @@ export function startServer() {
       startCloudCommandsCron();
     } catch (err) {
       console.error('[SUPABASE] Erro ao iniciar sync worker, checkin ou commands cron (não crítico):', err);
+    }
+    try {
+      startVignetteScheduler(broadcastEvent);
+      console.log('[VINHETAS] Agendador recorrente iniciado.');
+    } catch (err) {
+      console.error('[VINHETAS] Erro ao iniciar agendador:', err);
     }
   });
 
@@ -4814,6 +4826,11 @@ export function stopServer(): Promise<void> {
       console.error('Erro ao parar Commands cron', e);
     }
 
+    try {
+      stopVignetteScheduler();
+    } catch(e) {
+      console.error('Erro ao parar agendador de vinhetas', e);
+    }
     try {
       const db = getDb();
       if (db) db.close();
