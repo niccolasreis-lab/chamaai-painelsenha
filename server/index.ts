@@ -17,6 +17,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { setupMediaIndoorRoutes } from './media-indoor';
+import { isTelaoTtsMode, TELAO_TTS_MODES } from '../src/shared/ttsMode';
 
 const app = express();
 app.set('trust proxy', true);
@@ -2245,6 +2246,19 @@ export function startServer() {
     try {
       const configuracoes = req.body;
       const db = getDb();
+
+      if (!configuracoes || typeof configuracoes !== 'object' || Array.isArray(configuracoes)) {
+        return res.status(400).json({ error: 'Configurações devem ser enviadas como objeto.' });
+      }
+
+      if (
+        Object.prototype.hasOwnProperty.call(configuracoes, 'telao_tts_modo')
+        && !isTelaoTtsMode(configuracoes.telao_tts_modo)
+      ) {
+        return res.status(400).json({
+          error: `Modo de TTS inválido. Valores aceitos: ${TELAO_TTS_MODES.join(', ')}.`,
+        });
+      }
 
       // Validação de tamanhos de fonte CSS
       const cssSize = /^(\d+(\.\d+)?)(rem|em|px|vw|vh|%)$/;

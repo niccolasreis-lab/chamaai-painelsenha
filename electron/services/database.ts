@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import { app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import { TELAO_TTS_MODE_MIGRATION_SQL } from './tts-mode-migration';
 
 let db: Database.Database;
 
@@ -148,6 +149,7 @@ export async function initDatabase({ appVersion }: { appVersion: string }): Prom
       INSERT OR IGNORE INTO configuracoes VALUES ('totem_screensaver_intervalo', '10', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('totem_solicita_nome', '0', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_ativo', '0', datetime('now'));
+      ${TELAO_TTS_MODE_MIGRATION_SQL}
       INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_voz', 'Feminina', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('telao_ticker_texto', '', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('sync_pendente_cor_primaria', '0', datetime('now'));
