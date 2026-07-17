@@ -319,6 +319,42 @@ export async function initDatabase({ appVersion }: { appVersion: string }): Prom
         updated_at TEXT DEFAULT (datetime('now', 'localtime'))
       );
 
+      CREATE TABLE IF NOT EXISTS vignette_folders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+      );
+
+      CREATE TABLE IF NOT EXISTS vignette_files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        folder_id INTEGER NOT NULL REFERENCES vignette_folders(id) ON DELETE CASCADE,
+        original_name TEXT NOT NULL,
+        local_path TEXT NOT NULL UNIQUE,
+        mime_type TEXT NOT NULL DEFAULT 'audio/mpeg',
+        size_bytes INTEGER NOT NULL CHECK(size_bytes >= 0),
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+      );
+
+      CREATE TABLE IF NOT EXISTS vignette_schedules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        folder_id INTEGER NOT NULL REFERENCES vignette_folders(id) ON DELETE RESTRICT,
+        weekdays_mask INTEGER NOT NULL CHECK(weekdays_mask BETWEEN 1 AND 127),
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        interval_minutes INTEGER NOT NULL CHECK(interval_minutes BETWEEN 1 AND 1440),
+        is_active INTEGER NOT NULL DEFAULT 0,
+        last_triggered_slot TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_vignette_files_folder
+        ON vignette_files(folder_id);
+      CREATE INDEX IF NOT EXISTS idx_vignette_schedules_active
+        ON vignette_schedules(is_active, folder_id);
+
       CREATE TABLE IF NOT EXISTS weather_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         latitude REAL,
