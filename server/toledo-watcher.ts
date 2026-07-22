@@ -20,6 +20,7 @@ import { getDb } from '../electron/services/database';
 import { parseFileContent, ParsedItem } from './file-parsers';
 import { syncProdutos } from './supabase-sync';
 import { getCategoryFromDescription } from './categorizador';
+import { findToledoSourceFile } from './toledo-file-discovery';
 
 // Broadcast function injected by server to avoid circular dependency
 let broadcastEvent: (event: string, data: any) => void = () => {};
@@ -99,9 +100,15 @@ function getWatchedPaths() {
   return {
     txt: path.join(dir, fileNameTxt),
     bak: path.join(dir, fileNameBak),
+    fileNameTxt,
+    fileNameBak,
     dir: dir,
     format: format
   };
+}
+
+function resolveWatchedSource(paths: ReturnType<typeof getWatchedPaths>) {
+  return findToledoSourceFile(paths.dir, paths.fileNameTxt, paths.fileNameBak);
 }
 
 // Persistent paths for configuration
@@ -259,6 +266,7 @@ function processToledoItems(items: ToledoItem[]): number {
 
 // ── Watcher Engine ─────────────────────────────────────────────────────────────
 let lastMtime: number = 0;
+let lastFilePath: string | null = null;
 let debounceTimer: NodeJS.Timeout | null = null;
 let isProcessing = false;
 let watcherActive = false;
@@ -400,48 +408,31 @@ export function startToledoWatcher() {
   console.log(`[TOLEDO]  Intervalo de poll: ${POLL_INTERVAL_MS}ms`);
   console.log('[TOLEDO] ═══════════════════════════════════════════');
 
-  // Check if the file/path is accessible
+  // Resolve either the conventional file or the newest versioned MGV6 export.
   try {
-    if (fs.existsSync(paths.txt)) {
-      const stat = fs.statSync(paths.txt);
-      lastMtime = stat.mtimeMs;
-      console.log(`[TOLEDO] ✅ Arquivo TXT encontrado. Última modificação: ${new Date(stat.mtimeMs).toLocaleString('pt-BR')}`);
-      processFile(paths.txt);
-    } else if (fs.existsSync(paths.bak)) {
-      const stat = fs.statSync(paths.bak);
-      lastMtime = stat.mtimeMs;
-      console.log(`[TOLEDO] ✅ Arquivo BAK encontrado. Última modificação: ${new Date(stat.mtimeMs).toLocaleString('pt-BR')}`);
-      processFile(paths.bak);
+    const source = resolveWatchedSource(paths);
+    if (source) {
+      lastMtime = source.mtimeMs;
+      lastFilePath = source.path;
+      console.log(`[TOLEDO] Arquivo ${source.kind} encontrado. Última modificação: ${new Date(source.mtimeMs).toLocaleString('pt-BR')}`);
+      processFile(source.path);
     } else {
-      console.warn(`[TOLEDO] ⚠️ Nenhum arquivo encontrado em ${paths.dir}. O watcher ficará ativo aguardando.`);
+      console.warn(`[TOLEDO] Nenhum arquivo encontrado em ${paths.dir}. O watcher ficará ativo aguardando.`);
     }
   } catch (err: any) {
-    console.warn(`[TOLEDO] ⚠️ Caminho de rede não acessível: ${err.message}. O watcher ficará tentando...`);
+    console.warn(`[TOLEDO] Caminho de rede não acessível: ${err.message}. O watcher ficará tentando...`);
   }
 
   // Use polling for UNC network paths (fs.watch is unreliable on network shares)
   const pollTimer = setInterval(() => {
     try {
       const currentPaths = getWatchedPaths(); // Check dynamically in case it changed
-      // Check TXT first
-      if (fs.existsSync(currentPaths.txt)) {
-        const stat = fs.statSync(currentPaths.txt);
-        if (stat.mtimeMs > lastMtime) {
-          lastMtime = stat.mtimeMs;
-          console.log(`[TOLEDO] 📁 Modificação detectada em TXT: ${new Date(stat.mtimeMs).toLocaleString('pt-BR')}`);
-          onFileChanged(currentPaths.txt);
-          return;
-        }
-      }
-      
-      // Check BAK if TXT hasn't changed or doesn't exist
-      if (fs.existsSync(currentPaths.bak)) {
-        const stat = fs.statSync(currentPaths.bak);
-        if (stat.mtimeMs > lastMtime) {
-          lastMtime = stat.mtimeMs;
-          console.log(`[TOLEDO] 📁 Modificação detectada em BAK: ${new Date(stat.mtimeMs).toLocaleString('pt-BR')}`);
-          onFileChanged(currentPaths.bak);
-        }
+      const source = resolveWatchedSource(currentPaths);
+      if (source && (source.path !== lastFilePath || source.mtimeMs > lastMtime)) {
+        lastMtime = source.mtimeMs;
+        lastFilePath = source.path;
+        console.log(`[TOLEDO] Modificação detectada em ${source.kind}: ${new Date(source.mtimeMs).toLocaleString('pt-BR')}`);
+        onFileChanged(source.path);
       }
     } catch (err: any) {
       // Network path temporarily unavailable — silent retry
@@ -468,15 +459,10 @@ export function startToledoWatcher() {
  */
 export async function forceToledoRefresh() {
   const paths = getWatchedPaths();
-  if (fs.existsSync(paths.txt)) {
-    await processFile(paths.txt);
-    return { success: true, message: 'Leitura forçada do TXT concluída.' };
-  } else if (fs.existsSync(paths.bak)) {
-    await processFile(paths.bak);
-    return { success: true, message: 'Leitura forçada do BAK concluída.' };
-  } else {
-    return { success: false, message: `Nenhum arquivo encontrado na pasta: ${paths.dir}` };
-  }
+  const source = resolveWatchedSource(paths);
+  if (!source) return { success: false, message: `Nenhum arquivo encontrado na pasta: ${paths.dir}` };
+  await processFile(source.path);
+  return { success: true, message: `Leitura forçada de ${path.basename(source.path)} concluída.` };
 }
 
 /**
