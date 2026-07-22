@@ -31,9 +31,10 @@ export interface TicketStatus {
   ok: boolean;
   ticket: {
     id: number | string;
-    senha_id: string;
-    status: 'aguardando' | 'expirado' | 'chamada';
+    numero: string;
+    status: 'aguardando' | 'chamada' | 'atendida' | 'cancelada';
     position: number | null;
+    guiche: string | null;
     last_update: string;
   };
 }
@@ -59,7 +60,7 @@ export async function fetchPortalSummary(token: string): Promise<PortalSummary> 
 }
 
 export async function fetchTicketStatus(token: string, ticketId: string): Promise<TicketStatus> {
-  const response = await fetch(`${PORTAL_API_URL}?token=${encodeURIComponent(token)}&senha_id=${encodeURIComponent(ticketId)}`);
+  const response = await fetch(`${PORTAL_API_URL}?token=${encodeURIComponent(token)}&ticket=${encodeURIComponent(ticketId)}`);
   if (!response.ok) {
     throw new Error('Falha ao obter status do ticket.');
   }

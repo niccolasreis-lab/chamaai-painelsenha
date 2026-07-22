@@ -152,7 +152,7 @@ export default function ClientePortal() {
           const data = await fetchTicketStatus(token, ticketId);
           if (!data.ok) throw new Error();
 
-          setTicketNumero(data.ticket.senha_id || '');
+          setTicketNumero(data.ticket.numero || '');
 
           if (data.ticket.status === 'aguardando') {
             setTicketStatus('aguardando');

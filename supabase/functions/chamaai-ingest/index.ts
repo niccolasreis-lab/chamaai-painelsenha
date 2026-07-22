@@ -36,6 +36,21 @@ async function sha256(input: string): Promise<string> {
 const ALLOWED_TABLES = ['senhas_publicas', 'toledo_produtos_publicos', 'configuracoes_publicas'];
 const ALLOWED_ACTIONS = ['upsert', 'update', 'delete', 'delete_all'];
 
+function scopePayload(
+  payload: Record<string, unknown> | Array<Record<string, unknown>>,
+  tenantId: string,
+  storeId: string,
+  installationId: string,
+) {
+  const applyScope = (row: Record<string, unknown>) => ({
+    ...row,
+    tenant_id: tenantId,
+    store_id: storeId,
+    installation_id: installationId,
+  });
+  return Array.isArray(payload) ? payload.map(applyScope) : applyScope(payload);
+}
+
 serve(async (req) => {
   const reqOrigin = req.headers.get("origin") || "";
   const corsHeaders = getCorsHeaders(reqOrigin);
@@ -152,9 +167,20 @@ serve(async (req) => {
 
       // Validar payload e injetar dados de tenant/store
       if (acao === 'upsert' || acao === 'update') {
-        const payloadTenant = payload.tenant_id;
-        const payloadStore = payload.store_id;
-        if ((payloadTenant && payloadTenant !== tenantId) || (payloadStore && payloadStore !== storeId)) {
+        const payloadRows = Array.isArray(payload) ? payload : [payload];
+        const invalidPayload = payloadRows.length === 0
+          || payloadRows.some(row => !row || typeof row !== 'object' || Array.isArray(row))
+          || (acao !== 'upsert' && Array.isArray(payload));
+        if (invalidPayload) {
+          results.push({ queue_id, ok: false, status: 'failed', error_code: 'INVALID_PAYLOAD' });
+          allOk = false;
+          continue;
+        }
+        const hasScopeMismatch = payloadRows.some(row =>
+          (row.tenant_id && row.tenant_id !== tenantId)
+          || (row.store_id && row.store_id !== storeId)
+        );
+        if (hasScopeMismatch) {
           results.push({ queue_id, ok: false, status: 'failed', error_code: 'TENANT_STORE_MISMATCH' });
           allOk = false;
           continue;
@@ -166,13 +192,13 @@ serve(async (req) => {
 
         if (acao === 'upsert') {
           // Garante que o payload tenha tenant_id e store_id e installation_id correto
-          const finalPayload = {
-            ...payload,
-            tenant_id: tenantId,
-            store_id: storeId,
-            installation_id: installationId
-          };
-          const { error } = await adminClient.from(tabela).upsert(finalPayload);
+          const finalPayload = scopePayload(payload, tenantId, storeId, installationId);
+          const conflictTarget = tabela === 'senhas_publicas'
+            ? 'tenant_id,store_id,id'
+            : tabela === 'toledo_produtos_publicos'
+              ? 'tenant_id,store_id,plu'
+              : 'tenant_id,store_id,chave';
+          const { error } = await adminClient.from(tabela).upsert(finalPayload, { onConflict: conflictTarget });
           dbError = error;
         } 
         else if (acao === 'update') {
@@ -197,12 +223,7 @@ serve(async (req) => {
             continue;
           }
 
-          const finalPayload = {
-            ...payload,
-            tenant_id: tenantId,
-            store_id: storeId,
-            installation_id: installationId
-          };
+          const finalPayload = scopePayload(payload, tenantId, storeId, installationId);
 
           const { error } = await adminClient.from(tabela).update(finalPayload)
             .eq(idField, queryId)

@@ -1307,7 +1307,7 @@ export function startServer() {
       }
 
       // Sync: espelha a nova senha na nuvem para o Portal do Cliente
-      syncNovaSenha(novaSenha.id, txResult.numero, 'aguardando');
+      syncNovaSenha(novaSenha.id, txResult.numero, 'aguardando', Boolean(preferencial));
 
       res.status(201).json(novaSenha);
     } catch (err: any) {

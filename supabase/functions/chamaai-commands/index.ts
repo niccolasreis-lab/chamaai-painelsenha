@@ -9,7 +9,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 
 const allowedOriginsStr = Deno.env.get("ALLOWED_ADMIN_ORIGINS") || "";
-const origin = reqOriginSelector;
 
 function getCorsHeaders(reqOrigin: string) {
   let allowedOrigin = "";
@@ -120,6 +119,13 @@ serve(async (req) => {
 
     if (action === 'poll') {
       const limit = Math.min(20, Math.max(1, body.limit || 5));
+      const staleClaimCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      await adminClient.from('comandos_operador')
+        .update({ status: 'pending', claimed_at: null })
+        .eq('tenant_id', tenantId)
+        .eq('store_id', storeId)
+        .eq('status', 'claimed')
+        .lt('claimed_at', staleClaimCutoff);
 
       // Busca comandos pendentes para essa loja/tenant que estão na allowlist
       // Também verifica se a installation_id do comando é nula ou igual a do dispositivo

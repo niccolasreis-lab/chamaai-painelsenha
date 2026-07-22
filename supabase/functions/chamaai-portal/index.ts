@@ -21,6 +21,8 @@ function getCorsHeaders(reqOrigin: string) {
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Vary': 'Origin',
   };
 }
 
@@ -89,25 +91,84 @@ serve(async (req) => {
 
     const { tenant_id, store_id, allowed_features } = portalRow;
 
-    // Atualiza last_used_at
-    await adminClient.from('store_public_portals')
-      .update({ last_used_at: new Date().toISOString() })
-      .eq('id', portalRow.id);
+    // Evita uma escrita a cada polling de 2s; o timestamp é operacional, não
+    // participa da consistência da fila.
+    const lastUsedAt = portalRow.last_used_at ? new Date(portalRow.last_used_at).getTime() : 0;
+    if (!Number.isFinite(lastUsedAt) || Date.now() - lastUsedAt > 5 * 60 * 1000) {
+      await adminClient.from('store_public_portals')
+        .update({ last_used_at: new Date().toISOString() })
+        .eq('id', portalRow.id);
+    }
 
     // 2. Determinar o Modo com base nos parâmetros
-    const senhaId = url.searchParams.get('senha_id') || url.searchParams.get('ticket');
+    const senhaId = url.searchParams.get('ticket') || url.searchParams.get('senha_id');
     const resource = url.searchParams.get('resource');
+
+    if (resource === 'events' && req.method === 'POST') {
+      const body = await req.json();
+      const ticketId = Number(body.ticket_id);
+      const allowedTypes = ['analytics', 'feedback'];
+      const allowedEvents = ['visualizacao', 'pdf_download', 'whatsapp_share', 'emoji_rating'];
+      if (!Number.isInteger(ticketId)
+        || !allowedTypes.includes(body.tipo_evento)
+        || !allowedEvents.includes(body.evento)) {
+        return new Response(JSON.stringify({ error: 'Evento inválido.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const { data: scopedTicket } = await adminClient
+        .from('senhas_publicas')
+        .select('id')
+        .eq('tenant_id', tenant_id)
+        .eq('store_id', store_id)
+        .eq('id', ticketId)
+        .maybeSingle();
+      if (!scopedTicket) {
+        return new Response(JSON.stringify({ error: 'Senha não encontrada para esta loja.' }), {
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const { error: eventError } = await adminClient.from('feedbacks').insert({
+        tenant_id,
+        store_id,
+        ticket_id: ticketId,
+        tipo_evento: body.tipo_evento,
+        evento: body.evento,
+        valor: typeof body.valor === 'string' ? body.valor : null,
+        metadata: body.metadata && typeof body.metadata === 'object' ? body.metadata : null,
+      });
+      if (eventError) {
+        return new Response(JSON.stringify({ error: 'Erro ao registrar evento.' }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     // MODO B: status de uma senha específica
     if (senhaId) {
-      const parsedId = Number(senhaId) || -1;
+      if (!/^\d+$/.test(senhaId)) {
+        return new Response(JSON.stringify({ error: 'Identificador da senha inválido.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      const parsedId = Number(senhaId);
+      if (!Number.isSafeInteger(parsedId) || parsedId <= 0) {
+        return new Response(JSON.stringify({ error: 'Identificador da senha inválido.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
       
       const { data: ticket, error: ticketError } = await adminClient
         .from('senhas_publicas')
         .select('*')
         .eq('tenant_id', tenant_id)
         .eq('store_id', store_id)
-        .or(`id.eq.${parsedId},numero.eq.${parsedId}`)
+        .eq('id', parsedId)
         .limit(1)
         .maybeSingle();
 
@@ -119,16 +180,31 @@ serve(async (req) => {
 
       let position = null;
       if (ticket.status === 'aguardando') {
-        const { count, error: countError } = await adminClient
+        let ahead = 0;
+        const { count: priorityAhead, error: priorityError } = await adminClient
           .from('senhas_publicas')
           .select('*', { count: 'exact', head: true })
           .eq('tenant_id', tenant_id)
           .eq('store_id', store_id)
           .eq('status', 'aguardando')
-          .lte('id', ticket.id);
-        
-        if (!countError && count !== null) {
-          position = count;
+          .eq('preferencial', true)
+          .lt('id', ticket.preferencial ? ticket.id : Number.MAX_SAFE_INTEGER);
+
+        if (!priorityError) {
+          ahead += priorityAhead || 0;
+          if (!ticket.preferencial) {
+            const { count: normalAhead, error: normalError } = await adminClient
+              .from('senhas_publicas')
+              .select('*', { count: 'exact', head: true })
+              .eq('tenant_id', tenant_id)
+              .eq('store_id', store_id)
+              .eq('status', 'aguardando')
+              .eq('preferencial', false)
+              .lt('id', ticket.id);
+            if (!normalError) position = ahead + (normalAhead || 0) + 1;
+          } else {
+            position = ahead + 1;
+          }
         }
       }
 
@@ -136,9 +212,10 @@ serve(async (req) => {
         ok: true,
         ticket: {
           id: ticket.id,
-          senha_id: ticket.numero?.toString() || ticket.id.toString(),
+          numero: ticket.numero?.toString() || ticket.id.toString(),
           status: ticket.status,
           position,
+          guiche: ticket.guiche || null,
           last_update: ticket.updated_at || ticket.created_at
         }
       }), {
@@ -159,9 +236,9 @@ serve(async (req) => {
       const limit = Math.min(50, Math.max(1, Number(url.searchParams.get('limit')) || 50));
       const offset = (page - 1) * limit;
 
-      const { data: products, error: prodError } = await adminClient
+      const { data: products, error: prodError, count } = await adminClient
         .from('toledo_produtos_publicos')
-        .select('plu, descricao, preco, categoria')
+        .select('plu, descricao, preco, categoria', { count: 'exact' })
         .eq('tenant_id', tenant_id)
         .eq('store_id', store_id)
         .range(offset, offset + limit - 1)
@@ -177,8 +254,31 @@ serve(async (req) => {
         ok: true,
         page,
         limit,
+        total: count || 0,
         products
       }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (resource === 'configs') {
+      const { data: configs, error: configError } = await adminClient
+        .from('configuracoes_publicas')
+        .select('chave, valor')
+        .eq('tenant_id', tenant_id)
+        .eq('store_id', store_id);
+
+      if (configError) {
+        return new Response(JSON.stringify({ error: 'Erro ao buscar configurações públicas.' }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const configMap = (configs || []).reduce((acc, row) => {
+        acc[row.chave] = row.valor;
+        return acc;
+      }, {} as Record<string, string>);
+      return new Response(JSON.stringify({ ok: true, configs: configMap }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }

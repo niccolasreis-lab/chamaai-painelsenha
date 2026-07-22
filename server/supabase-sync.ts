@@ -152,11 +152,12 @@ function enqueueSyncOp(tabela: string, acao: string, payload: any) {
  * Cria ou atualiza uma senha na tabela pública do Supabase.
  * Chamado quando uma nova senha é emitida no totem.
  */
-export function syncNovaSenha(id: number | bigint, numero: number, status: string = 'aguardando') {
+export function syncNovaSenha(id: number | bigint, numero: number, status: string = 'aguardando', preferencial = false) {
   enqueueSyncOp('senhas_publicas', 'upsert', {
     id: Number(id),
     numero,
     status,
+    preferencial,
     updated_at: new Date().toISOString()
   });
   console.log(`[SYNC QUEUE] 📥 Senha ${numero} enfileirada para sync (status: ${status})`);
@@ -426,7 +427,12 @@ async function processSyncQueue() {
 
           if (item.acao === 'upsert') {
             const tenantPayload = withTenantStoreContext(payload, context);
-            const result = await client.from(item.tabela).upsert(tenantPayload);
+            const conflictTarget = item.tabela === 'senhas_publicas'
+              ? 'tenant_id,store_id,id'
+              : item.tabela === 'toledo_produtos_publicos'
+                ? 'tenant_id,store_id,plu'
+                : 'tenant_id,store_id,chave';
+            const result = await client.from(item.tabela).upsert(tenantPayload, { onConflict: conflictTarget });
             error = result.error;
           } else if (item.acao === 'update') {
             const { id, ...updateData } = payload;
