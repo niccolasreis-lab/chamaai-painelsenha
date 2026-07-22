@@ -2,6 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { Activity } from 'lucide-react';
 import { getApiUrl } from '../shared/apiConfig';
 import type { ProdutoToledo, Categoria, TemaEncarte, EstablishmentConfig } from '../shared/types';
+import {
+  calculateRowsPerColumn,
+  normalizeColumnCount,
+  normalizeItemLimit,
+  paginateGroupedProducts,
+} from './encartePagination';
+import { useElementHeight } from './useElementHeight';
 
 interface EncarteProps {
   duracao: number;
@@ -66,8 +73,12 @@ export default function EncartePrecos({
 }: EncarteProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const { ref: containerRef, height: containerHeight } = useElementHeight();
 
   const API_URL = getApiUrl();
+  const colunas = normalizeColumnCount(config.toledo_encarte_colunas, 3);
+  const maxItemsPerSlide = normalizeItemLimit(itensPorSlide, 12);
+  const rowsPerColumn = calculateRowsPerColumn(containerHeight, 'precos');
 
   const activeCategories = useMemo(() => {
     return categorias.filter((c: Categoria) => c.ativo);
@@ -131,45 +142,16 @@ export default function EncartePrecos({
       nonOfertas.unshift({ nome: 'OFERTAS DO DIA', isOferta: true, produtos: ofertas });
     }
 
-    // Chunk into slides
-    const newSlides: PrecosGroup[][] = [];
-    let currentSlideData: PrecosGroup[] = [];
-    let currentCount = 0;
+    return paginateGroupedProducts(nonOfertas, {
+      columns: colunas,
+      rowsPerColumn,
+      maxItemsPerSlide,
+    });
+  }, [produtos, activeCategories, config.toledo_ocultar_em_falta, categoriasFiltro, colunas, rowsPerColumn, maxItemsPerSlide, loading]);
 
-    for (const group of nonOfertas) {
-      const gCount = group.produtos.length;
-      if (currentCount + gCount <= itensPorSlide && gCount > 0) {
-        currentSlideData.push(group);
-        currentCount += gCount;
-      } else if (gCount > 0) {
-        if (currentCount > 0) {
-          newSlides.push(currentSlideData);
-          currentSlideData = [];
-          currentCount = 0;
-        }
-        const chunks = [];
-        for (let i = 0; i < group.produtos.length; i += itensPorSlide) {
-          chunks.push(group.produtos.slice(i, i + itensPorSlide));
-        }
-        for (let i = 0; i < chunks.length; i++) {
-          if (i < chunks.length - 1) {
-            newSlides.push([{ nome: group.nome, isOferta: group.isOferta, produtos: chunks[i] }]);
-          } else {
-            currentSlideData = [{ nome: group.nome, isOferta: group.isOferta, produtos: chunks[i] }];
-            currentCount = chunks[i].length;
-          }
-        }
-      }
-    }
-    if (currentSlideData.length > 0) {
-      newSlides.push(currentSlideData);
-    }
-
-    if (newSlides.length === 0) {
-      newSlides.push([]);
-    }
-    return newSlides;
-  }, [produtos, activeCategories, config.toledo_ocultar_em_falta, categoriasFiltro, itensPorSlide, loading]);
+  useEffect(() => {
+    setCurrentSlide(0);
+  }, [slides.length, produtos, categorias, categoriasFiltro, colunas, rowsPerColumn, maxItemsPerSlide]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -237,16 +219,16 @@ export default function EncartePrecos({
     );
   }
 
-  if (slides.length === 0 || (slides.length === 1 && slides[0].length === 0)) {
+  if (slides.length === 0) {
     return (
       <div className="h-full w-full bg-slate-950 flex items-center justify-center text-white/50 text-lg uppercase tracking-widest font-sans">
-        Nenhum produto a granel disponível.
+        Nenhum produto disponível para exibição.
       </div>
     );
   }
 
-  const colunas = config.toledo_encarte_colunas || 3;
-  const currentSlideData = slides[currentSlide] || [];
+  const visibleSlideIndex = Math.min(currentSlide, Math.max(0, slides.length - 1));
+  const currentSlideData = slides[visibleSlideIndex] || [];
   const totalSlides = slides.length || 1;
 
   const theme = config.toledo_encarte_tema || config.toledo_tema || 'padrao';
@@ -287,7 +269,7 @@ export default function EncartePrecos({
   const accentColor = accentBgClass.split('-')[1];
 
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden animate-fade-in" style={{ background: bgGradient || 'transparent', ...dynamicBgStyle }}>
+    <div ref={containerRef} className="h-full w-full flex flex-col overflow-hidden animate-fade-in" style={{ background: bgGradient || 'transparent', ...dynamicBgStyle }}>
       {temaDinâmico && <div className="absolute inset-0 bg-black/60 z-0"></div>}
       
       <div className="relative z-10 flex flex-col h-full w-full overflow-hidden">
@@ -320,7 +302,7 @@ export default function EncartePrecos({
             {totalSlides > 1 && (
               <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/10">
                 <span className="text-white/50 text-xs font-bold uppercase tracking-widest">Página</span>
-                <span className="text-white text-2xl font-black">{currentSlide + 1}</span>
+                <span className="text-white text-2xl font-black">{visibleSlideIndex + 1}</span>
                 <span className="text-white/30 text-lg font-bold">/</span>
                 <span className="text-white/50 text-2xl font-bold">{totalSlides}</span>
               </div>
@@ -332,11 +314,13 @@ export default function EncartePrecos({
 
         {/* Products Grid */}
         <div className="flex-1 overflow-hidden px-2 py-2">
-          <div className="h-full" style={{ columnCount: colunas, columnGap: '2rem' }}>
-            {currentSlideData.map((group, gIdx) => {
+          <div className="grid h-full gap-4" style={{ gridTemplateColumns: `repeat(${colunas}, minmax(0, 1fr))` }}>
+            {currentSlideData.map((column, columnIdx) => (
+              <div key={`column-${columnIdx}`} className="min-w-0 overflow-hidden">
+              {column.map((group, gIdx) => {
               const style = getCategoryStyle(group.nome, !!group.isOferta);
               return (
-                <div key={`${group.nome}-${gIdx}`} className="mb-6 break-inside-avoid-page">
+                <div key={`${group.nome}-${gIdx}`} className="mb-3">
                   {/* Category header */}
                   <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl ${style.bg} border ${style.border} mb-3.5 break-inside-avoid shadow-sm ${style.isPulse ? 'animate-pulse ring-4 ring-red-500/30 scale-[1.02] shadow-red-500/20' : ''}`}>
                     <span className="text-2xl flex items-center shrink-0">{style.icon}</span>
@@ -355,7 +339,8 @@ export default function EncartePrecos({
                       const priceText = formatPreco(produto.preco);
                       return (
                         <div
-                          key={produto.plu}
+                          key={String(produto.plu) + '-' + idx}
+                          data-encarte-plu={String(produto.plu ?? '')}
                           className={`flex items-center justify-between px-5 py-3 rounded-lg transition-colors break-inside-avoid ${
                             produto.preco === 0
                               ? 'bg-white/[0.02] border border-white/5 opacity-50'
@@ -369,14 +354,20 @@ export default function EncartePrecos({
                               className={`font-bold leading-tight tracking-wide block ${
                                 produto.preco === 0 ? 'text-white/40' : group.isOferta ? 'text-red-100' : 'text-white'
                               } line-clamp-2`}
-                              style={getProductNameStyle(produto.descricao, isAutoDesc, config.toledo_fonte_descricao ?? undefined)}
+                              style={{
+                                ...getProductNameStyle(produto.descricao, isAutoDesc, config.toledo_fonte_descricao ?? undefined),
+                                display: '-webkit-box',
+                                WebkitBoxOrient: 'vertical',
+                                WebkitLineClamp: 2,
+                                overflow: 'hidden',
+                              }}
                             >
                               {cleanName}
                             </span>
                           </div>
                           <div className="flex items-baseline gap-1 shrink-0">
                             {produto.preco === 0 ? (
-                              <span className="text-gray-400 font-extrabold tracking-tight drop-shadow-sm uppercase text-sm">
+                              <span className="text-gray-400 font-extrabold tracking-tight drop-shadow-sm uppercase text-xs whitespace-nowrap">
                                 PRODUTO EM FALTA 🥲
                               </span>
                             ) : (
@@ -399,7 +390,9 @@ export default function EncartePrecos({
                   </div>
                 </div>
               );
-            })}
+              })}
+              </div>
+            ))}
           </div>
         </div>
 
@@ -418,7 +411,7 @@ export default function EncartePrecos({
             <div
               className={`h-full bg-gradient-to-r ${glowClass.split(' shadow')[0]}`}
               style={{ animation: `slideProgress ${duracao}s linear forwards` }}
-              key={`progress-${currentSlide}`}
+              key={`progress-${visibleSlideIndex}`}
             />
           </div>
         )}

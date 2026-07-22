@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { getApiUrl } from '../shared/apiConfig';
 import type { ProdutoToledo, Categoria, TemaEncarte, EstablishmentConfig } from '../shared/types';
+import { calculateGridItemCapacity, normalizeColumnCount, normalizeItemLimit } from './encartePagination';
+import { useElementHeight } from './useElementHeight';
 
 interface EncarteGranelProps {
   duracao: number;
@@ -86,10 +88,15 @@ export default function EncarteGranel({
   const [currentSlide, setCurrentSlide] = useState(0);
   const [animKey, setAnimKey] = useState(0);
   const progressRef = useRef<HTMLDivElement>(null);
+  const { ref: containerRef, height: containerHeight } = useElementHeight();
 
   const API_URL = getApiUrl();
-  const colunas = parseInt(String(config?.toledo_encarte_colunas ?? '4'), 10);
-  const itemsLimit = itensPorSlide || (colunas * 2); 
+  const colunas = normalizeColumnCount(config?.toledo_encarte_colunas, 4);
+  const itemsLimit = calculateGridItemCapacity({
+    containerHeight,
+    columns: colunas,
+    maxItemsPerSlide: normalizeItemLimit(itensPorSlide, colunas * 2),
+  });
 
   const temaDinamico = temaAtivo;
 
@@ -148,9 +155,12 @@ export default function EncarteGranel({
       }
     }
 
-    if (slides.length === 0) slides.push({ category: 'Vazio', icon: '📦', label: '', items: [], totalItems: 0 });
     return slides;
   }, [produtos, categorias, config?.toledo_ocultar_em_falta, categoriasFiltro, itemsLimit, loading]);
+
+  useEffect(() => {
+    setCurrentSlide(0);
+  }, [categorySlides.length, produtos, categorias, categoriasFiltro, colunas, itemsLimit]);
 
   useEffect(() => {
     if (categorySlides.length === 0) return;
@@ -184,7 +194,16 @@ export default function EncarteGranel({
     );
   }
 
-  const slide = categorySlides[currentSlide] || { category: '', icon: '', label: '', tag: 'granel', items: [] };
+  if (!loading && categorySlides.length === 0) {
+    return (
+      <div className="h-full w-full bg-[#041a14] flex items-center justify-center text-white/60 text-lg uppercase tracking-widest font-sans">
+        Nenhum produto disponível para exibição.
+      </div>
+    );
+  }
+
+  const visibleSlideIndex = Math.min(currentSlide, Math.max(0, categorySlides.length - 1));
+  const slide = categorySlides[visibleSlideIndex] || { category: '', icon: '', label: '', tag: 'granel', items: [] };
   const totalSlides = categorySlides.length || 1;
   const storeName = config.nome_estabelecimento || 'Mercado';
 
@@ -206,7 +225,7 @@ export default function EncarteGranel({
   const isAutoPrice = config?.toledo_fonte_preco === 'auto';
 
   return (
-    <div className="h-full w-full flex flex-col" style={{ background: temaDinamico?.imagem_fundo ? 'transparent' : COLORS.bg, fontFamily: 'var(--font-body), sans-serif', overflow: 'hidden', ...dynamicBgStyle }}>
+    <div ref={containerRef} className="h-full w-full flex flex-col" style={{ background: temaDinamico?.imagem_fundo ? 'transparent' : COLORS.bg, fontFamily: 'var(--font-body), sans-serif', overflow: 'hidden', ...dynamicBgStyle }}>
       {temaDinamico && <div className="absolute inset-0 bg-white/70 z-0 backdrop-blur-sm"></div>}
       
       <div className="relative z-10 flex flex-col h-full w-full overflow-hidden">
@@ -265,7 +284,7 @@ export default function EncarteGranel({
               background: 'rgba(0,0,0,0.04)', padding: '4px 10px', borderRadius: 12,
               fontSize: 12, fontWeight: 700, color: COLORS.forest, letterSpacing: 1
             }}>
-              {currentSlide + 1} / {totalSlides}
+              {visibleSlideIndex + 1} / {totalSlides}
             </div>
           </div>
         </div>
@@ -284,7 +303,8 @@ export default function EncarteGranel({
 
               return (
                 <div
-                  key={p.plu}
+                  key={`${slide.category}-${p.plu}-${idx}`}
+                  data-encarte-plu={String(p.plu ?? '')}
                   className={lowPerformanceMode ? "" : "encarte-granel-card"}
                   style={{
                     minHeight: 'clamp(68px, 3.2rem, 180px)',
@@ -365,7 +385,7 @@ export default function EncarteGranel({
           }}>
             <div
               ref={progressRef}
-              key={`progress-${currentSlide}`}
+              key={`progress-${visibleSlideIndex}`}
               style={{
                 height: '100%',
                 background: `linear-gradient(90deg, ${COLORS.green}, ${COLORS.goldLt})`,
