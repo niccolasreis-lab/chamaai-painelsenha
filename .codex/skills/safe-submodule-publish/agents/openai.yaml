@@ -1,0 +1,4 @@
+interface:
+  display_name: "Publicação segura de submódulo"
+  short_description: "Publica submódulos sem expor credenciais."
+  default_prompt: "Use $safe-submodule-publish para publicar o ChamaCliente com validações de segurança."
