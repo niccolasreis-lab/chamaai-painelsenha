@@ -137,10 +137,10 @@ ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE licenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE devices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE senhas_publicas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE toledo_produtos_publicos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE configuracoes_publicas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE comandos_operador ENABLE ROW LEVEL SECURITY;
+
+-- The legacy public mirrors are intentionally left unchanged in this phase.
+-- Their permissive policies are removed only by 005_lock_down_public_mirrors,
+-- after the scoped Edge Functions and client have been deployed and verified.
 
 -- ⚠️ IMPORTANTE CONTEXTO DE SEGURANÇA:
 -- 1. A chave 'SUPABASE_SERVICE_ROLE_KEY' (bypass de RLS) NUNCA deve ser incluída no app Electron distribuído ao cliente.

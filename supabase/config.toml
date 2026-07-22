@@ -1,0 +1,36 @@
+[functions.chamaai-activate-license]
+# Custom license-key authentication is enforced in the handler.
+verify_jwt = false
+
+[functions.chamaai-checkin]
+# Custom high-entropy device-token authentication is enforced in the handler.
+verify_jwt = false
+
+[functions.chamaai-ingest]
+# Custom high-entropy device-token authentication is enforced in the handler.
+verify_jwt = false
+
+[functions.chamaai-commands]
+# Custom high-entropy device-token authentication is enforced in the handler.
+verify_jwt = false
+
+[functions.chamaai-activate-license]
+# Custom license-key authentication is enforced in the handler.
+verify_jwt = false
+
+[functions.chamaai-checkin]
+# Custom high-entropy device-token authentication is enforced in the handler.
+verify_jwt = false
+
+[functions.chamaai-ingest]
+# Custom high-entropy device-token authentication is enforced in the handler.
+verify_jwt = false
+
+[functions.chamaai-commands]
+# Custom high-entropy device-token authentication is enforced in the handler.
+verify_jwt = false
+
+[functions.chamaai-portal]
+# The portal is intentionally public and authorizes each request with the
+# high-entropy portal_public_token before using the service-role client.
+verify_jwt = false

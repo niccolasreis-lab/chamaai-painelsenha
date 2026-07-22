@@ -28,6 +28,5 @@ ON comandos_operador(installation_id, status);
 CREATE INDEX IF NOT EXISTS idx_comandos_operador_created_at
 ON comandos_operador(created_at);
 
--- RLS de Infraestrutura
-ALTER TABLE comandos_operador ENABLE ROW LEVEL SECURITY;
--- Sem políticas públicas anônimas abertas para esta tabela. Acesso via Service Role / Edge Function.
+-- RLS is activated by 005_lock_down_public_mirrors only after the scoped
+-- command Edge Function has been deployed and verified.
