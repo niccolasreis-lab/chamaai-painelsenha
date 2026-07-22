@@ -1,0 +1,3 @@
+[submodule "chamacliente"]
+	path = chamacliente
+	url = https://github.com/niccolasreis-lab/chamacliente.git
