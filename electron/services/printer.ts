@@ -4,6 +4,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { app } from 'electron';
 import * as QRCode from 'qrcode';
+import { assertPublicPortalUrl, buildPortalTicketUrl } from './portal-url';
 
 const execAsync = promisify(exec);
 
@@ -120,22 +121,24 @@ export class PrinterService {
     try {
       const { getDb } = require('./database');
       const db = getDb();
-      
+      const configuredRow = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'portal_cliente_url'").get() as any;
+      const configuredUrl = configuredRow?.valor?.trim() || '';
       const cloudRow = db.prepare("SELECT portal_public_token FROM cloud_installation LIMIT 1").get() as any;
       if (cloudRow && cloudRow.portal_public_token && cloudRow.portal_public_token.trim() !== '') {
         const token = cloudRow.portal_public_token.trim();
-        const baseUrl = process.env.CHAMAAI_PUBLIC_PORTAL_BASE_URL || 'http://localhost:3001';
-        return `${baseUrl}/cliente?token=${token}`;
+        const baseUrl = process.env.CHAMAAI_PUBLIC_PORTAL_BASE_URL || configuredUrl;
+        if (!baseUrl) throw new Error('URL pública do portal não configurada para o token cloud.');
+        const url = new URL(baseUrl);
+        url.searchParams.set('token', token);
+        return url.toString();
       }
 
-      const row = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'portal_cliente_url'").get() as any;
-      if (row && row.valor && row.valor.trim() !== '') {
-        return row.valor.trim();
-      }
+      throw new Error('Token público da loja ausente. Ative a integração cloud antes de imprimir o QR Code.');
     } catch (err) {
       console.error('[PrinterService] Erro ao ler URL do portal:', err);
+      throw err;
     }
-    return 'http://localhost:3001/#/cliente';
+    throw new Error('URL pública do Portal do Cliente não configurada.');
   }
 
   async printTicket(data: TicketData): Promise<{ success: boolean; error?: string }> {
@@ -268,23 +271,15 @@ export class PrinterService {
         // Monta a URL do QR Code fora do template literal para evitar problemas com 'this'
         let qrCodeUrl = '';
         if (mostraQRCode) {
-          const portalBase = this.getPortalUrl();
-          const tId = data.ticketId || (data as any).id || '';
-          let portalComTicket: string;
-          if (portalBase.includes('?')) {
-            portalComTicket = portalBase + '&senha_id=' + tId;
-          } else if (portalBase.includes('#')) {
-            portalComTicket = portalBase + '?ticket=' + tId;
-          } else {
-            portalComTicket = portalBase.endsWith('/')
-              ? portalBase + '#/?ticket=' + tId
-              : portalBase + '/#/?ticket=' + tId;
-          }
           try {
+            const portalBase = this.getPortalUrl();
+            const tId = data.ticketId || (data as any).id || '';
+            const portalComTicket = buildPortalTicketUrl(portalBase, tId);
+            assertPublicPortalUrl(portalComTicket);
             // Gera o QR Code localmente e retorna como Data URL (base64)
             qrCodeUrl = await QRCode.toDataURL(portalComTicket, { margin: 1, width: 100 });
           } catch (e) {
-            console.error('[PrinterService] Erro ao gerar QR Code local:', e);
+            console.error('[PrinterService] ERRO OPERACIONAL: QR Code omitido; ticket impresso sem link inválido.', e);
           }
         }
 
@@ -338,7 +333,7 @@ export class PrinterService {
               <div class="tipo ${data.preferencial ? 'preferencial' : ''}">${data.preferencial ? 'ATENDIMENTO PREFERENCIAL' : 'ATENDIMENTO NORMAL'}</div>
               <div class="data">${escapeHtml(data.data)}</div>
 
-              ${mostraQRCode ? `
+              ${mostraQRCode && qrCodeUrl ? `
               <div class="qr-container">
                 <div class="qr-text">Confira Nossas Ofertas:</div>
                 <img class="qr-code" src="${qrCodeUrl}" alt="QR Code" />

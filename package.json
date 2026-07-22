@@ -19,6 +19,7 @@
     "lint": "eslint .",
     "test:tts": "tsx --test tests/audioCallFlow.test.ts",
     "test:vignettes": "tsx --test tests/vignette*.test.ts",
+    "test:portal": "tsx --test tests/encartePagination.test.ts tests/portalUrl.test.ts tests/ticketState.test.ts",
     "preview": "vite preview"
   },
   "build": {
