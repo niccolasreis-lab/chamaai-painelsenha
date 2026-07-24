@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Sun, Cloud } from 'lucide-react';
 import { getApiUrl } from '../shared/apiConfig';
 import EncartePrecos from './EncartePrecos';
@@ -51,6 +51,11 @@ export default function SmartMediaLayer({
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [config, setConfig] = useState<Partial<EstablishmentConfig>>({});
   const [perfil, setPerfil] = useState<PerfilTelao | null>(null);
+  const parsedEncarteCategories = useMemo(() => (
+    perfil?.encarte_categorias
+      ? perfil.encarte_categorias.split(';').map((category: string) => category.trim()).filter(Boolean)
+      : []
+  ), [perfil?.encarte_categorias]);
   
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -287,10 +292,6 @@ export default function SmartMediaLayer({
     }
 
     if (currentMedia.type === 'tabela' || currentMedia.type === 'encarte') {
-      const parsedCategories = perfil?.encarte_categorias
-        ? perfil.encarte_categorias.split(';').map((c: string) => c.trim()).filter(Boolean)
-        : [];
-      
       const EncarteComponent = config.toledo_encarte_estilo === 'granel' ? EncarteGranel : EncartePrecos;
 
       return (
@@ -299,7 +300,7 @@ export default function SmartMediaLayer({
           itensPorSlide={parseInt(String(config.toledo_itens_por_slide ?? '12'), 10)}
           onComplete={handleNext}
           config={config}
-          categoriasFiltro={parsedCategories}
+          categoriasFiltro={parsedEncarteCategories}
           produtos={encarteProdutos}
           categorias={encarteCategorias}
           temaAtivo={encarteTemaAtivo}

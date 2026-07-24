@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import SenhaChamada from './SenhaChamada';
 import EncartePrecos from './EncartePrecos';
@@ -149,6 +149,11 @@ export default function MediaIndoor() {
   // Session / Pairing state
   const [telaoCode, setTelaoCode] = useState<string | null>(localStorage.getItem('telao_code'));
   const [perfil, setPerfil] = useState<PerfilTelao | null>(null);
+  const parsedCategories = useMemo(() => (
+    perfil?.encarte_categorias
+      ? perfil.encarte_categorias.split(';').map((category: string) => category.trim()).filter(Boolean)
+      : []
+  ), [perfil?.encarte_categorias]);
   const [perfilLoading, setPerfilLoading] = useState(true);
 
   const isLowPerformanceMode = 
@@ -987,11 +992,6 @@ export default function MediaIndoor() {
   if (!perfil || perfil.status !== 'vinculado') {
     return <TelaoEspera code={telaoCode || ''} />;
   }
-
-  // Resolve filters for price list categories
-  const parsedCategories = perfil.encarte_categorias
-    ? perfil.encarte_categorias.split(';').map((c: string) => c.trim()).filter(Boolean)
-    : [];
 
   const activeMidiaCandidate = midias[activeMidiaIndex];
   const activeMidia = activeMidiaCandidate && !failedMidiaIds.has(activeMidiaCandidate.id)

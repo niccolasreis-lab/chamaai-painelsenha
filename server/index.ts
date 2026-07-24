@@ -2886,10 +2886,15 @@ export function startServer() {
       const mapNomes = new Map();
       nomes.forEach(n => mapNomes.set(n.codigo_produto, n.nome_exibicao));
 
-      // 3. Buscar os produtos da tabela unificada (produtos + categorias)
+      // 3. Usar a categoria macro Toledo para manter o mesmo vocabulário
+      // escolhido no perfil do telão. A categoria do catálogo pode ser uma
+      // subcategoria (ex.: "Queijos") e não deve reduzir o encarte selecionado.
       let produtos = db.prepare(`
-        SELECT p.id, p.plu, p.nome as descricao, p.preco, COALESCE(c.nome, p.categoria_legada, 'Outros') as categoria, p.unidade, p.updated_at as atualizado_em
+        SELECT p.id, p.plu, p.nome as descricao, p.preco,
+          COALESCE(t.categoria, p.categoria_legada, c.nome, 'Outros') as categoria,
+          p.unidade, p.updated_at as atualizado_em
         FROM produtos p
+        LEFT JOIN toledo_produtos t ON CAST(t.plu AS TEXT) = CAST(p.plu AS TEXT)
         LEFT JOIN categorias c ON p.categoria_id = c.id
         WHERE p.deleted_at IS NULL AND p.status = 1
         ORDER BY categoria ASC, p.nome ASC
