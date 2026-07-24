@@ -13,6 +13,8 @@ import { startCloudCheckinCron } from './services/cloud-license.service';
 import { startCloudCommandsCron, stopCloudCommandsCron } from './services/cloud-commands.service';
 import { createSupabaseAnonClient } from './services/supabase-config.service';
 import { migrateDatabaseAndConfigs } from './categorizador';
+import { getUploadsDirectory, planMediaFileReconciliation, resolveUploadPath } from './media-files';
+import { isPublicDisplayReadRequest } from './public-display-routes';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -343,14 +345,7 @@ function remoteAuthMiddleware(req: express.Request, res: express.Response, next:
   }
 
   // Ler dados do telão, fila, mídias e chamadas recentes, e criar senha (totem)
-  if (method === 'GET' && (
-    reqPath === '/api/configuracoes' ||
-    reqPath === '/api/midias' ||
-    reqPath === '/api/fila' ||
-    reqPath === '/api/chamadas/recentes' ||
-    reqPath === '/api/telao/init' ||
-    reqPath.startsWith('/api/telao/profile/')
-  )) {
+  if (isPublicDisplayReadRequest(method, reqPath)) {
     return next();
   }
 
@@ -395,8 +390,8 @@ export function startServer() {
   const PORT = 3001;
   
   // Resolve o caminho para uma pasta local visível e fácil de gerenciar
-  const userDataPath = 'C:\\ChamaAi';
-  const UPLOADS_DIR = path.join(userDataPath, 'uploads');
+  const userDataPath = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+  const UPLOADS_DIR = getUploadsDirectory(userDataPath);
 
   // Ensure uploads directory exists
   if (!fs.existsSync(UPLOADS_DIR)) {
@@ -421,18 +416,14 @@ export function startServer() {
       const db = getDb();
       // Only process media that aren't marked as deleted or failed
       const activeMidias = db.prepare("SELECT id, caminho, file_status FROM midias WHERE deleted_at IS NULL AND file_status != 'failed'").all() as any[];
+      const changes = planMediaFileReconciliation(activeMidias, UPLOADS_DIR);
       let missingCount = 0;
-      
-      for (const m of activeMidias) {
-        const filePath = path.join(process.cwd(), m.caminho.replace(/^[\\/\\\\]/, ''));
-        const exists = fs.existsSync(filePath);
-        
-        if (!exists && m.file_status !== 'missing') {
-          db.prepare("UPDATE midias SET file_status = 'missing' WHERE id = ?").run(m.id);
-          missingCount++;
-        } else if (exists && m.file_status === 'missing') {
-          db.prepare("UPDATE midias SET file_status = 'active' WHERE id = ?").run(m.id);
-        }
+      let recoveredCount = 0;
+
+      for (const change of changes) {
+        db.prepare('UPDATE midias SET file_status = ? WHERE id = ?').run(change.status, change.id);
+        if (change.status === 'missing') missingCount++;
+        else recoveredCount++;
       }
       
       // Checking for orphan files in UPLOADS_DIR (that are not in DB)
@@ -450,6 +441,9 @@ export function startServer() {
       
       if (missingCount > 0) {
         console.warn(`[RECONCILE] ${missingCount} mídias marcadas como 'missing' (arquivo não encontrado).`);
+      }
+      if (recoveredCount > 0) {
+        console.log(`[RECONCILE] ${recoveredCount} mídias recuperadas na pasta persistente.`);
       }
     } catch (err) {
       console.error('[RECONCILE] Erro ao reconciliar mídias:', err);
@@ -2149,6 +2143,11 @@ export function startServer() {
       const db = getDb();
       const { nome, tipo, ordem } = req.body;
       const caminho = `/uploads/${req.file.filename}`;
+      const storedFilePath = resolveUploadPath(caminho, UPLOADS_DIR);
+
+      if (!storedFilePath || !fs.existsSync(storedFilePath)) {
+        throw new Error('O arquivo enviado não foi confirmado na pasta persistente de mídias.');
+      }
 
       console.log('Inserting media into DB:', { nome, caminho });
 
@@ -2156,6 +2155,10 @@ export function startServer() {
       const result = stmt.run(nome || req.file.originalname, caminho, tipo || (req.file.mimetype.startsWith('video') ? 'video' : 'imagem'), ordem || 0);
 
       reconcileMidias();
+      const persistedMedia = db.prepare('SELECT file_status FROM midias WHERE id = ?').get(result.lastInsertRowid) as { file_status?: string } | undefined;
+      if (persistedMedia?.file_status !== 'active') {
+        throw new Error('A mídia foi cadastrada, mas o arquivo persistente não está disponível.');
+      }
       broadcastEvent('MIDIAS_ATUALIZADAS', { action: 'upload' });
 
       res.status(201).json({ 
@@ -2188,10 +2191,10 @@ export function startServer() {
       const midia = db.prepare('SELECT caminho FROM midias WHERE id = ?').get(id) as any;
       
       if (midia) {
-        const filePath = path.join(process.cwd(), midia.caminho.replace(/^[\\/\\\\]/, ''));
-        console.log('Deleting file:', filePath);
+        const filePath = resolveUploadPath(midia.caminho, UPLOADS_DIR);
+        console.log('Deleting file:', filePath || '[caminho inválido]');
         try {
-          if (fs.existsSync(filePath)) {
+          if (filePath && fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
           }
         } catch (fileErr) {

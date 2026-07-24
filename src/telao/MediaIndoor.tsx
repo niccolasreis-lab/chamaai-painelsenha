@@ -11,6 +11,12 @@ import { getApiUrl } from '../shared/apiConfig';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { VignetteAudioCoordinator } from './vignetteAudioCoordinator';
 import {
+  isMediaAvailableForDisplay,
+  readDisplayCache,
+  writeDisplayCache,
+  type EncarteDisplaySnapshot,
+} from './displayCache';
+import {
   buildSpeechText,
   createAudioCallPlan,
   executeAudioCall,
@@ -134,6 +140,8 @@ function normalizeAudioVolume(value: unknown): number {
 }
 
 export default function MediaIndoor() {
+  const API_URL = getApiUrl();
+
   // Session / Pairing state
   const [telaoCode, setTelaoCode] = useState<string | null>(localStorage.getItem('telao_code'));
   const [perfil, setPerfil] = useState<PerfilTelao | null>(null);
@@ -154,8 +162,11 @@ export default function MediaIndoor() {
   const [ultimaSenha, setUltimaSenha] = useState<RecentCall | null>(null);
   const [showMedia, setShowMedia] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [midias, setMidias] = useState<MediaItem[]>([]);
+  const [midias, setMidias] = useState<MediaItem[]>(() => (
+    readDisplayCache<MediaItem[]>(API_URL, 'midias')?.data || []
+  ));
   const [activeMidiaIndex, setActiveMidiaIndex] = useState(0);
+  const [failedMidiaIds, setFailedMidiaIds] = useState<Set<string | number>>(() => new Set());
   const [config, setConfig] = useState<Partial<EstablishmentConfig>>({});
   const [smartMediaSettings, setSmartMediaSettings] = useState<SmartMediaSettings>({ midia_indoor_ativa: false, midia_indoor_layout: 'lateral' });
   const [pessoasAguardando, setPessoasAguardando] = useState(0);
@@ -164,8 +175,6 @@ export default function MediaIndoor() {
   const [isRepeticao, setIsRepeticao] = useState(false);
   const repeticaoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  const API_URL = getApiUrl();
-
   const [encarteCache, setEncarteCache] = useState<{
     produtos: ProdutoToledo[];
     categorias: Categoria[];
@@ -173,13 +182,16 @@ export default function MediaIndoor() {
     loading: boolean;
     error: string | null;
     loadedAt: number | null;
-  }>({
-    produtos: [],
-    categorias: [],
-    temaAtivo: null,
-    loading: false,
-    error: null,
-    loadedAt: null,
+  }>(() => {
+    const cached = readDisplayCache<EncarteDisplaySnapshot>(API_URL, 'encarte');
+    return {
+      produtos: cached?.data.produtos || [],
+      categorias: cached?.data.categorias || [],
+      temaAtivo: cached?.data.temaAtivo || null,
+      loading: false,
+      error: null,
+      loadedAt: cached?.savedAt || null,
+    };
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -221,14 +233,23 @@ export default function MediaIndoor() {
 
       if (!isMountedRef.current) return;
 
+      if (!Array.isArray(prodRes) || !Array.isArray(catRes) || prodRes.length === 0) {
+        throw new Error('A origem do encarte retornou uma carga vazia ou inválida.');
+      }
+
+      const snapshot: EncarteDisplaySnapshot = {
+        produtos: prodRes as ProdutoToledo[],
+        categorias: catRes as Categoria[],
+        temaAtivo: temaRes as TemaEncarte | null,
+      };
+
       setEncarteCache({
-        produtos: prodRes,
-        categorias: catRes,
-        temaAtivo: temaRes,
+        ...snapshot,
         loading: false,
         error: null,
         loadedAt: Date.now(),
       });
+      writeDisplayCache(API_URL, 'encarte', snapshot);
       console.log(`[TELAO] Dados do encarte carregados com sucesso: ${prodRes.length} produtos.`);
     } catch (err: unknown) {
       const errorObj = err as Error;
@@ -426,46 +447,48 @@ export default function MediaIndoor() {
   const fetchMidias = async () => {
     try {
       const res = await fetch(`${API_URL}/api/midias`);
-      if (res.ok) {
-        const data = await res.json();
-        // Filtrar apenas mídias ativas e não expiradas para o Telão
-        const midiasAtivas = Array.isArray(data) 
-          ? (data as MediaItem[]).filter((m) => m.ativo === 1 && m.status === 'ativo')
-          : [];
-        
-        setMidias(prev => {
-          const prevIds = prev.map(m => m.id).join(',');
-          const newIds = midiasAtivas.map((m: MediaItem) => m.id).join(',');
-          
-          // Se a lista mudou, resetar o índice para evitar apontar para mídia inexistente
-          if (prevIds !== newIds) {
-            console.log(`[TELAO] Mídias atualizadas: ${prev.length} → ${midiasAtivas.length}`);
-            setActiveMidiaIndex(idx => {
-              if (midiasAtivas.length === 0) return 0;
-              // Clampa o índice ao novo tamanho
-              return idx >= midiasAtivas.length ? 0 : idx;
-            });
-            
-            // Se não há mais mídias e o encarte está ativo, forçar exibição do encarte
-            if (midiasAtivas.length === 0 && activeModules.includes('encarte')) {
-              setShowingEncarte(true);
-            }
+      if (!res.ok) throw new Error(`Falha ao buscar mídias (${res.status})`);
 
-            // Parar o vídeo atual para não ficar preso com o src antigo
-            if (videoRef.current) {
-              try {
-                videoRef.current.pause();
-                videoRef.current.removeAttribute('src');
-                videoRef.current.load();
-              } catch {
-                // ignore
-              }
+      const data = await res.json();
+      // Filtrar apenas mídias ativas e não expiradas para o Telão.
+      const midiasAtivas = Array.isArray(data)
+        ? (data as MediaItem[]).filter((m) => isMediaAvailableForDisplay(m))
+        : [];
+      writeDisplayCache(API_URL, 'midias', midiasAtivas);
+        
+      setMidias(prev => {
+        const prevIds = prev.map(m => m.id).join(',');
+        const newIds = midiasAtivas.map((m: MediaItem) => m.id).join(',');
+          
+        // Se a lista mudou, resetar o índice para evitar apontar para mídia inexistente
+        if (prevIds !== newIds) {
+          console.log(`[TELAO] Mídias atualizadas: ${prev.length} → ${midiasAtivas.length}`);
+          setFailedMidiaIds(new Set());
+          setActiveMidiaIndex(idx => {
+            if (midiasAtivas.length === 0) return 0;
+            // Clampa o índice ao novo tamanho
+            return idx >= midiasAtivas.length ? 0 : idx;
+          });
+            
+          // Se não há mais mídias e o encarte está ativo, forçar exibição do encarte
+          if (midiasAtivas.length === 0 && activeModules.includes('encarte')) {
+            setShowingEncarte(true);
+          }
+
+          // Parar o vídeo atual para não ficar preso com o src antigo
+          if (videoRef.current) {
+            try {
+              videoRef.current.pause();
+              videoRef.current.removeAttribute('src');
+              videoRef.current.load();
+            } catch {
+              // ignore
             }
           }
-          
-          return midiasAtivas;
-        });
-      }
+        }
+
+        return midiasAtivas;
+      });
     } catch (err) {
       console.error('Erro ao buscar mídias', err);
     }
@@ -548,11 +571,34 @@ export default function MediaIndoor() {
   /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
   useEffect(() => {
     if (sseConnected && telaoCode) {
-      console.log('[TELAO] SSE reconectado. Sincronizando perfil...');
+      console.log('[TELAO] SSE reconectado. Sincronizando perfil e conteúdo...');
       fetchPerfil(telaoCode);
+      fetchConfig();
+      fetchSmartMediaSettings();
+      fetchMidias();
+      refreshEncarteData('SSE reconectado');
+      window.dispatchEvent(new CustomEvent('MEDIA_CAMPAIGN_UPDATED'));
     }
-  }, [sseConnected, telaoCode]);
+  }, [sseConnected, telaoCode, refreshEncarteData]);
   /* eslint-enable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
+
+  // O SSE entrega atualizações imediatas; esta revisão recupera eventos perdidos
+  // durante suspensão da TV, troca de rede ou retomada do WebView.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    if (!telaoCode) return;
+
+    const contentRevalidationTimer = setInterval(() => {
+      fetchPerfil(telaoCode);
+      fetchConfig();
+      fetchSmartMediaSettings();
+      fetchMidias();
+      refreshEncarteData('Revalidação periódica de 60s');
+    }, 60_000);
+
+    return () => clearInterval(contentRevalidationTimer);
+  }, [telaoCode, activeModules, refreshEncarteData]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Watch unified SSE events (pairing events + queue/calling events) via window events
   /* eslint-disable react-hooks/exhaustive-deps */
@@ -826,6 +872,16 @@ export default function MediaIndoor() {
     }
   }, [midias.length, activeMidiaIndex, activeModules, showingEncarte, config.toledo_encarte_posicao]);
 
+  const handleNativeMediaError = useCallback((mediaId: string | number, error: unknown) => {
+    console.error('[MEDIA ERROR] Arquivo inválido ou indisponível. Pulando...', error);
+    setFailedMidiaIds(previous => {
+      const next = new Set(previous);
+      next.add(mediaId);
+      return next;
+    });
+    nextMedia();
+  }, [nextMedia]);
+
   const onEncarteComplete = useCallback(() => {
     setShowingEncarte(false);
     if (midias.length > 0) {
@@ -914,7 +970,10 @@ export default function MediaIndoor() {
     ? perfil.encarte_categorias.split(';').map((c: string) => c.trim()).filter(Boolean)
     : [];
 
-  const activeMidia = midias[activeMidiaIndex];
+  const activeMidiaCandidate = midias[activeMidiaIndex];
+  const activeMidia = activeMidiaCandidate && !failedMidiaIds.has(activeMidiaCandidate.id)
+    ? activeMidiaCandidate
+    : undefined;
   const showingPriceEncarte = activeModules.includes('encarte') && showingEncarte;
   
   const isSmartMediaFull = smartMediaSettings.midia_indoor_ativa && smartMediaSettings.midia_indoor_layout === 'full';
@@ -1048,8 +1107,7 @@ export default function MediaIndoor() {
                             }
                           }}
                           onError={(e) => {
-                            console.error('[MEDIA ERROR] Erro na reprodução do vídeo. Pulando...', e);
-                            nextMedia();
+                            handleNativeMediaError(activeMidia.id, e);
                           }}
                           playsInline
                           preload="auto"
@@ -1061,8 +1119,7 @@ export default function MediaIndoor() {
                           alt={activeMidia.nome}
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            console.error('[MEDIA ERROR] Erro ao carregar imagem. Pulando...', e);
-                            nextMedia();
+                            handleNativeMediaError(activeMidia.id, e);
                           }}
                         />
                       )}
@@ -1216,8 +1273,7 @@ export default function MediaIndoor() {
                           }
                         }}
                         onError={(e) => {
-                          console.error('[MEDIA ERROR] Erro na reprodução do vídeo. Pulando...', e);
-                          nextMedia();
+                          handleNativeMediaError(activeMidia.id, e);
                         }}
                         playsInline
                         preload="auto"
@@ -1229,8 +1285,7 @@ export default function MediaIndoor() {
                         alt={activeMidia.nome}
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          console.error('[MEDIA ERROR] Erro ao carregar imagem. Pulando...', e);
-                          nextMedia();
+                          handleNativeMediaError(activeMidia.id, e);
                         }}
                       />
                     )}
