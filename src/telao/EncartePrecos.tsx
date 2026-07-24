@@ -87,8 +87,6 @@ export default function EncartePrecos({
   const temaDinâmico = temaAtivo;
 
   const slides = useMemo(() => {
-    if (loading) return [];
-
     const catMap = new Map<string, Categoria>();
     activeCategories.forEach((c: Categoria) => {
       catMap.set(c.nome.trim().toLowerCase(), c);
@@ -147,7 +145,7 @@ export default function EncartePrecos({
       rowsPerColumn,
       maxItemsPerSlide,
     });
-  }, [produtos, activeCategories, config.toledo_ocultar_em_falta, categoriasFiltro, colunas, rowsPerColumn, maxItemsPerSlide, loading]);
+  }, [produtos, activeCategories, config.toledo_ocultar_em_falta, categoriasFiltro, colunas, rowsPerColumn, maxItemsPerSlide]);
 
   useEffect(() => {
     setCurrentSlide(0);

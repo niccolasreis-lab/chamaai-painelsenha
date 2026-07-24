@@ -36,6 +36,10 @@ import type {
   VignetteOccurrence,
 } from '../shared/types';
 
+function haveSameModules(current: string[], next: string[]): boolean {
+  return current.length === next.length && current.every((module, index) => module === next[index]);
+}
+
 async function falarSenha(
   texto: string,
   rate: number,
@@ -154,6 +158,7 @@ export default function MediaIndoor() {
 
   // Active view state
   const [activeModules, setActiveModules] = useState<string[]>([]);
+  const activeModulesRef = useRef<string[]>([]);
   const [showingEncarte, setShowingEncarte] = useState(false);
   const [encarteRefreshKey, setEncarteRefreshKey] = useState(0);
 
@@ -200,8 +205,13 @@ export default function MediaIndoor() {
   const audioSequenceRef = useRef(0);
   const autoRecoverAttemptsRef = useRef(0);
 
+  useEffect(() => {
+    activeModulesRef.current = activeModules;
+  }, [activeModules]);
+
   const refreshEncarteData = useCallback(async (reason: string) => {
-    if (activeModules.length > 0 && !activeModules.includes('encarte')) {
+    const modules = activeModulesRef.current;
+    if (modules.length > 0 && !modules.includes('encarte')) {
       console.log(`[TELAO] Encarte desativado. Ignorando fetch (${reason}).`);
       return;
     }
@@ -211,6 +221,7 @@ export default function MediaIndoor() {
     }
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
 
     console.log(`[TELAO] Buscando dados do Encarte. Motivo: ${reason}`);
     setEncarteCache(prev => ({ ...prev, loading: true }));
@@ -254,6 +265,13 @@ export default function MediaIndoor() {
     } catch (err: unknown) {
       const errorObj = err as Error;
       if (errorObj.name === 'AbortError') {
+        if (abortControllerRef.current === controller && isMountedRef.current) {
+          setEncarteCache(prev => ({
+            ...prev,
+            loading: false,
+            error: 'Não foi possível atualizar o encarte agora.',
+          }));
+        }
         console.log('[TELAO] Fetch do encarte abortado por nova requisição.');
         return;
       }
@@ -264,8 +282,13 @@ export default function MediaIndoor() {
         loading: false,
         error: errorObj.message || 'Erro de rede',
       }));
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
     }
-  }, [API_URL, activeModules]);
+  }, [API_URL]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -273,7 +296,7 @@ export default function MediaIndoor() {
     console.log("MODULO ENCARTES:", modulo_encarte);
     console.log("ENCARTE CACHE:", encarteCache?.produtos?.length);
 
-    if (modulo_encarte && !encarteCache.loading) {
+    if (modulo_encarte && !encarteCache.loading && !encarteCache.error) {
       if (!encarteCache.loadedAt) {
         refreshEncarteData('Módulo encarte ativado no telão');
       } else if (!encarteCache.produtos?.length && autoRecoverAttemptsRef.current < 2) {
@@ -282,7 +305,7 @@ export default function MediaIndoor() {
         refreshEncarteData("webview-auto-recover");
       }
     }
-  }, [activeModules, encarteCache.loadedAt, encarteCache.loading, encarteCache.produtos, refreshEncarteData]);
+  }, [activeModules, encarteCache.loadedAt, encarteCache.loading, encarteCache.error, encarteCache.produtos, refreshEncarteData]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const {
@@ -405,7 +428,7 @@ export default function MediaIndoor() {
         if (data.modulo_painel) modules.push('painel');
         if (data.modulo_encarte) modules.push('encarte');
         if (data.modulo_midia) modules.push('midia');
-        setActiveModules(modules);
+        setActiveModules(previous => haveSameModules(previous, modules) ? previous : modules);
         setShowingEncarte(modules.includes('encarte') && !modules.includes('midia'));
       } else if (res.status === 404) {
         // DB got reset or this device got deleted/desvinculado
@@ -790,7 +813,7 @@ export default function MediaIndoor() {
       if (data.modulo_painel) modules.push('painel');
       if (data.modulo_encarte) modules.push('encarte');
       if (data.modulo_midia) modules.push('midia');
-      setActiveModules(modules);
+      setActiveModules(previous => haveSameModules(previous, modules) ? previous : modules);
       setShowingEncarte(modules.includes('encarte') && !modules.includes('midia'));
     };
 

@@ -101,7 +101,6 @@ export default function EncarteGranel({
   const temaDinamico = temaAtivo;
 
   const categorySlides = useMemo(() => {
-    if (loading) return [];
     const activeCats = categorias.filter((c: Categoria) => c.ativo);
     const catMap = new Map<string, Categoria>();
     activeCats.forEach((c: Categoria) => {
@@ -156,7 +155,7 @@ export default function EncarteGranel({
     }
 
     return slides;
-  }, [produtos, categorias, config?.toledo_ocultar_em_falta, categoriasFiltro, itemsLimit, loading]);
+  }, [produtos, categorias, config?.toledo_ocultar_em_falta, categoriasFiltro, itemsLimit]);
 
   useEffect(() => {
     setCurrentSlide(0);
