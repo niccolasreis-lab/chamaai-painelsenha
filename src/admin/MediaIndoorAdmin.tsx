@@ -229,6 +229,7 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
         const fd = new FormData();
         fd.append('file', uploadFile);
         fd.append('nome', form.title);
+        fd.append('tipo', form.type === 'video' ? 'video' : 'imagem');
         fd.append('duracao', String(form.duration_seconds));
         const up = await fetch(`${API_URL}/api/midias`, { method: 'POST', body: fd });
         if (!up.ok) throw new Error('Falha no upload');
