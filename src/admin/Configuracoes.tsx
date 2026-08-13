@@ -102,8 +102,6 @@ export default function Configuracoes() {
     totem_screensaver_intervalo: '10',
     totem_screensaver_modo: 'ambos',
     totem_solicita_nome: '0',
-    telao_agendamento_ativo: '0',
-    telao_agendamento_regras: '[]',
     telao_tts_ativo: '0',
     telao_tts_modo: 'desativado',
     telao_tts_voz: 'Feminina',
@@ -117,7 +115,6 @@ export default function Configuracoes() {
     painel_habilitar_concluir: '1',
   });
 
-  const [agendamentoRegras, setAgendamentoRegras] = useState<{ hora: string; layout: string }[]>([]);
   const [ttsStatus, setTtsStatus] = useState<Record<string, { count: number; range: string }>>({
     tipo1: { count: 0, range: '' },
     tipo2: { count: 0, range: '' },
@@ -401,14 +398,6 @@ export default function Configuracoes() {
         
         setConfig(prev => ({ ...prev, ...mergedData }));
 
-        // Parse de agendamentoRegras
-        try {
-          if (mergedData.telao_agendamento_regras) {
-            setAgendamentoRegras(JSON.parse(mergedData.telao_agendamento_regras));
-          }
-        } catch (e) {
-          console.error('Erro ao ler regras de agendamento:', e);
-        }
       }
     } catch (err) {
       console.error('Erro ao buscar configurações', err);
@@ -432,9 +421,6 @@ export default function Configuracoes() {
       alert('A cor primária da marca deve ser um código hexadecimal válido (ex: #2563eb).');
       return;
     }
-    // Serializa as regras para salvar
-    config.telao_agendamento_regras = JSON.stringify(agendamentoRegras);
-    
     setSaving(true);
     try {
       const res = await fetch(`${API_URL}/api/configuracoes`, {

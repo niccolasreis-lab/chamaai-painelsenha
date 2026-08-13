@@ -7,7 +7,7 @@ import EncarteGranel from './EncarteGranel';
 import TelaoEspera from './TelaoEspera';
 import SmartMediaLayer from './SmartMediaLayer';
 import { useSSE } from '../shared/useSSE';
-import { getApiUrl } from '../shared/apiConfig';
+import { getApiUrl, setServerIp } from '../shared/apiConfig';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { VignetteAudioCoordinator } from './vignetteAudioCoordinator';
 import {
@@ -23,7 +23,7 @@ import {
   type AudioCallPhase,
   type PlaybackResult,
 } from './audioCallFlow';
-import { ArrowLeft, Users, History, Ticket, Megaphone, Volume2, Clock } from 'lucide-react';
+import { ArrowLeft, Users, History, Ticket, Megaphone, Volume2, Clock, WifiOff } from 'lucide-react';
 import type {
   ProdutoToledo,
   Categoria,
@@ -155,6 +155,9 @@ export default function MediaIndoor() {
       : []
   ), [perfil?.encarte_categorias]);
   const [perfilLoading, setPerfilLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState(false);
+  const [serverAddress, setServerAddress] = useState(localStorage.getItem('server_ip_override') || '');
+  const initFailureCountRef = useRef(0);
 
   const isLowPerformanceMode = 
     localStorage.getItem('telao_low_performance') === '1' || 
@@ -408,14 +411,20 @@ export default function MediaIndoor() {
   const initTelaoSession = async () => {
     try {
       const res = await fetch(`${API_URL}/api/telao/init`);
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem('telao_code', data.code);
-        setTelaoCode(data.code);
-        setPerfilLoading(false);
-      }
+      if (!res.ok) throw new Error(`Servidor respondeu ${res.status}`);
+      const data = await res.json();
+      initFailureCountRef.current = 0;
+      setConnectionError(false);
+      localStorage.setItem('telao_code', data.code);
+      setTelaoCode(data.code);
+      setPerfilLoading(false);
     } catch (e) {
       console.error('Erro ao inicializar telão:', e);
+      initFailureCountRef.current += 1;
+      if (initFailureCountRef.current >= 2) {
+        setConnectionError(true);
+        setPerfilLoading(false);
+      }
       setTimeout(initTelaoSession, 5000);
     }
   };
@@ -979,6 +988,41 @@ export default function MediaIndoor() {
   }, [telaoSseEvent]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  if (connectionError && !telaoCode) {
+    return (
+      <main className="h-screen w-screen bg-[#041a14] text-white flex items-center justify-center p-[5vw] font-sans">
+        <section className="w-full max-w-3xl text-center">
+          <WifiOff className="h-16 w-16 mx-auto text-amber-300" aria-hidden="true" />
+          <h1 className="mt-8 text-4xl md:text-5xl font-bold tracking-[-0.03em]">Conecte este telão ao servidor</h1>
+          <p className="mt-4 text-xl text-emerald-50/80">Informe o IP do computador onde o ChamaAí está aberto. Exemplo: 192.168.1.50</p>
+          <form
+            className="mt-10 flex flex-col sm:flex-row gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const normalized = serverAddress.trim().replace(/^https?:\/\//, '').replace(/:\d+$/, '');
+              if (normalized) setServerIp(normalized);
+            }}
+          >
+            <label className="sr-only" htmlFor="server-address">IP do servidor</label>
+            <input
+              id="server-address"
+              autoFocus
+              inputMode="decimal"
+              value={serverAddress}
+              onChange={(event) => setServerAddress(event.target.value)}
+              placeholder="192.168.1.50"
+              className="min-h-16 flex-1 rounded-xl bg-white text-slate-950 px-6 text-2xl outline-none focus-visible:ring-4 focus-visible:ring-emerald-300"
+            />
+            <button type="submit" className="min-h-16 rounded-xl bg-emerald-400 px-8 text-xl font-bold text-emerald-950 outline-none focus-visible:ring-4 focus-visible:ring-white active:bg-emerald-300">
+              Conectar
+            </button>
+          </form>
+          <p className="mt-6 text-base text-emerald-50/60">Servidor esperado: porta 3001. O telão tentará reconectar automaticamente.</p>
+        </section>
+      </main>
+    );
+  }
+
   if (perfilLoading) {
     return (
       <div className="h-screen w-screen bg-[#041a14] flex flex-col items-center justify-center text-white font-sans uppercase tracking-[0.2em] text-sm gap-4">
@@ -1002,13 +1046,9 @@ export default function MediaIndoor() {
   const isSmartMediaFull = smartMediaSettings.midia_indoor_ativa && smartMediaSettings.midia_indoor_layout === 'full';
   const shouldShowNativeContent = !isSmartMediaFull;
 
-  // Resolvendo layout com suporte a query params (?template=)
-  const query = new URLSearchParams(window.location.search);
-  const templateParam = query.get('template') || query.get('layout');
-  const validTemplates = ['classic', 'sidebar', 'l-shape'];
-  const layout = (templateParam && validTemplates.includes(templateParam))
-    ? templateParam
-    : (perfil?.template_layout || 'classic');
+  // A composição antiga por dispositivo foi removida. O posicionamento da
+  // mídia agora possui uma única fonte: Configurações > Mídia Indoor.
+  const layout: string = 'classic';
 
   return (
     <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-sans text-ink relative">

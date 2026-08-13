@@ -59,6 +59,12 @@ export default function SmartMediaLayer({
   
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  const resolveMediaUrl = useCallback((value?: string | null) => {
+    if (!value) return '';
+    if (/^(https?:|data:|blob:)/i.test(value)) return value;
+    return `${API_URL}${value.startsWith('/') ? value : `/${value}`}`;
+  }, [API_URL]);
+
   const fetchActivePlaylist = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/api/media/active-playlist`);
@@ -269,7 +275,7 @@ export default function SmartMediaLayer({
       return (
         <video 
           ref={videoRef}
-          src={`${API_URL}${currentMedia.local_path}`} 
+          src={resolveMediaUrl(currentMedia.local_path)}
           className="w-full h-full object-cover"
           autoPlay
           muted
@@ -283,7 +289,7 @@ export default function SmartMediaLayer({
     if (currentMedia.type === 'image' || currentMedia.type === 'imagem') {
       return (
         <img 
-          src={`${API_URL}${currentMedia.local_path}`} 
+          src={resolveMediaUrl(currentMedia.local_path)}
           alt={currentMedia.title}
           className="w-full h-full object-cover"
           onError={() => markMediaFailed(currentMedia.id)}
