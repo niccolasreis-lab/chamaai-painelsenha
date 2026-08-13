@@ -633,52 +633,6 @@ export function startServer() {
   });
   // -----------------
 
-  // Cron para agendamento de layouts de telão (roda a cada minuto)
-  cron.schedule('* * * * *', () => {
-    try {
-      const db = getDb();
-      // 1. Verificar se o agendamento está ativo
-      const agendamentoAtivo = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'telao_agendamento_ativo'").get() as any;
-      if (!agendamentoAtivo || agendamentoAtivo.valor !== '1') return;
-
-      // 2. Buscar regras do agendamento
-      const agendamentoRegrasRow = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'telao_agendamento_regras'").get() as any;
-      if (!agendamentoRegrasRow || !agendamentoRegrasRow.valor) return;
-
-      let regras: { hora: string; layout: string }[] = [];
-      try {
-        regras = JSON.parse(agendamentoRegrasRow.valor);
-      } catch (parseErr) {
-        console.error('[CRON TELÃO] Erro ao analisar JSON de regras. Desativando agendamento...', parseErr);
-        db.prepare("UPDATE configuracoes SET valor = '0', atualizado_em = datetime('now') WHERE chave = 'telao_agendamento_ativo'").run();
-        broadcastEvent('CONFIG_ATUALIZADA', { telao_agendamento_ativo: '0' });
-        return;
-      }
-
-      if (!Array.isArray(regras) || regras.length === 0) return;
-
-      // 3. Pegar horário local do servidor no formato HH:MM
-      const agora = new Date();
-      const horaStr = String(agora.getHours()).padStart(2, '0') + ':' + String(agora.getMinutes()).padStart(2, '0');
-
-      // 4. Encontrar regra para o horário atual
-      const regraCorrespondente = regras.find(r => r.hora === horaStr);
-      if (regraCorrespondente) {
-        console.log(`[CRON TELÃO] Horário correspondente detectado (${horaStr}). Atualizando layouts para: ${regraCorrespondente.layout}`);
-        
-        // 5. Buscar todos os telões vinculados
-        const teloesVinculados = db.prepare("SELECT code FROM teloes WHERE status = 'vinculado'").all() as any[];
-        
-        for (const device of teloesVinculados) {
-          db.prepare("UPDATE teloes SET template_layout = ? WHERE code = ?").run(regraCorrespondente.layout, device.code);
-          const perfil = db.prepare('SELECT * FROM teloes WHERE code = ?').get(device.code);
-          broadcastToTelao(device.code, 'TELAO_ATUALIZADO', perfil);
-        }
-      }
-    } catch (err) {
-      console.error('[CRON TELÃO] Erro crítico no cron de agendamento de telões:', err);
-    }
-  });
 
   // --- Admin Status Endpoint ---
   app.get('/api/admin/status', (req, res) => {
@@ -1096,13 +1050,13 @@ export function startServer() {
   app.post('/api/telao/vincular', requireMaster, (req, res) => {
     try {
       const db = getDb();
-      const { code, nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias, template_layout } = req.body;
+      const { code, nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias } = req.body;
       const stmt = db.prepare(`
         UPDATE teloes 
-        SET nome = ?, status = 'vinculado', modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = ?, vinculado_em = datetime('now')
+        SET nome = ?, status = 'vinculado', modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = 'classic', vinculado_em = datetime('now')
         WHERE code = ?
       `);
-      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', template_layout || 'classic', code.toUpperCase());
+      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', code.toUpperCase());
       
       const perfil = db.prepare('SELECT * FROM teloes WHERE code = ?').get(code.toUpperCase());
       broadcastToTelao(code.toUpperCase(), 'TELAO_VINCULADO', perfil);
@@ -1116,13 +1070,13 @@ export function startServer() {
     try {
       const db = getDb();
       const code = (req.params.code as string).toUpperCase();
-      const { nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias, template_layout } = req.body;
+      const { nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias } = req.body;
       const stmt = db.prepare(`
         UPDATE teloes 
-        SET nome = ?, modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = ?
+        SET nome = ?, modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = 'classic'
         WHERE code = ?
       `);
-      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', template_layout || 'classic', code);
+      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', code);
       
       const perfil = db.prepare('SELECT * FROM teloes WHERE code = ?').get(code);
       broadcastToTelao(code, 'TELAO_ATUALIZADO', perfil);

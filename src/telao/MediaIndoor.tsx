@@ -1046,13 +1046,9 @@ export default function MediaIndoor() {
   const isSmartMediaFull = smartMediaSettings.midia_indoor_ativa && smartMediaSettings.midia_indoor_layout === 'full';
   const shouldShowNativeContent = !isSmartMediaFull;
 
-  // Resolvendo layout com suporte a query params (?template=)
-  const query = new URLSearchParams(window.location.search);
-  const templateParam = query.get('template') || query.get('layout');
-  const validTemplates = ['classic', 'sidebar', 'l-shape'];
-  const layout = (templateParam && validTemplates.includes(templateParam))
-    ? templateParam
-    : (perfil?.template_layout || 'classic');
+  // A composição antiga por dispositivo foi removida. O posicionamento da
+  // mídia agora possui uma única fonte: Configurações > Mídia Indoor.
+  const layout: string = 'classic';
 
   return (
     <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-sans text-ink relative">

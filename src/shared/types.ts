@@ -48,7 +48,6 @@ export type PerfilTelao = {
   modulo_encarte?: boolean | number;
   modulo_midia?: boolean | number;
   encarte_categorias?: string | null;
-  template_layout?: string | null;
 };
 
 export type MediaItem = {
