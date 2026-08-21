@@ -30,6 +30,7 @@ import { Dialog, Input, Button } from './shared/components';
 import TelaoConnectionDialog from './telao/TelaoConnectionDialog';
 
 const IS_DEDICATED_TELAO = import.meta.env.VITE_APP_MODE === 'telao';
+const IS_DEDICATED_OPERATOR = import.meta.env.VITE_APP_MODE === 'operador';
 
 function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) {
   const [checking, setChecking] = useState(true);
@@ -404,6 +405,10 @@ export default function App() {
         </Routes>
       </HashRouter>
     );
+  }
+
+  if (IS_DEDICATED_OPERATOR) {
+    return <HashRouter><Routes><Route path="*" element={<ControleTouch />} /></Routes></HashRouter>;
   }
 
   return (

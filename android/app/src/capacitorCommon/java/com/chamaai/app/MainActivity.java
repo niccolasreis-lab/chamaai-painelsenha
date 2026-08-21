@@ -47,6 +47,11 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(TelaoCachePlugin.class);
         super.onCreate(savedInstanceState);
 
+        if (isOperator()) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            enterImmersiveMode();
+        }
+
         if (isTelao()) {
             getWindow().addFlags(
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
@@ -68,6 +73,10 @@ public class MainActivity extends BridgeActivity {
 
     private boolean isTelao() {
         return "telao".equals(BuildConfig.APP_MODE);
+    }
+
+    private boolean isOperator() {
+        return "operador".equals(BuildConfig.APP_MODE);
     }
 
     private void configureWebView() {
@@ -143,7 +152,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus && isTelao()) {
+        if (hasFocus && (isTelao() || isOperator())) {
             enterImmersiveMode();
         }
     }

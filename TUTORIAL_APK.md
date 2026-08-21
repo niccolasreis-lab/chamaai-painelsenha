@@ -1,6 +1,9 @@
 # Guia para Criar o APK do Operador
 
-A interface mobile em `src/operador/MobileOperador.tsx` agora possui **3 botões de ação**: **Chamar Próximo**, **Repetir** e **Devolver à Fila**. O layout é totalmente responsivo para celulares (vertical) e tablets (Galaxy Tab A11, vertical e horizontal).
+A interface dedicada em `src/operador/ControleTouch.tsx` possui **3 botões de ação** sempre visíveis: **Chamar Próximo**, **Repetir** e **Devolver**. O layout se adapta estruturalmente a tablets em orientação vertical e horizontal.
+
+> [!WARNING]
+> O APK do operador não exige login. Instale-o somente em dispositivos controlados e conecte-o exclusivamente a uma rede local confiável; as rotas de operação não devem ser publicadas na internet.
 
 ---
 
@@ -13,7 +16,7 @@ npx cap init "ChamaAi Operador" com.chamaai.app --web-dir dist
 
 ### 2. Gerar o Build do Web
 ```powershell
-npm run build
+npm run build:operador
 ```
 
 ### 3. Adicionar o Android
@@ -52,8 +55,14 @@ Para permitir **vertical e horizontal** no tablet, edite o `AndroidManifest.xml`
 
 ### 6. Sincronizar e Abrir no Android Studio
 ```powershell
-npx cap sync
+npm run android:operador:sync
 npx cap open android
+```
+
+Para gerar diretamente o APK de homologação pela linha de comando:
+
+```powershell
+npm run android:operador:apk
 ```
 
 ### 7. Gerar o APK no Android Studio
@@ -64,8 +73,12 @@ npx cap open android
 ---
 
 ### Funcionalidades no APK:
-- **Chamar Próximo**: Puxa a próxima senha da fila (azul gigante)
+- **Chamar Próximo**: Puxa a próxima senha da fila
 - **Repetir**: Re-emite o chamado da senha atual no telão
 - **Devolver à Fila**: Devolve a senha atual de volta à fila de espera (amarelo)
-- **Configuração de IP**: Se o servidor não for encontrado, abre automaticamente a configuração de rede
-- **Layout Tablet**: Em telas ≥768px, todos os botões, números e espaçamentos se expandem automaticamente
+- **Contador da fila**: Exibe o total atualizado de pessoas aguardando
+- **Configuração de IP**: Disponível na primeira abertura e pelo botão de configurações
+- **Tela sempre ligada**: O flavor operador aplica `FLAG_KEEP_SCREEN_ON`
+- **Layout Tablet**: Os três botões mantêm dimensões iguais em retrato e paisagem
+- **Reconexão automática**: Enquanto o servidor estiver offline, o APK verifica `/health` a cada 3 segundos e também tenta imediatamente ao tocar ou voltar ao aplicativo
+- **Ação pendente**: Uma única ação feita offline fica aguardando em memória e é revalidada antes da execução automática quando o servidor retornar

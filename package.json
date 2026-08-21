@@ -1,7 +1,7 @@
 {
   "name": "chamaai-novo",
   "private": true,
-  "version": "1.0.170",
+  "version": "1.0.171",
   "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev:vite": "vite --host",
@@ -15,6 +15,10 @@
     "build:dist": "npm run rebuild:native && npm run build && electron-builder",
     "publish:update": "npm run rebuild:native && npm run build && electron-builder -p always",
     "android:sync": "vite build && npx cap sync",
+    "build:operador": "set VITE_APP_MODE=operador&& tsc -b && vite build",
+    "android:operador:sync": "npm run build:operador && npx cap sync android",
+    "android:operador:apk": "npm run android:operador:sync && cd android && gradlew.bat :app:assembleOperadorDebug",
+    "android:operador:release": "npm run android:operador:sync && cd android && gradlew.bat :app:assembleOperadorRelease",
     "build:telao": "set VITE_APP_MODE=telao&& tsc -b && vite build",
     "android:telao:sync": "npm run build:telao && npx cap sync android",
     "android:telao:apk": "npm run android:telao:sync && cd android && gradlew.bat :app:assembleTelaoDebug",
@@ -23,6 +27,7 @@
     "test:tts": "tsx --test tests/audioCallFlow.test.ts",
     "test:vignettes": "tsx --test tests/vignette*.test.ts",
     "test:portal": "tsx --test tests/encartePagination.test.ts tests/portalUrl.test.ts tests/ticketState.test.ts",
+    "test": "tsx --test tests/*.test.ts",
     "preview": "vite preview"
   },
   "build": {

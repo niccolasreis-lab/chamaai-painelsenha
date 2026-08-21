@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 
 export function useSSE(url: string | null, eventType?: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -8,12 +8,29 @@ export function useSSE(url: string | null, eventType?: string) {
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
   const verificationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const connectNowRef = useRef<(() => void) | null>(null);
+
+  const reconnectNow = useCallback(() => {
+    if (reconnectTimeout.current) {
+      clearTimeout(reconnectTimeout.current);
+      reconnectTimeout.current = null;
+    }
+    connectNowRef.current?.();
+  }, []);
 
   useEffect(() => {
     if (!url) return;
 
     const connect = () => {
+      setConnected(false);
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+        reconnectTimeout.current = null;
+      }
       if (eventSourceRef.current) {
+        eventSourceRef.current.onopen = null;
+        eventSourceRef.current.onmessage = null;
+        eventSourceRef.current.onerror = null;
         eventSourceRef.current.close();
       }
 
@@ -28,12 +45,14 @@ export function useSSE(url: string | null, eventType?: string) {
       let ultimoEventoTimestamp = Date.now();
 
       eventSource.onopen = () => {
+        if (eventSourceRef.current !== eventSource) return;
         setConnected(true);
         reconnectAttempts.current = 0;
         console.log('[SSE] Conectado a', url);
       };
 
       eventSource.onmessage = (event) => {
+        if (eventSourceRef.current !== eventSource) return;
         ultimoEventoTimestamp = Date.now();
         try {
           const payload = JSON.parse(event.data);
@@ -57,7 +76,11 @@ export function useSSE(url: string | null, eventType?: string) {
       };
 
       eventSource.onerror = () => {
+        if (eventSourceRef.current !== eventSource) return;
         setConnected(false);
+        eventSource.onopen = null;
+        eventSource.onmessage = null;
+        eventSource.onerror = null;
         eventSource.close();
         
         const attempts = reconnectAttempts.current;
@@ -85,21 +108,28 @@ export function useSSE(url: string | null, eventType?: string) {
       }, 5 * 60 * 1000);
     };
 
+    connectNowRef.current = connect;
+
     connect();
 
     return () => {
       if (eventSourceRef.current) {
+        eventSourceRef.current.onopen = null;
+        eventSourceRef.current.onmessage = null;
+        eventSourceRef.current.onerror = null;
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
+      setConnected(false);
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }
       if (verificationIntervalRef.current) {
         clearInterval(verificationIntervalRef.current);
       }
+      connectNowRef.current = null;
     };
   }, [url, eventType]);
 
-  return { data, connected };
+  return { data, connected, reconnectNow };
 }

@@ -1600,15 +1600,34 @@ export function startServer() {
     res.json({ status: 'ok' });
   });
 
+  const parseOperatorGuiche = (value: unknown): string | null => {
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim().replace(/^(guich[eê]|balc[aã]o)\s*:?\s*/i, '');
+    return normalized.length > 0 && normalized.length <= 40 ? normalized : null;
+  };
+
   app.post('/api/operador/proximo', (req: express.Request, res: express.Response) => {
     try {
-      const { guiche } = req.body;
+      const guiche = parseOperatorGuiche(req.body?.guiche);
+      if (!guiche) return res.status(400).json({ error: 'Guichê inválido.' });
       const db = getDb();
       
       console.log(`[Operador Touch - Proximo] guiche=${guiche}`);
 
       const proximoTouchTx = db.transaction((guicheStr: string) => {
-        // 0. Auto-finalize previous called ticket of this guichê
+        // Reserve the next ticket before finalizing the active one. This keeps
+        // the current service intact when the waiting queue is empty.
+        const proxima = db.prepare(
+          `SELECT s.*, b.nome as balcao_nome, b.prefixo_senha
+           FROM senhas s
+           JOIN balcoes b ON s.balcao_id = b.id
+           WHERE s.status = 'aguardando'
+           ORDER BY s.preferencial DESC, s.id ASC
+           LIMIT 1`
+        ).get() as any;
+
+        if (!proxima) return { proxima: null, geral: 0, preferencial: 0, autoAttendedId: null };
+
         const activeCalled = db.prepare(`
           SELECT s.id 
           FROM chamadas c
@@ -1621,26 +1640,7 @@ export function startServer() {
           db.prepare("UPDATE senhas SET status = 'atendida', atendida_em = datetime('now') WHERE id = ?").run(activeCalled.id);
         }
 
-        // 1. Busca a próxima senha (preferencial primeiro, depois por ordem de chegada)
-        const proxima = db.prepare(
-          `SELECT s.*, b.nome as balcao_nome, b.prefixo_senha 
-           FROM senhas s 
-           JOIN balcoes b ON s.balcao_id = b.id 
-           WHERE s.status = 'aguardando' 
-           ORDER BY s.preferencial DESC, s.id ASC 
-           LIMIT 1`
-        ).get() as any;
-
-        if (!proxima) {
-          return {
-            proxima: null,
-            geral: 0,
-            preferencial: 0,
-            autoAttendedId: activeCalled?.id
-          };
-        }
-
-        // 2. Marca como chamada
+        // Mark as called and register the call atomically.
         db.prepare("UPDATE senhas SET status = 'chamada', chamada_em = datetime('now') WHERE id = ?").run(proxima.id);
 
         // 3. Registra a chamada (operador_id = 1 como padrão)
@@ -1698,7 +1698,7 @@ export function startServer() {
       // Sincroniza com Supabase
       syncStatusSenha(proxima.id, 'chamada', `Guichê ${guiche}`);
 
-      res.json({ success: true, data: ticketPayload });
+      res.json({ success: true, data: { ticket: ticketPayload, aguardando: geral + preferencial } });
     } catch (err: any) {
       console.error('[Operador Touch - Proximo] ERRO:', err.message);
       res.status(500).json({ error: err.message });
@@ -1707,7 +1707,8 @@ export function startServer() {
 
   app.post('/api/operador/repetir', (req: express.Request, res: express.Response) => {
     try {
-      const { guiche } = req.body;
+      const guiche = parseOperatorGuiche(req.body?.guiche);
+      if (!guiche) return res.status(400).json({ error: 'Guichê inválido.' });
       const db = getDb();
       
       console.log(`[Operador Touch - Repetir] guiche=${guiche}`);
@@ -1717,13 +1718,13 @@ export function startServer() {
         SELECT s.*, c.guiche 
         FROM chamadas c
         JOIN senhas s ON c.senha_id = s.id
-        WHERE c.guiche = ?
+        WHERE c.guiche = ? AND s.status = 'chamada'
         ORDER BY c.id DESC
         LIMIT 1
       `).get(`Guichê ${guiche}`) as any;
 
       if (!ultimaChamada) {
-        return res.status(404).json({ error: 'Nenhuma senha chamada anteriormente neste guichê.' });
+        return res.status(409).json({ error: 'Nenhuma senha em atendimento para repetir.' });
       }
 
       // Atualiza o timestamp da senha e registra uma nova chamada
@@ -1756,16 +1757,17 @@ export function startServer() {
       // Sincroniza com Supabase
       syncStatusSenha(ultimaChamada.id, 'chamada', `Guichê ${guiche}`);
 
-      res.json({ success: true, data: ticketPayload });
+      res.json({ success: true, data: { ticket: ticketPayload, aguardando: countGeral.count + countPref.count } });
     } catch (err: any) {
       console.error('[Operador Touch - Repetir] ERRO:', err.message);
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.post('/api/operador/devolver', requireAuth, (req: express.Request, res: express.Response) => {
+  app.post('/api/operador/devolver', (req: express.Request, res: express.Response) => {
     try {
-      const { guiche } = req.body;
+      const guiche = parseOperatorGuiche(req.body?.guiche);
+      if (!guiche) return res.status(400).json({ error: 'Guichê inválido.' });
       const db = getDb();
       
       console.log(`[Operador Touch - Devolver] guiche=${guiche}`);
@@ -1799,7 +1801,7 @@ export function startServer() {
       const txResult = devolverTouchTx(guiche);
 
       if (!txResult) {
-        return res.status(404).json({ error: 'Nenhuma senha em atendimento encontrada para este guichê.' });
+        return res.status(409).json({ error: 'Nenhuma senha em atendimento para devolver.' });
       }
 
       const { ultimaChamada, geral, preferencial } = txResult;
@@ -1815,7 +1817,7 @@ export function startServer() {
       // Sincroniza com Supabase
       syncStatusSenha(ultimaChamada.id, 'aguardando');
 
-      res.json({ success: true });
+      res.json({ success: true, data: { ticket: null, aguardando: geral + preferencial } });
     } catch (err: any) {
       console.error('[Operador Touch - Devolver] ERRO:', err.message);
       res.status(500).json({ error: err.message });
