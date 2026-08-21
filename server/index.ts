@@ -30,6 +30,7 @@ import {
   TTS_DIR,
   UPLOADS_DIR,
   ensureStorageDirectories,
+  resolveManagedAssetPath,
   unlinkManagedAsset,
 } from './storage';
 import { setupTelaoAssetRoutes } from './telao-assets';
@@ -4183,9 +4184,8 @@ export function startServer() {
         console.error('[STARTUP] Erro ao sincronizar ordem das categorias no startup:', errOrdem);
       }
       if (cfg['logo_cliente']) {
-        const logoRelPath = cfg['logo_cliente'].replace(/^\//, ''); // remove leading slash
-        const fullLogoPath = path.join(userDataPath, logoRelPath);
-        if (fs.existsSync(fullLogoPath)) {
+        const fullLogoPath = resolveManagedAssetPath(cfg['logo_cliente']);
+        if (fullLogoPath && fs.existsSync(fullLogoPath)) {
           const base64 = fs.readFileSync(fullLogoPath, 'base64');
           const ext = path.extname(fullLogoPath).toLowerCase().replace('.', '');
           const mimeType = ext === 'svg' ? 'image/svg+xml' : `image/${ext}`;
