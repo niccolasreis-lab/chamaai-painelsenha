@@ -16,10 +16,12 @@ import Logo from '../shared/Logo';
 import { Button } from '../shared/components/Button';
 import { Input } from '../shared/components/Input';
 import { Dialog } from '../shared/components/Dialog';
+import { getTotemQueueAvailability } from './queueAvailability';
 
 export default function Emissao() {
   const navigate = useNavigate();
   const [config, setConfig] = useState<any>({});
+  const [configLoaded, setConfigLoaded] = useState(false);
   const [pessoasAguardando, setPessoasAguardando] = useState(0);
   const [saudacao, setSaudacao] = useState('BEM-VINDO(A)');
 
@@ -72,12 +74,14 @@ export default function Emissao() {
       if (!res.ok) throw new Error();
       const data = await res.json();
       setConfig(data);
+      setConfigLoaded(true);
       if (data.totem_screensaver_ativo === '1') {
         fetchMidias();
       }
     } catch (err) {
       console.error('Erro ao carregar configurações', err);
       setError(true);
+      setConfigLoaded(false);
     }
   };
 
@@ -129,6 +133,15 @@ export default function Emissao() {
 
     if (sseEvent.event === 'NOVA_SENHA_EMITIDA' || sseEvent.event === 'NOVA_SENHA_CHAMADA' || sseEvent.event === 'SISTEMA_RESETADO') {
       if (!isIdle) fetchFila();
+    } else if (sseEvent.event === 'CONFIG_ATUALIZADA') {
+      // The event contains only changed keys. Merge them immediately so a
+      // disabled queue cannot remain visible until a reload or another poll.
+      if (sseEvent.data && typeof sseEvent.data === 'object') {
+        setConfig((current: any) => ({ ...current, ...sseEvent.data }));
+        setConfigLoaded(true);
+      } else {
+        fetchConfig();
+      }
     } else if (sseEvent.event === 'RECARREGAR_PAGINA') {
       window.location.reload();
     }
@@ -216,6 +229,10 @@ export default function Emissao() {
       });
       const data = await res.json();
 
+      if (!res.ok) {
+        throw new Error(data?.error || 'Não foi possível emitir a senha.');
+      }
+
       // Redireciona imediatamente — senha já está registrada no banco
       navigate('/totem/confirmacao', { state: { senha: data } });
 
@@ -242,7 +259,7 @@ export default function Emissao() {
       }
     } catch (err) {
       console.error('Erro ao emitir senha', err);
-      alert('Erro de conexão ao emitir senha. Tente novamente.');
+      alert(err instanceof Error ? err.message : 'Erro de conexão ao emitir senha. Tente novamente.');
     }
   };
 
@@ -546,6 +563,16 @@ export default function Emissao() {
     );
   }
 
+  if (!configLoaded) {
+    return (
+      <div className="h-screen w-screen bg-background flex items-center justify-center fixed inset-0">
+        <p className="font-sans text-lg font-bold uppercase tracking-widest text-ink-variant">Carregando atendimento…</p>
+      </div>
+    );
+  }
+
+  const queueAvailability = getTotemQueueAvailability(config);
+
   return (
     <div className="h-screen w-screen bg-background flex flex-col font-sans select-none overflow-hidden fixed inset-0">
       <PrinterErrorModal />
@@ -612,7 +639,7 @@ export default function Emissao() {
         </div>
 
         <div className="flex flex-col md:flex-row justify-center gap-6 max-w-6xl w-full px-4 mb-8">
-          {config.ocultar_tipo_senha === '1' ? (
+          {queueAvailability.singleButton ? (
             <button 
               onClick={() => handleBotaoEmitir(false)}
               className="w-full bg-surface border-2 border-outline-variant rounded-md py-8 md:py-10 lg:py-12 flex flex-col items-center justify-center gap-6 shadow-[0_20px_40px_rgba(0,0,0,0.05)] hover:border-primary hover:shadow-[0_20px_50px_rgba(37,99,235,0.15)] active:scale-95 transition-all duration-200 outline-none group"
@@ -627,7 +654,7 @@ export default function Emissao() {
           ) : (
             <>
               {/* Card Normal */}
-              {config.fila_normal_ativa !== '0' && (
+              {queueAvailability.normal && (
                 <button 
                   onClick={() => handleBotaoEmitir(false)}
                   className="w-full bg-surface border-[4px] md:border-[6px] border-primary/40 rounded-md py-6 md:py-8 lg:py-12 flex flex-col items-center justify-center gap-4 hover:border-primary hover:bg-primary/5 active:scale-95 transition-all duration-300 outline-none group" style={{animation: 'totemGlow 1.5s ease-in-out infinite'}}
@@ -643,7 +670,7 @@ export default function Emissao() {
               )}
 
               {/* Card Preferencial */}
-              {config.fila_preferencial_ativa !== '0' && (
+              {queueAvailability.preferential && (
                 <button 
                   onClick={() => handleBotaoEmitir(true)}
                   className="w-full bg-surface border-[4px] md:border-[6px] border-warning/40 rounded-md py-6 md:py-8 lg:py-12 flex flex-col items-center justify-center gap-4 hover:border-warning hover:bg-warning/5 active:scale-95 transition-all duration-300 outline-none group" style={{animation: 'totemGlowWarning 1.5s ease-in-out infinite'}}

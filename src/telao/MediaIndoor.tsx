@@ -187,6 +187,7 @@ export default function MediaIndoor() {
   const [activeMidiaIndex, setActiveMidiaIndex] = useState(0);
   const [failedMidiaIds, setFailedMidiaIds] = useState<Set<string | number>>(() => new Set());
   const [config, setConfig] = useState<Partial<EstablishmentConfig>>({});
+  const configRef = useRef<Partial<EstablishmentConfig>>({});
   const [smartMediaSettings, setSmartMediaSettings] = useState<SmartMediaSettings>({ midia_indoor_ativa: false, midia_indoor_layout: 'lateral' });
   const [pessoasAguardando, setPessoasAguardando] = useState(0);
 
@@ -497,17 +498,22 @@ export default function MediaIndoor() {
     }
   };
 
-  const fetchConfig = async () => {
+  const fetchConfig = async (): Promise<Partial<EstablishmentConfig> | null> => {
     try {
       const res = await fetch(`${API_URL}/api/configuracoes`);
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as Partial<EstablishmentConfig>;
         invalidateTtsAudioRevision(data.telao_tts_revision || 'initial');
+        // Atualize a referência antes do próximo render: eventos SSE podem chegar
+        // no mesmo intervalo em que a configuração está sendo revalidada.
+        configRef.current = data;
         setConfig(data);
+        return data;
       }
     } catch (err) {
       console.error('Erro ao buscar configs', err);
     }
+    return null;
   };
 
   const fetchSmartMediaSettings = async () => {
@@ -683,11 +689,6 @@ export default function MediaIndoor() {
     const handleNovaSenhaChamada = (e: Event) => {
       const payload = (e as CustomEvent).detail as RecentCall;
       const sequence = ++audioSequenceRef.current;
-      const plan = createAudioCallPlan(payload, config, API_URL);
-      logAudioPhase(payload.id, sequence, 'event_received', {
-        mode: plan.mode,
-        repeat: payload.repeticao === true,
-      });
       
       // PASSO 1: Atualizar o estado React imediatamente (agenda o re-render)
       setUltimaSenha(payload);
@@ -721,6 +722,17 @@ export default function MediaIndoor() {
         });
       } else {
         void coordinator.startCall(async () => {
+          // A configuração do servidor é a fonte de verdade. Sem esta leitura, uma
+          // chamada recebida durante o carregamento/CONFIG_ATUALIZADA podia usar o
+          // estado inicial vazio e ser interpretada como voz desativada.
+          const refreshedConfig = await fetchConfig();
+          const callConfig = refreshedConfig || configRef.current;
+          const plan = createAudioCallPlan(payload, callConfig, API_URL);
+          logAudioPhase(payload.id, sequence, 'event_received', {
+            mode: plan.mode,
+            repeat: payload.repeticao === true,
+            configSource: refreshedConfig ? 'server' : 'last_known',
+          });
           await new Promise<void>((resolve) => {
             requestAnimationFrame(() => resolve());
           });
@@ -732,7 +744,7 @@ export default function MediaIndoor() {
             return;
           }
 
-          const volume = normalizeAudioVolume(config.volume_audio);
+          const volume = normalizeAudioVolume(callConfig.volume_audio);
           const numericSetting = (
             value: string | null | undefined,
             fallback: number,
@@ -752,10 +764,10 @@ export default function MediaIndoor() {
               : playSystemSound(chime.type, volume),
             playMp3: (url) => playDynamicUrl(url, volume),
             speak: () => falarSenha(
-              buildSpeechText(payload, config),
-              numericSetting(config.telao_tts_velocidade, 0.95, 0.1, 10),
-              numericSetting(config.telao_tts_tom, 1, 0, 2),
-              config.telao_tts_voz || 'Feminina',
+              buildSpeechText(payload, callConfig),
+              numericSetting(callConfig.telao_tts_velocidade, 0.95, 0.1, 10),
+              numericSetting(callConfig.telao_tts_tom, 1, 0, 2),
+              callConfig.telao_tts_voz || 'Feminina',
               isCurrent,
             ),
             onPhase: (phase, details) => logAudioPhase(payload.id, sequence, phase, {

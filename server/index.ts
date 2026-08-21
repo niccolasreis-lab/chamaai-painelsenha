@@ -26,6 +26,7 @@ import {
 } from './services/vignette-scheduler.service';
 import { isTelaoTtsMode, TELAO_TTS_MODES } from '../src/shared/ttsMode';
 import { normalizePortalBaseUrl } from '../electron/services/portal-url';
+import { resolveRequestedQueue } from './ticket-queue-policy';
 import {
   CHAMAAI_DATA_DIR,
   TTS_DIR,
@@ -1207,6 +1208,12 @@ export function startServer() {
     try {
       const { balcao_id, preferencial, nome_cliente } = req.body;
       const db = getDb();
+      let queueSelection: { preferential: boolean };
+      try {
+        queueSelection = resolveRequestedQueue(db, preferencial);
+      } catch (queueError: any) {
+        return res.status(409).json({ error: queueError.message, code: 'QUEUE_DISABLED' });
+      }
       console.log('Emitindo senha para balcão:', balcao_id, 'Preferencial:', preferencial, 'Nome:', nome_cliente);
       
       const balcaoIdNum = Number(balcao_id);
@@ -1243,13 +1250,13 @@ export function startServer() {
         };
       });
 
-      const txResult = emitirSenhaTx(balcaoIdNum, preferencial ? 1 : 0, nome_cliente || null);
+      const txResult = emitirSenhaTx(balcaoIdNum, queueSelection.preferential ? 1 : 0, nome_cliente || null);
 
       const novaSenha = {
         id: txResult.id,
         balcao_id: balcaoIdNum,
         numero: txResult.numero,
-        preferencial: preferencial ? 1 : 0,
+        preferencial: queueSelection.preferential ? 1 : 0,
         status: 'aguardando',
         aguardando_count: txResult.aguardando_count,
         nome_cliente: nome_cliente || null
@@ -1268,7 +1275,7 @@ export function startServer() {
       }
 
       // Sync: espelha a nova senha na nuvem para o Portal do Cliente
-      syncNovaSenha(novaSenha.id, txResult.numero, 'aguardando', Boolean(preferencial));
+      syncNovaSenha(novaSenha.id, txResult.numero, 'aguardando', queueSelection.preferential);
 
       res.status(201).json(novaSenha);
     } catch (err: any) {
