@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import SenhaChamada from './SenhaChamada';
 import EncartePrecos from './EncartePrecos';
@@ -7,10 +7,16 @@ import EncarteGranel from './EncarteGranel';
 import TelaoEspera from './TelaoEspera';
 import SmartMediaLayer from './SmartMediaLayer';
 import { useSSE } from '../shared/useSSE';
-import { getApiUrl } from '../shared/apiConfig';
+import { getApiUrl, setServerIp } from '../shared/apiConfig';
 import { invalidateTtsAudioRevision, useAudioPlayer } from '../hooks/useAudioPlayer';
 import { VignetteAudioCoordinator } from './vignetteAudioCoordinator';
 import { useTelaoAssetCache } from './useTelaoAssetCache';
+import {
+  isMediaAvailableForDisplay,
+  readDisplayCache,
+  writeDisplayCache,
+  type EncarteDisplaySnapshot,
+} from './displayCache';
 import {
   buildSpeechText,
   createAudioCallPlan,
@@ -18,7 +24,7 @@ import {
   type AudioCallPhase,
   type PlaybackResult,
 } from './audioCallFlow';
-import { ArrowLeft, Users, History, Ticket, Megaphone, Volume2, Clock } from 'lucide-react';
+import { ArrowLeft, Users, History, Ticket, Megaphone, Volume2, Clock, WifiOff } from 'lucide-react';
 import type {
   ProdutoToledo,
   Categoria,
@@ -30,6 +36,10 @@ import type {
   SmartMediaSettings,
   VignetteOccurrence,
 } from '../shared/types';
+
+function haveSameModules(current: string[], next: string[]): boolean {
+  return current.length === next.length && current.every((module, index) => module === next[index]);
+}
 
 async function falarSenha(
   texto: string,
@@ -136,10 +146,19 @@ function normalizeAudioVolume(value: unknown): number {
 
 export default function MediaIndoor() {
   const isDedicatedTelao = import.meta.env.VITE_APP_MODE === 'telao';
+  const API_URL = getApiUrl();
   // Session / Pairing state
   const [telaoCode, setTelaoCode] = useState<string | null>(localStorage.getItem('telao_code'));
   const [perfil, setPerfil] = useState<PerfilTelao | null>(null);
+  const parsedCategories = useMemo(() => (
+    perfil?.encarte_categorias
+      ? perfil.encarte_categorias.split(';').map((category: string) => category.trim()).filter(Boolean)
+      : []
+  ), [perfil?.encarte_categorias]);
   const [perfilLoading, setPerfilLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState(false);
+  const [serverAddress, setServerAddress] = useState(localStorage.getItem('server_ip_override') || '');
+  const initFailureCountRef = useRef(0);
 
   const isLowPerformanceMode = 
     localStorage.getItem('telao_low_performance') === '1' || 
@@ -148,6 +167,7 @@ export default function MediaIndoor() {
 
   // Active view state
   const [activeModules, setActiveModules] = useState<string[]>([]);
+  const activeModulesRef = useRef<string[]>([]);
   const [showingEncarte, setShowingEncarte] = useState(false);
   const [encarteRefreshKey, setEncarteRefreshKey] = useState(0);
 
@@ -156,8 +176,11 @@ export default function MediaIndoor() {
   const [ultimaSenha, setUltimaSenha] = useState<RecentCall | null>(null);
   const [showMedia, setShowMedia] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [midias, setMidias] = useState<MediaItem[]>([]);
+  const [midias, setMidias] = useState<MediaItem[]>(() => (
+    readDisplayCache<MediaItem[]>(API_URL, 'midias')?.data || []
+  ));
   const [activeMidiaIndex, setActiveMidiaIndex] = useState(0);
+  const [failedMidiaIds, setFailedMidiaIds] = useState<Set<string | number>>(() => new Set());
   const [config, setConfig] = useState<Partial<EstablishmentConfig>>({});
   const [smartMediaSettings, setSmartMediaSettings] = useState<SmartMediaSettings>({ midia_indoor_ativa: false, midia_indoor_layout: 'lateral' });
   const [pessoasAguardando, setPessoasAguardando] = useState(0);
@@ -166,9 +189,7 @@ export default function MediaIndoor() {
   const [isRepeticao, setIsRepeticao] = useState(false);
   const repeticaoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  const API_URL = getApiUrl();
   const { resolve: resolveAssetUrl, sync: syncAssetCache } = useTelaoAssetCache(API_URL, telaoCode);
-
   const [encarteCache, setEncarteCache] = useState<{
     produtos: ProdutoToledo[];
     categorias: Categoria[];
@@ -176,13 +197,16 @@ export default function MediaIndoor() {
     loading: boolean;
     error: string | null;
     loadedAt: number | null;
-  }>({
-    produtos: [],
-    categorias: [],
-    temaAtivo: null,
-    loading: false,
-    error: null,
-    loadedAt: null,
+  }>(() => {
+    const cached = readDisplayCache<EncarteDisplaySnapshot>(API_URL, 'encarte');
+    return {
+      produtos: cached?.data.produtos || [],
+      categorias: cached?.data.categorias || [],
+      temaAtivo: cached?.data.temaAtivo || null,
+      loading: false,
+      error: null,
+      loadedAt: cached?.savedAt || null,
+    };
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -191,8 +215,13 @@ export default function MediaIndoor() {
   const audioSequenceRef = useRef(0);
   const autoRecoverAttemptsRef = useRef(0);
 
+  useEffect(() => {
+    activeModulesRef.current = activeModules;
+  }, [activeModules]);
+
   const refreshEncarteData = useCallback(async (reason: string) => {
-    if (activeModules.length > 0 && !activeModules.includes('encarte')) {
+    const modules = activeModulesRef.current;
+    if (modules.length > 0 && !modules.includes('encarte')) {
       console.log(`[TELAO] Encarte desativado. Ignorando fetch (${reason}).`);
       return;
     }
@@ -202,6 +231,7 @@ export default function MediaIndoor() {
     }
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
 
     console.log(`[TELAO] Buscando dados do Encarte. Motivo: ${reason}`);
     setEncarteCache(prev => ({ ...prev, loading: true }));
@@ -224,18 +254,34 @@ export default function MediaIndoor() {
 
       if (!isMountedRef.current) return;
 
+      if (!Array.isArray(prodRes) || !Array.isArray(catRes) || prodRes.length === 0) {
+        throw new Error('A origem do encarte retornou uma carga vazia ou inválida.');
+      }
+
+      const snapshot: EncarteDisplaySnapshot = {
+        produtos: prodRes as ProdutoToledo[],
+        categorias: catRes as Categoria[],
+        temaAtivo: temaRes as TemaEncarte | null,
+      };
+
       setEncarteCache({
-        produtos: prodRes,
-        categorias: catRes,
-        temaAtivo: temaRes,
+        ...snapshot,
         loading: false,
         error: null,
         loadedAt: Date.now(),
       });
+      writeDisplayCache(API_URL, 'encarte', snapshot);
       console.log(`[TELAO] Dados do encarte carregados com sucesso: ${prodRes.length} produtos.`);
     } catch (err: unknown) {
       const errorObj = err as Error;
       if (errorObj.name === 'AbortError') {
+        if (abortControllerRef.current === controller && isMountedRef.current) {
+          setEncarteCache(prev => ({
+            ...prev,
+            loading: false,
+            error: 'Não foi possível atualizar o encarte agora.',
+          }));
+        }
         console.log('[TELAO] Fetch do encarte abortado por nova requisição.');
         return;
       }
@@ -246,8 +292,13 @@ export default function MediaIndoor() {
         loading: false,
         error: errorObj.message || 'Erro de rede',
       }));
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
     }
-  }, [API_URL, activeModules]);
+  }, [API_URL]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -255,7 +306,7 @@ export default function MediaIndoor() {
     console.log("MODULO ENCARTES:", modulo_encarte);
     console.log("ENCARTE CACHE:", encarteCache?.produtos?.length);
 
-    if (modulo_encarte && !encarteCache.loading) {
+    if (modulo_encarte && !encarteCache.loading && !encarteCache.error) {
       if (!encarteCache.loadedAt) {
         refreshEncarteData('Módulo encarte ativado no telão');
       } else if (!encarteCache.produtos?.length && autoRecoverAttemptsRef.current < 2) {
@@ -264,7 +315,7 @@ export default function MediaIndoor() {
         refreshEncarteData("webview-auto-recover");
       }
     }
-  }, [activeModules, encarteCache.loadedAt, encarteCache.loading, encarteCache.produtos, refreshEncarteData]);
+  }, [activeModules, encarteCache.loadedAt, encarteCache.loading, encarteCache.error, encarteCache.produtos, refreshEncarteData]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const {
@@ -361,14 +412,20 @@ export default function MediaIndoor() {
   const initTelaoSession = async () => {
     try {
       const res = await fetch(`${API_URL}/api/telao/init`);
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem('telao_code', data.code);
-        setTelaoCode(data.code);
-        setPerfilLoading(false);
-      }
+      if (!res.ok) throw new Error(`Servidor respondeu ${res.status}`);
+      const data = await res.json();
+      initFailureCountRef.current = 0;
+      setConnectionError(false);
+      localStorage.setItem('telao_code', data.code);
+      setTelaoCode(data.code);
+      setPerfilLoading(false);
     } catch (e) {
       console.error('Erro ao inicializar telão:', e);
+      initFailureCountRef.current += 1;
+      if (initFailureCountRef.current >= 2) {
+        setConnectionError(true);
+        setPerfilLoading(false);
+      }
       setTimeout(initTelaoSession, 5000);
     }
   };
@@ -386,7 +443,7 @@ export default function MediaIndoor() {
         if (data.modulo_painel) modules.push('painel');
         if (data.modulo_encarte) modules.push('encarte');
         if (data.modulo_midia) modules.push('midia');
-        setActiveModules(modules);
+        setActiveModules(previous => haveSameModules(previous, modules) ? previous : modules);
         setShowingEncarte(modules.includes('encarte') && !modules.includes('midia'));
       } else if (res.status === 404) {
         // DB got reset or this device got deleted/desvinculado
@@ -429,46 +486,48 @@ export default function MediaIndoor() {
   const fetchMidias = async () => {
     try {
       const res = await fetch(`${API_URL}/api/midias`);
-      if (res.ok) {
-        const data = await res.json();
-        // Filtrar apenas mídias ativas e não expiradas para o Telão
-        const midiasAtivas = Array.isArray(data) 
-          ? (data as MediaItem[]).filter((m) => m.ativo === 1 && m.status === 'ativo')
-          : [];
-        
-        setMidias(prev => {
-          const prevIds = prev.map(m => m.id).join(',');
-          const newIds = midiasAtivas.map((m: MediaItem) => m.id).join(',');
-          
-          // Se a lista mudou, resetar o índice para evitar apontar para mídia inexistente
-          if (prevIds !== newIds) {
-            console.log(`[TELAO] Mídias atualizadas: ${prev.length} → ${midiasAtivas.length}`);
-            setActiveMidiaIndex(idx => {
-              if (midiasAtivas.length === 0) return 0;
-              // Clampa o índice ao novo tamanho
-              return idx >= midiasAtivas.length ? 0 : idx;
-            });
-            
-            // Se não há mais mídias e o encarte está ativo, forçar exibição do encarte
-            if (midiasAtivas.length === 0 && activeModules.includes('encarte')) {
-              setShowingEncarte(true);
-            }
+      if (!res.ok) throw new Error(`Falha ao buscar mídias (${res.status})`);
 
-            // Parar o vídeo atual para não ficar preso com o src antigo
-            if (videoRef.current) {
-              try {
-                videoRef.current.pause();
-                videoRef.current.removeAttribute('src');
-                videoRef.current.load();
-              } catch {
-                // ignore
-              }
+      const data = await res.json();
+      // Filtrar apenas mídias ativas e não expiradas para o Telão.
+      const midiasAtivas = Array.isArray(data)
+        ? (data as MediaItem[]).filter((m) => isMediaAvailableForDisplay(m))
+        : [];
+      writeDisplayCache(API_URL, 'midias', midiasAtivas);
+        
+      setMidias(prev => {
+        const prevIds = prev.map(m => m.id).join(',');
+        const newIds = midiasAtivas.map((m: MediaItem) => m.id).join(',');
+          
+        // Se a lista mudou, resetar o índice para evitar apontar para mídia inexistente
+        if (prevIds !== newIds) {
+          console.log(`[TELAO] Mídias atualizadas: ${prev.length} → ${midiasAtivas.length}`);
+          setFailedMidiaIds(new Set());
+          setActiveMidiaIndex(idx => {
+            if (midiasAtivas.length === 0) return 0;
+            // Clampa o índice ao novo tamanho
+            return idx >= midiasAtivas.length ? 0 : idx;
+          });
+            
+          // Se não há mais mídias e o encarte está ativo, forçar exibição do encarte
+          if (midiasAtivas.length === 0 && activeModules.includes('encarte')) {
+            setShowingEncarte(true);
+          }
+
+          // Parar o vídeo atual para não ficar preso com o src antigo
+          if (videoRef.current) {
+            try {
+              videoRef.current.pause();
+              videoRef.current.removeAttribute('src');
+              videoRef.current.load();
+            } catch {
+              // ignore
             }
           }
-          
-          return midiasAtivas;
-        });
-      }
+        }
+
+        return midiasAtivas;
+      });
     } catch (err) {
       console.error('Erro ao buscar mídias', err);
     }
@@ -551,11 +610,34 @@ export default function MediaIndoor() {
   /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
   useEffect(() => {
     if (sseConnected && telaoCode) {
-      console.log('[TELAO] SSE reconectado. Sincronizando perfil...');
+      console.log('[TELAO] SSE reconectado. Sincronizando perfil e conteúdo...');
       fetchPerfil(telaoCode);
+      fetchConfig();
+      fetchSmartMediaSettings();
+      fetchMidias();
+      refreshEncarteData('SSE reconectado');
+      window.dispatchEvent(new CustomEvent('MEDIA_CAMPAIGN_UPDATED'));
     }
-  }, [sseConnected, telaoCode]);
+  }, [sseConnected, telaoCode, refreshEncarteData]);
   /* eslint-enable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
+
+  // O SSE entrega atualizações imediatas; esta revisão recupera eventos perdidos
+  // durante suspensão da TV, troca de rede ou retomada do WebView.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    if (!telaoCode) return;
+
+    const contentRevalidationTimer = setInterval(() => {
+      fetchPerfil(telaoCode);
+      fetchConfig();
+      fetchSmartMediaSettings();
+      fetchMidias();
+      refreshEncarteData('Revalidação periódica de 60s');
+    }, 60_000);
+
+    return () => clearInterval(contentRevalidationTimer);
+  }, [telaoCode, activeModules, refreshEncarteData]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Watch unified SSE events (pairing events + queue/calling events) via window events
   /* eslint-disable react-hooks/exhaustive-deps */
@@ -744,7 +826,7 @@ export default function MediaIndoor() {
       if (data.modulo_painel) modules.push('painel');
       if (data.modulo_encarte) modules.push('encarte');
       if (data.modulo_midia) modules.push('midia');
-      setActiveModules(modules);
+      setActiveModules(previous => haveSameModules(previous, modules) ? previous : modules);
       setShowingEncarte(modules.includes('encarte') && !modules.includes('midia'));
     };
 
@@ -826,6 +908,16 @@ export default function MediaIndoor() {
     }
   }, [midias.length, activeMidiaIndex, activeModules, showingEncarte, config.toledo_encarte_posicao]);
 
+  const handleNativeMediaError = useCallback((mediaId: string | number, error: unknown) => {
+    console.error('[MEDIA ERROR] Arquivo inválido ou indisponível. Pulando...', error);
+    setFailedMidiaIds(previous => {
+      const next = new Set(previous);
+      next.add(mediaId);
+      return next;
+    });
+    nextMedia();
+  }, [nextMedia]);
+
   const onEncarteComplete = useCallback(() => {
     setShowingEncarte(false);
     if (midias.length > 0) {
@@ -895,6 +987,41 @@ export default function MediaIndoor() {
   }, [telaoSseEvent]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  if (connectionError && !telaoCode) {
+    return (
+      <main className="h-screen w-screen bg-[#041a14] text-white flex items-center justify-center p-[5vw] font-sans">
+        <section className="w-full max-w-3xl text-center">
+          <WifiOff className="h-16 w-16 mx-auto text-amber-300" aria-hidden="true" />
+          <h1 className="mt-8 text-4xl md:text-5xl font-bold tracking-[-0.03em]">Conecte este telão ao servidor</h1>
+          <p className="mt-4 text-xl text-emerald-50/80">Informe o IP do computador onde o ChamaAí está aberto. Exemplo: 192.168.1.50</p>
+          <form
+            className="mt-10 flex flex-col sm:flex-row gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const normalized = serverAddress.trim().replace(/^https?:\/\//, '').replace(/:\d+$/, '');
+              if (normalized) setServerIp(normalized);
+            }}
+          >
+            <label className="sr-only" htmlFor="server-address">IP do servidor</label>
+            <input
+              id="server-address"
+              autoFocus
+              inputMode="decimal"
+              value={serverAddress}
+              onChange={(event) => setServerAddress(event.target.value)}
+              placeholder="192.168.1.50"
+              className="min-h-16 flex-1 rounded-xl bg-white text-slate-950 px-6 text-2xl outline-none focus-visible:ring-4 focus-visible:ring-emerald-300"
+            />
+            <button type="submit" className="min-h-16 rounded-xl bg-emerald-400 px-8 text-xl font-bold text-emerald-950 outline-none focus-visible:ring-4 focus-visible:ring-white active:bg-emerald-300">
+              Conectar
+            </button>
+          </form>
+          <p className="mt-6 text-base text-emerald-50/60">Servidor esperado: porta 3001. O telão tentará reconectar automaticamente.</p>
+        </section>
+      </main>
+    );
+  }
+
   if (perfilLoading) {
     return (
       <div className="h-screen w-screen bg-[#041a14] flex flex-col items-center justify-center text-white font-sans uppercase tracking-[0.2em] text-sm gap-4">
@@ -909,24 +1036,18 @@ export default function MediaIndoor() {
     return <TelaoEspera code={telaoCode || ''} />;
   }
 
-  // Resolve filters for price list categories
-  const parsedCategories = perfil.encarte_categorias
-    ? perfil.encarte_categorias.split(';').map((c: string) => c.trim()).filter(Boolean)
-    : [];
-
-  const activeMidia = midias[activeMidiaIndex];
+  const activeMidiaCandidate = midias[activeMidiaIndex];
+  const activeMidia = activeMidiaCandidate && !failedMidiaIds.has(activeMidiaCandidate.id)
+    ? activeMidiaCandidate
+    : undefined;
   const showingPriceEncarte = activeModules.includes('encarte') && showingEncarte;
   
   const isSmartMediaFull = smartMediaSettings.midia_indoor_ativa && smartMediaSettings.midia_indoor_layout === 'full';
   const shouldShowNativeContent = !isSmartMediaFull;
 
-  // Resolvendo layout com suporte a query params (?template=)
-  const query = new URLSearchParams(window.location.search);
-  const templateParam = query.get('template') || query.get('layout');
-  const validTemplates = ['classic', 'sidebar', 'l-shape'];
-  const layout = (templateParam && validTemplates.includes(templateParam))
-    ? templateParam
-    : (perfil?.template_layout || 'classic');
+  // A composição antiga por dispositivo foi removida. O posicionamento da
+  // mídia agora possui uma única fonte: Configurações > Mídia Indoor.
+  const layout: string = 'classic';
 
   return (
     <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-sans text-ink relative">
@@ -1049,8 +1170,7 @@ export default function MediaIndoor() {
                             }
                           }}
                           onError={(e) => {
-                            console.error('[MEDIA ERROR] Erro na reprodução do vídeo. Pulando...', e);
-                            nextMedia();
+                            handleNativeMediaError(activeMidia.id, e);
                           }}
                           playsInline
                           preload="auto"
@@ -1062,8 +1182,7 @@ export default function MediaIndoor() {
                           alt={activeMidia.nome}
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            console.error('[MEDIA ERROR] Erro ao carregar imagem. Pulando...', e);
-                            nextMedia();
+                            handleNativeMediaError(activeMidia.id, e);
                           }}
                         />
                       )}
@@ -1217,8 +1336,7 @@ export default function MediaIndoor() {
                           }
                         }}
                         onError={(e) => {
-                          console.error('[MEDIA ERROR] Erro na reprodução do vídeo. Pulando...', e);
-                          nextMedia();
+                          handleNativeMediaError(activeMidia.id, e);
                         }}
                         playsInline
                         preload="auto"
@@ -1230,8 +1348,7 @@ export default function MediaIndoor() {
                         alt={activeMidia.nome}
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          console.error('[MEDIA ERROR] Erro ao carregar imagem. Pulando...', e);
-                          nextMedia();
+                          handleNativeMediaError(activeMidia.id, e);
                         }}
                       />
                     )}

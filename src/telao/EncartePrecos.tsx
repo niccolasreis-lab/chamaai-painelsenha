@@ -74,6 +74,11 @@ export default function EncartePrecos({
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());
   const { ref: containerRef, height: containerHeight } = useElementHeight();
+  const categoryFilterKey = (categoriasFiltro || []).map(category => category.trim()).filter(Boolean).join(';');
+  const normalizedCategoriesFilter = useMemo(
+    () => categoryFilterKey ? categoryFilterKey.split(';') : [],
+    [categoryFilterKey],
+  );
 
   const API_URL = getApiUrl();
   const colunas = normalizeColumnCount(config.toledo_encarte_colunas, 3);
@@ -87,8 +92,6 @@ export default function EncartePrecos({
   const temaDinâmico = temaAtivo;
 
   const slides = useMemo(() => {
-    if (loading) return [];
-
     const catMap = new Map<string, Categoria>();
     activeCategories.forEach((c: Categoria) => {
       catMap.set(c.nome.trim().toLowerCase(), c);
@@ -99,10 +102,10 @@ export default function EncartePrecos({
     let filteredData = ocultarEmFalta ? produtos.filter((p: ProdutoToledo) => p.preco > 0) : produtos;
 
     // Apply category filter if provided
-    if (categoriasFiltro && categoriasFiltro.length > 0) {
+    if (normalizedCategoriesFilter.length > 0) {
       filteredData = filteredData.filter((p: ProdutoToledo) => {
         const productCat = (p.categoria || '').trim().toLowerCase();
-        return categoriasFiltro.some(filterCat => {
+        return normalizedCategoriesFilter.some(filterCat => {
           const fCat = filterCat.trim().toLowerCase();
           return productCat === fCat || productCat.includes(fCat) || fCat.includes(productCat);
         });
@@ -147,11 +150,11 @@ export default function EncartePrecos({
       rowsPerColumn,
       maxItemsPerSlide,
     });
-  }, [produtos, activeCategories, config.toledo_ocultar_em_falta, categoriasFiltro, colunas, rowsPerColumn, maxItemsPerSlide, loading]);
+  }, [produtos, activeCategories, config.toledo_ocultar_em_falta, categoryFilterKey, colunas, rowsPerColumn, maxItemsPerSlide]);
 
   useEffect(() => {
     setCurrentSlide(0);
-  }, [slides.length, produtos, categorias, categoriasFiltro, colunas, rowsPerColumn, maxItemsPerSlide]);
+  }, [slides.length, produtos, categorias, categoryFilterKey, colunas, rowsPerColumn, maxItemsPerSlide]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);

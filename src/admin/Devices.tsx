@@ -27,8 +27,7 @@ export default function Devices() {
     modulo_painel: true,
     modulo_encarte: false,
     modulo_midia: false,
-    encarte_categorias: '',
-    template_layout: 'classic'
+    encarte_categorias: ''
   });
 
   const API_URL = getApiUrl();
@@ -98,8 +97,7 @@ export default function Devices() {
       modulo_painel: true,
       modulo_encarte: false,
       modulo_midia: false,
-      encarte_categorias: '',
-      template_layout: 'classic'
+      encarte_categorias: ''
     });
     setIsModalOpen(true);
   };
@@ -112,8 +110,7 @@ export default function Devices() {
       modulo_painel: !!telao.modulo_painel,
       modulo_encarte: !!telao.modulo_encarte,
       modulo_midia: !!telao.modulo_midia,
-      encarte_categorias: telao.encarte_categorias || '',
-      template_layout: telao.template_layout || 'classic'
+      encarte_categorias: telao.encarte_categorias || ''
     });
     setIsModalOpen(true);
   };
@@ -215,9 +212,6 @@ export default function Devices() {
                     {device.modulo_encarte ? <span className="bg-surface-container text-ink px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">Encarte</span> : null}
                     {device.modulo_midia ? <span className="bg-surface-container text-ink px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">Mídia</span> : null}
                   </div>
-                  <div className="text-[10px] text-ink-variant font-bold uppercase tracking-wider mt-2">
-                    Layout: {device.template_layout === 'sidebar' ? 'Mídia + Fila' : device.template_layout === 'l-shape' ? 'Modo L' : 'Clássico'}
-                  </div>
                   {device.modulo_encarte && device.encarte_categorias && (
                     <div className="mt-2 text-xs text-ink-variant font-semibold">
                       Categorias: {device.encarte_categorias}
@@ -281,19 +275,6 @@ export default function Devices() {
               onChange={e => setFormData({...formData, nome: e.target.value})}
               placeholder="Nome do Telão"
             />
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-ink">Layout do telão</label>
-              <select
-                value={formData.template_layout || 'classic'}
-                onChange={e => setFormData({...formData, template_layout: e.target.value})}
-                className="w-full h-11 rounded-sm border border-outline-variant bg-surface text-ink px-sp-4 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="classic">Clássico ( classic )</option>
-                <option value="sidebar">Mídia + Fila Lateral ( sidebar )</option>
-                <option value="l-shape">Modo L ( l-shape )</option>
-              </select>
-            </div>
-
             <div className="space-y-3 pt-4 border-t border-outline-variant/30">
               <label className="block text-xs font-bold text-ink-variant tracking-wider uppercase">Módulos ativos</label>
               

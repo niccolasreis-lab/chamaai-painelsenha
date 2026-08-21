@@ -68,6 +68,12 @@ interface Theme {
   ends_at?: string;
 }
 
+type IndoorLayout = 'lateral' | 'rodape' | 'background' | 'full';
+type IndoorSettings = {
+  midia_indoor_ativa: boolean;
+  midia_indoor_layout: IndoorLayout;
+};
+
 // ─── Type badge colors ────────────────────────────────────────────────────────
 const TYPE_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   image:   { label: 'Imagem',      icon: <ImageIcon className="h-5 w-5" />,   color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
@@ -86,38 +92,59 @@ function useConfirm() {
 // TAB: CONFIGURAÇÕES
 // ═══════════════════════════════════════════════════════════════════════════════
 function TabConfig({ API_URL }: { API_URL: string }) {
-  const [settings, setSettings] = useState({ midia_indoor_ativa: true, midia_indoor_layout: 'lateral' });
+  const [settings, setSettings] = useState<IndoorSettings>({ midia_indoor_ativa: false, midia_indoor_layout: 'lateral' });
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch(`${API_URL}/api/media/settings`)
-      .then(r => r.json())
-      .then(setSettings)
-      .catch(console.error);
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    fetch(`${API_URL}/api/media/settings`, { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error(`Servidor respondeu ${response.status}`);
+        return response.json();
+      })
+      .then(data => setSettings({
+        midia_indoor_ativa: data.midia_indoor_ativa === true,
+        midia_indoor_layout: ['lateral', 'rodape', 'background', 'full'].includes(data.midia_indoor_layout)
+          ? data.midia_indoor_layout
+          : 'lateral',
+      }))
+      .catch(fetchError => {
+        if (fetchError instanceof Error && fetchError.name !== 'AbortError') {
+          console.error(fetchError);
+          setError('Não foi possível carregar a configuração salva. Verifique a conexão e tente novamente.');
+        }
+      })
+      .finally(() => setLoading(false));
+    return () => controller.abort();
   }, [API_URL]);
 
-  const save = async (next: typeof settings) => {
+  const save = async (next: IndoorSettings) => {
     setSaving(true);
+    setError('');
     try {
       const res = await fetch(`${API_URL}/api/media/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(next),
       });
-      if (res.ok) { 
-        setSettings(next); 
-        setToast('Salvo!'); 
-        setTimeout(() => setToast(''), 2000); 
-      }
-    } catch { 
-      setToast('Erro ao salvar'); 
+      if (!res.ok) throw new Error(`Servidor respondeu ${res.status}`);
+      setSettings(next);
+      setToast('Configuração aplicada no telão');
+      setTimeout(() => setToast(''), 2000);
+    } catch (saveError) {
+      console.error(saveError);
+      setError('Não foi possível salvar. A configuração anterior foi mantida.');
     } finally { 
       setSaving(false); 
     }
   };
 
-  const LAYOUTS = [
+  const LAYOUTS: Array<{ id: IndoorLayout; label: string; desc: string; icon: React.ReactNode }> = [
     { id: 'lateral',     label: 'Lateral',     desc: 'Painel lateral direito', icon: <Sidebar className="h-6 w-6" /> },
     { id: 'rodape',      label: 'Rodapé',      desc: 'Barra inferior',         icon: <Layout className="h-6 w-6" /> },
     { id: 'background',  label: 'Background',  desc: 'Plano de fundo',         icon: <ImageIcon className="h-6 w-6" /> },
@@ -127,8 +154,14 @@ function TabConfig({ API_URL }: { API_URL: string }) {
   return (
     <div className="space-y-6">
       {toast && (
-        <div className="fixed top-6 right-6 bg-emerald-600 text-white px-4 py-2.5 rounded-sm font-bold shadow-md z-50 text-xs uppercase tracking-wider">
+        <div role="status" className="fixed top-6 right-6 bg-emerald-700 text-white px-4 py-2.5 rounded-sm font-bold shadow-md z-50 text-xs uppercase tracking-wider">
           {toast}
+        </div>
+      )}
+
+      {error && (
+        <div role="alert" className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+          {error}
         </div>
       )}
 
@@ -138,10 +171,12 @@ function TabConfig({ API_URL }: { API_URL: string }) {
           <p className="text-xs text-ink-variant mt-0.5">Se desativado, o telão exibirá apenas o painel de senhas.</p>
         </div>
         <button
-          disabled={saving}
+          disabled={saving || loading || !!error}
           type="button"
+          aria-label="Ativar ou desativar a Mídia Indoor"
+          aria-pressed={settings.midia_indoor_ativa}
           onClick={() => save({ ...settings, midia_indoor_ativa: !settings.midia_indoor_ativa })}
-          className={`w-12 h-7 flex items-center rounded-full p-1 transition-all duration-200 ${settings.midia_indoor_ativa ? 'bg-primary' : 'bg-outline-variant'}`}
+          className={`w-12 h-7 flex items-center rounded-full p-1 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${settings.midia_indoor_ativa ? 'bg-primary' : 'bg-outline'}`}
         >
           <div className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-200 ${settings.midia_indoor_ativa ? 'translate-x-5' : 'translate-x-0'}`} />
         </button>
@@ -149,15 +184,16 @@ function TabConfig({ API_URL }: { API_URL: string }) {
 
       <div className="p-4 bg-surface-container-low rounded-md border border-outline-variant">
         <h3 className="font-bold text-base text-ink mb-0.5">Layout de Exibição</h3>
-        <p className="text-xs text-ink-variant mb-4">Escolha como a Mídia Indoor aparecerá na tela do Telão.</p>
+        <p className="text-xs text-ink-variant mb-4">Esta é a única configuração de layout do telão. Escolha onde a Mídia Indoor aparecerá.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           {LAYOUTS.map(l => (
             <button
               key={l.id}
               type="button"
-              disabled={saving}
+              disabled={saving || loading || !settings.midia_indoor_ativa || !!error}
+              aria-pressed={settings.midia_indoor_layout === l.id}
               onClick={() => save({ ...settings, midia_indoor_layout: l.id })}
-              className={`flex flex-col items-center gap-2.5 p-4 rounded-md border transition-all ${
+              className={`flex flex-col items-center gap-2.5 p-4 rounded-md border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
                 settings.midia_indoor_layout === l.id
                   ? 'border-primary bg-primary/5 text-primary shadow-sm'
                   : 'border-outline-variant hover:border-primary/50 text-ink-variant hover:bg-surface-container-high'
@@ -229,6 +265,7 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
         const fd = new FormData();
         fd.append('file', uploadFile);
         fd.append('nome', form.title);
+        fd.append('tipo', form.type === 'video' ? 'video' : 'imagem');
         fd.append('duracao', String(form.duration_seconds));
         const up = await fetch(`${API_URL}/api/midias`, { method: 'POST', body: fd });
         if (!up.ok) throw new Error('Falha no upload');

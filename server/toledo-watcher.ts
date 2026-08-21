@@ -20,7 +20,11 @@ import { getDb } from '../electron/services/database';
 import { parseFileContent, ParsedItem } from './file-parsers';
 import { syncProdutos } from './supabase-sync';
 import { getCategoryFromDescription } from './categorizador';
-import { findToledoSourceFile } from './toledo-file-discovery';
+import {
+  findToledoSourceFile,
+  hasToledoSourceChanged,
+  type ToledoSourceFile,
+} from './toledo-file-discovery';
 
 // Broadcast function injected by server to avoid circular dependency
 let broadcastEvent: (event: string, data: any) => void = () => {};
@@ -265,8 +269,7 @@ function processToledoItems(items: ToledoItem[]): number {
 }
 
 // ── Watcher Engine ─────────────────────────────────────────────────────────────
-let lastMtime: number = 0;
-let lastFilePath: string | null = null;
+let lastSource: ToledoSourceFile | null = null;
 let debounceTimer: NodeJS.Timeout | null = null;
 let isProcessing = false;
 let watcherActive = false;
@@ -412,8 +415,7 @@ export function startToledoWatcher() {
   try {
     const source = resolveWatchedSource(paths);
     if (source) {
-      lastMtime = source.mtimeMs;
-      lastFilePath = source.path;
+      lastSource = source;
       console.log(`[TOLEDO] Arquivo ${source.kind} encontrado. Última modificação: ${new Date(source.mtimeMs).toLocaleString('pt-BR')}`);
       processFile(source.path);
     } else {
@@ -428,9 +430,8 @@ export function startToledoWatcher() {
     try {
       const currentPaths = getWatchedPaths(); // Check dynamically in case it changed
       const source = resolveWatchedSource(currentPaths);
-      if (source && (source.path !== lastFilePath || source.mtimeMs > lastMtime)) {
-        lastMtime = source.mtimeMs;
-        lastFilePath = source.path;
+      if (source && hasToledoSourceChanged(lastSource, source)) {
+        lastSource = source;
         console.log(`[TOLEDO] Modificação detectada em ${source.kind}: ${new Date(source.mtimeMs).toLocaleString('pt-BR')}`);
         onFileChanged(source.path);
       }

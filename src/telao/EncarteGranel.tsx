@@ -89,6 +89,11 @@ export default function EncarteGranel({
   const [animKey, setAnimKey] = useState(0);
   const progressRef = useRef<HTMLDivElement>(null);
   const { ref: containerRef, height: containerHeight } = useElementHeight();
+  const categoryFilterKey = (categoriasFiltro || []).map(category => category.trim()).filter(Boolean).join(';');
+  const normalizedCategoriesFilter = useMemo(
+    () => categoryFilterKey ? categoryFilterKey.split(';') : [],
+    [categoryFilterKey],
+  );
 
   const API_URL = getApiUrl();
   const colunas = normalizeColumnCount(config?.toledo_encarte_colunas, 4);
@@ -101,7 +106,6 @@ export default function EncarteGranel({
   const temaDinamico = temaAtivo;
 
   const categorySlides = useMemo(() => {
-    if (loading) return [];
     const activeCats = categorias.filter((c: Categoria) => c.ativo);
     const catMap = new Map<string, Categoria>();
     activeCats.forEach((c: Categoria) => {
@@ -112,10 +116,10 @@ export default function EncarteGranel({
     let filteredData = ocultarEmFalta ? produtos.filter((p: ProdutoToledo) => p.preco > 0) : produtos;
 
     // Apply category filter if provided
-    if (categoriasFiltro && categoriasFiltro.length > 0) {
+    if (normalizedCategoriesFilter.length > 0) {
       filteredData = filteredData.filter((p: ProdutoToledo) => {
         const productCat = (p.categoria || '').trim().toLowerCase();
-        return categoriasFiltro.some(filterCat => {
+        return normalizedCategoriesFilter.some(filterCat => {
           const fCat = filterCat.trim().toLowerCase();
           return productCat === fCat || productCat.includes(fCat) || fCat.includes(productCat);
         });
@@ -156,11 +160,11 @@ export default function EncarteGranel({
     }
 
     return slides;
-  }, [produtos, categorias, config?.toledo_ocultar_em_falta, categoriasFiltro, itemsLimit, loading]);
+  }, [produtos, categorias, config?.toledo_ocultar_em_falta, categoryFilterKey, itemsLimit]);
 
   useEffect(() => {
     setCurrentSlide(0);
-  }, [categorySlides.length, produtos, categorias, categoriasFiltro, colunas, itemsLimit]);
+  }, [categorySlides.length, produtos, categorias, categoryFilterKey, colunas, itemsLimit]);
 
   useEffect(() => {
     if (categorySlides.length === 0) return;

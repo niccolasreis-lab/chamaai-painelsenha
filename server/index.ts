@@ -13,6 +13,8 @@ import { startCloudCheckinCron } from './services/cloud-license.service';
 import { startCloudCommandsCron, stopCloudCommandsCron } from './services/cloud-commands.service';
 import { createSupabaseAnonClient } from './services/supabase-config.service';
 import { migrateDatabaseAndConfigs } from './categorizador';
+import { planMediaFileReconciliation, resolveUploadPath } from './media-files';
+import { isPublicDisplayReadRequest } from './public-display-routes';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -28,7 +30,6 @@ import {
   TTS_DIR,
   UPLOADS_DIR,
   ensureStorageDirectories,
-  resolveManagedAssetPath,
   unlinkManagedAsset,
 } from './storage';
 import { setupTelaoAssetRoutes } from './telao-assets';
@@ -352,14 +353,7 @@ function remoteAuthMiddleware(req: express.Request, res: express.Response, next:
   }
 
   // Ler dados do telão, fila, mídias e chamadas recentes, e criar senha (totem)
-  if (method === 'GET' && (
-    reqPath === '/api/configuracoes' ||
-    reqPath === '/api/midias' ||
-    reqPath === '/api/fila' ||
-    reqPath === '/api/chamadas/recentes' ||
-    reqPath === '/api/telao/init' ||
-    reqPath.startsWith('/api/telao/profile/')
-  )) {
+  if (isPublicDisplayReadRequest(method, reqPath)) {
     return next();
   }
 
@@ -422,18 +416,14 @@ export function startServer() {
       const db = getDb();
       // Only process media that aren't marked as deleted or failed
       const activeMidias = db.prepare("SELECT id, caminho, file_status FROM midias WHERE deleted_at IS NULL AND file_status != 'failed'").all() as any[];
+      const changes = planMediaFileReconciliation(activeMidias, UPLOADS_DIR);
       let missingCount = 0;
-      
-      for (const m of activeMidias) {
-        const filePath = resolveManagedAssetPath(m.caminho);
-        const exists = !!filePath && fs.existsSync(filePath);
-        
-        if (!exists && m.file_status !== 'missing') {
-          db.prepare("UPDATE midias SET file_status = 'missing' WHERE id = ?").run(m.id);
-          missingCount++;
-        } else if (exists && m.file_status === 'missing') {
-          db.prepare("UPDATE midias SET file_status = 'active' WHERE id = ?").run(m.id);
-        }
+      let recoveredCount = 0;
+
+      for (const change of changes) {
+        db.prepare('UPDATE midias SET file_status = ? WHERE id = ?').run(change.status, change.id);
+        if (change.status === 'missing') missingCount++;
+        else recoveredCount++;
       }
       
       // Checking for orphan files in UPLOADS_DIR (that are not in DB)
@@ -451,6 +441,9 @@ export function startServer() {
       
       if (missingCount > 0) {
         console.warn(`[RECONCILE] ${missingCount} mídias marcadas como 'missing' (arquivo não encontrado).`);
+      }
+      if (recoveredCount > 0) {
+        console.log(`[RECONCILE] ${recoveredCount} mídias recuperadas na pasta persistente.`);
       }
     } catch (err) {
       console.error('[RECONCILE] Erro ao reconciliar mídias:', err);
@@ -638,52 +631,6 @@ export function startServer() {
   });
   // -----------------
 
-  // Cron para agendamento de layouts de telão (roda a cada minuto)
-  cron.schedule('* * * * *', () => {
-    try {
-      const db = getDb();
-      // 1. Verificar se o agendamento está ativo
-      const agendamentoAtivo = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'telao_agendamento_ativo'").get() as any;
-      if (!agendamentoAtivo || agendamentoAtivo.valor !== '1') return;
-
-      // 2. Buscar regras do agendamento
-      const agendamentoRegrasRow = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'telao_agendamento_regras'").get() as any;
-      if (!agendamentoRegrasRow || !agendamentoRegrasRow.valor) return;
-
-      let regras: { hora: string; layout: string }[] = [];
-      try {
-        regras = JSON.parse(agendamentoRegrasRow.valor);
-      } catch (parseErr) {
-        console.error('[CRON TELÃO] Erro ao analisar JSON de regras. Desativando agendamento...', parseErr);
-        db.prepare("UPDATE configuracoes SET valor = '0', atualizado_em = datetime('now') WHERE chave = 'telao_agendamento_ativo'").run();
-        broadcastEvent('CONFIG_ATUALIZADA', { telao_agendamento_ativo: '0' });
-        return;
-      }
-
-      if (!Array.isArray(regras) || regras.length === 0) return;
-
-      // 3. Pegar horário local do servidor no formato HH:MM
-      const agora = new Date();
-      const horaStr = String(agora.getHours()).padStart(2, '0') + ':' + String(agora.getMinutes()).padStart(2, '0');
-
-      // 4. Encontrar regra para o horário atual
-      const regraCorrespondente = regras.find(r => r.hora === horaStr);
-      if (regraCorrespondente) {
-        console.log(`[CRON TELÃO] Horário correspondente detectado (${horaStr}). Atualizando layouts para: ${regraCorrespondente.layout}`);
-        
-        // 5. Buscar todos os telões vinculados
-        const teloesVinculados = db.prepare("SELECT code FROM teloes WHERE status = 'vinculado'").all() as any[];
-        
-        for (const device of teloesVinculados) {
-          db.prepare("UPDATE teloes SET template_layout = ? WHERE code = ?").run(regraCorrespondente.layout, device.code);
-          const perfil = db.prepare('SELECT * FROM teloes WHERE code = ?').get(device.code);
-          broadcastToTelao(device.code, 'TELAO_ATUALIZADO', perfil);
-        }
-      }
-    } catch (err) {
-      console.error('[CRON TELÃO] Erro crítico no cron de agendamento de telões:', err);
-    }
-  });
 
   // --- Admin Status Endpoint ---
   app.get('/api/admin/status', (req, res) => {
@@ -1101,13 +1048,13 @@ export function startServer() {
   app.post('/api/telao/vincular', requireMaster, (req, res) => {
     try {
       const db = getDb();
-      const { code, nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias, template_layout } = req.body;
+      const { code, nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias } = req.body;
       const stmt = db.prepare(`
         UPDATE teloes 
-        SET nome = ?, status = 'vinculado', modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = ?, vinculado_em = datetime('now')
+        SET nome = ?, status = 'vinculado', modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = 'classic', vinculado_em = datetime('now')
         WHERE code = ?
       `);
-      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', template_layout || 'classic', code.toUpperCase());
+      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', code.toUpperCase());
       
       const perfil = db.prepare('SELECT * FROM teloes WHERE code = ?').get(code.toUpperCase());
       broadcastToTelao(code.toUpperCase(), 'TELAO_VINCULADO', perfil);
@@ -1121,13 +1068,13 @@ export function startServer() {
     try {
       const db = getDb();
       const code = (req.params.code as string).toUpperCase();
-      const { nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias, template_layout } = req.body;
+      const { nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias } = req.body;
       const stmt = db.prepare(`
         UPDATE teloes 
-        SET nome = ?, modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = ?
+        SET nome = ?, modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = 'classic'
         WHERE code = ?
       `);
-      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', template_layout || 'classic', code);
+      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', code);
       
       const perfil = db.prepare('SELECT * FROM teloes WHERE code = ?').get(code);
       broadcastToTelao(code, 'TELAO_ATUALIZADO', perfil);
@@ -2148,6 +2095,11 @@ export function startServer() {
       const db = getDb();
       const { nome, tipo, ordem } = req.body;
       const caminho = `/uploads/${req.file.filename}`;
+      const storedFilePath = resolveUploadPath(caminho, UPLOADS_DIR);
+
+      if (!storedFilePath || !fs.existsSync(storedFilePath)) {
+        throw new Error('O arquivo enviado não foi confirmado na pasta persistente de mídias.');
+      }
 
       console.log('Inserting media into DB:', { nome, caminho });
 
@@ -2155,6 +2107,10 @@ export function startServer() {
       const result = stmt.run(nome || req.file.originalname, caminho, tipo || (req.file.mimetype.startsWith('video') ? 'video' : 'imagem'), ordem || 0);
 
       reconcileMidias();
+      const persistedMedia = db.prepare('SELECT file_status FROM midias WHERE id = ?').get(result.lastInsertRowid) as { file_status?: string } | undefined;
+      if (persistedMedia?.file_status !== 'active') {
+        throw new Error('A mídia foi cadastrada, mas o arquivo persistente não está disponível.');
+      }
       broadcastEvent('MIDIAS_ATUALIZADAS', { action: 'upload' });
 
       res.status(201).json({ 
@@ -2187,7 +2143,7 @@ export function startServer() {
       const midia = db.prepare('SELECT caminho FROM midias WHERE id = ?').get(id) as any;
       
       if (midia) {
-        const filePath = resolveManagedAssetPath(midia.caminho);
+        const filePath = resolveUploadPath(midia.caminho, UPLOADS_DIR);
         console.log('Deleting managed file:', filePath || '[caminho inválido]');
         try {
           const sharedReference = db.prepare(`
@@ -2197,7 +2153,9 @@ export function startServer() {
               OR EXISTS (SELECT 1 FROM configuracoes WHERE valor = ?)
               OR EXISTS (SELECT 1 FROM vignette_files WHERE local_path = ?)
           `).get(midia.caminho, midia.caminho, midia.caminho, midia.caminho);
-          if (!sharedReference) unlinkManagedAsset(midia.caminho);
+          // A validação de media-files impede traversal e unlinkManagedAsset
+          // centraliza a exclusão no diretório persistente configurado.
+          if (filePath && !sharedReference) unlinkManagedAsset(midia.caminho);
         } catch (fileErr) {
           console.error('Erro ao deletar arquivo físico (pode estar em uso):', fileErr);
           try {
@@ -2905,10 +2863,15 @@ export function startServer() {
       const mapNomes = new Map();
       nomes.forEach(n => mapNomes.set(n.codigo_produto, n.nome_exibicao));
 
-      // 3. Buscar os produtos da tabela unificada (produtos + categorias)
+      // 3. Usar a categoria macro Toledo para manter o mesmo vocabulário
+      // escolhido no perfil do telão. A categoria do catálogo pode ser uma
+      // subcategoria (ex.: "Queijos") e não deve reduzir o encarte selecionado.
       let produtos = db.prepare(`
-        SELECT p.id, p.plu, p.nome as descricao, p.preco, COALESCE(c.nome, p.categoria_legada, 'Outros') as categoria, p.unidade, p.updated_at as atualizado_em
+        SELECT p.id, p.plu, p.nome as descricao, p.preco,
+          COALESCE(t.categoria, p.categoria_legada, c.nome, 'Outros') as categoria,
+          p.unidade, p.updated_at as atualizado_em
         FROM produtos p
+        LEFT JOIN toledo_produtos t ON CAST(t.plu AS TEXT) = CAST(p.plu AS TEXT)
         LEFT JOIN categorias c ON p.categoria_id = c.id
         WHERE p.deleted_at IS NULL AND p.status = 1
         ORDER BY categoria ASC, p.nome ASC

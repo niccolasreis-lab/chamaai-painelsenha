@@ -28,6 +28,32 @@ function cleanupUnreferencedLocalAsset(localPath: unknown): void {
   unlinkManagedAsset(localPath);
 }
 
+const acceptedIndoorLayouts = ['lateral', 'rodape', 'background', 'full'] as const;
+type IndoorLayout = typeof acceptedIndoorLayouts[number];
+
+const readIndoorSettings = (db: ReturnType<typeof getDb>) => {
+  const activeRow = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'midia_indoor_ativa'").get() as { valor: string } | undefined;
+  const layoutRow = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'midia_indoor_layout'").get() as { valor: string } | undefined;
+  const storedLayout = layoutRow?.valor;
+
+  return {
+    midia_indoor_ativa: activeRow?.valor === '1',
+    midia_indoor_layout: acceptedIndoorLayouts.includes(storedLayout as IndoorLayout)
+      ? storedLayout as IndoorLayout
+      : 'lateral' as IndoorLayout,
+  };
+};
+
+const upsertConfig = (db: ReturnType<typeof getDb>, key: string, value: string) => {
+  db.prepare(`
+    INSERT INTO configuracoes (chave, valor, atualizado_em)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(chave) DO UPDATE SET
+      valor = excluded.valor,
+      atualizado_em = excluded.atualizado_em
+  `).run(key, value);
+};
+
 export function setupMediaIndoorRoutes(app: express.Express, broadcastEvent: (event: string, data: any) => void, requireMaster: express.RequestHandler) {
   
   // ==========================================
@@ -37,13 +63,7 @@ export function setupMediaIndoorRoutes(app: express.Express, broadcastEvent: (ev
   app.get('/api/media/settings', (req, res) => {
     try {
       const db = getDb();
-      const ativaRow = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'midia_indoor_ativa'").get() as any;
-      const layoutRow = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'midia_indoor_layout'").get() as any;
-      
-      res.json({
-        midia_indoor_ativa: ativaRow ? ativaRow.valor === '1' : true,
-        midia_indoor_layout: layoutRow ? layoutRow.valor : 'lateral'
-      });
+      res.json(readIndoorSettings(db));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -54,20 +74,29 @@ export function setupMediaIndoorRoutes(app: express.Express, broadcastEvent: (ev
       const db = getDb();
       const { midia_indoor_ativa, midia_indoor_layout } = req.body;
       
-      if (typeof midia_indoor_ativa === 'boolean') {
-        db.prepare("UPDATE configuracoes SET valor = ?, atualizado_em = datetime('now') WHERE chave = 'midia_indoor_ativa'").run(midia_indoor_ativa ? '1' : '0');
+      if (midia_indoor_ativa !== undefined && typeof midia_indoor_ativa !== 'boolean') {
+        return res.status(400).json({ error: 'midia_indoor_ativa deve ser booleano' });
       }
       
-      if (midia_indoor_layout) {
-        const acceptedLayouts = ['lateral', 'rodape', 'background', 'full'];
-        if (!acceptedLayouts.includes(midia_indoor_layout)) {
+      if (midia_indoor_layout !== undefined) {
+        if (typeof midia_indoor_layout !== 'string' || !acceptedIndoorLayouts.includes(midia_indoor_layout as IndoorLayout)) {
           return res.status(400).json({ error: 'Layout inválido. Valores aceitos: lateral, rodape, background, full' });
         }
-        db.prepare("UPDATE configuracoes SET valor = ?, atualizado_em = datetime('now') WHERE chave = 'midia_indoor_layout'").run(midia_indoor_layout);
       }
       
-      broadcastEvent('MEDIA_SETTINGS_UPDATED', { midia_indoor_ativa, midia_indoor_layout });
-      res.json({ success: true });
+      const transaction = db.transaction(() => {
+        if (typeof midia_indoor_ativa === 'boolean') {
+          upsertConfig(db, 'midia_indoor_ativa', midia_indoor_ativa ? '1' : '0');
+        }
+        if (typeof midia_indoor_layout === 'string') {
+          upsertConfig(db, 'midia_indoor_layout', midia_indoor_layout);
+        }
+      });
+      transaction();
+
+      const settings = readIndoorSettings(db);
+      broadcastEvent('MEDIA_SETTINGS_UPDATED', settings);
+      res.json({ success: true, settings });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

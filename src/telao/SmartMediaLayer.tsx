@@ -1,9 +1,10 @@
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Sun, Cloud } from 'lucide-react';
 import { getApiUrl } from '../shared/apiConfig';
 import EncartePrecos from './EncartePrecos';
 import EncarteGranel from './EncarteGranel';
+import { readDisplayCache, writeDisplayCache } from './displayCache';
 import type { ProdutoToledo, Categoria, TemaEncarte, EstablishmentConfig, PerfilTelao, MediaItem } from '../shared/types';
 
 interface SmartMediaLayerProps {
@@ -40,37 +41,62 @@ export default function SmartMediaLayer({
   lowPerformanceMode = false,
   assetUrlResolver = (url) => url || '',
 }: SmartMediaLayerProps) {
-  const [playlist, setPlaylist] = useState<MediaItem[]>([]);
-  const [theme, setTheme] = useState<TemaEncarte | null>(null);
+  const API_URL = getApiUrl();
+  const [playlist, setPlaylist] = useState<MediaItem[]>(() => (
+    readDisplayCache<{ items: MediaItem[]; theme: TemaEncarte | null }>(API_URL, 'smart-playlist')?.data.items || []
+  ));
+  const [theme, setTheme] = useState<TemaEncarte | null>(() => (
+    readDisplayCache<{ items: MediaItem[]; theme: TemaEncarte | null }>(API_URL, 'smart-playlist')?.data.theme || null
+  ));
   const [activeIndex, setActiveIndex] = useState(0);
+  const [failedMediaIds, setFailedMediaIds] = useState<Set<string | number>>(() => new Set());
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [config, setConfig] = useState<Partial<EstablishmentConfig>>({});
   const [perfil, setPerfil] = useState<PerfilTelao | null>(null);
+  const parsedEncarteCategories = useMemo(() => (
+    perfil?.encarte_categorias
+      ? perfil.encarte_categorias.split(';').map((category: string) => category.trim()).filter(Boolean)
+      : []
+  ), [perfil?.encarte_categorias]);
   
   const videoRef = useRef<HTMLVideoElement>(null);
-  const API_URL = getApiUrl();
+
+  const resolveMediaUrl = useCallback((value?: string | null) => {
+    if (!value) return '';
+    const resolved = assetUrlResolver(value);
+    if (/^(https?:|data:|blob:|capacitor:)/i.test(resolved)) return resolved;
+    return `${API_URL}${resolved.startsWith('/') ? resolved : `/${resolved}`}`;
+  }, [API_URL, assetUrlResolver]);
 
   const fetchActivePlaylist = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/api/media/active-playlist`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.active) {
-          let items = (data.items || []) as MediaItem[];
-          // Remove encartes e tabelas se o layout for lateral ou rodape
-          if (layout === 'lateral' || layout === 'rodape') {
-             items = items.filter((item: MediaItem) => item.type !== 'encarte' && item.type !== 'tabela');
-          }
-          setPlaylist(items);
-          setTheme(data.theme);
-        } else {
-          setPlaylist([]);
+      if (!res.ok) throw new Error(`Falha ao buscar playlist (${res.status})`);
+
+      const data = await res.json();
+      if (data.active) {
+        let items = (data.items || []) as MediaItem[];
+        // Remove encartes e tabelas se o layout for lateral ou rodape
+        if (layout === 'lateral' || layout === 'rodape') {
+          items = items.filter((item: MediaItem) => item.type !== 'encarte' && item.type !== 'tabela');
         }
+        const nextTheme = (data.theme || null) as TemaEncarte | null;
+        setPlaylist(items);
+        setTheme(nextTheme);
+        setActiveIndex(0);
+        setFailedMediaIds(new Set());
+        writeDisplayCache(API_URL, 'smart-playlist', { items, theme: nextTheme });
+      } else {
+        setPlaylist([]);
+        setTheme(null);
+        setActiveIndex(0);
+        setFailedMediaIds(new Set());
+        writeDisplayCache(API_URL, 'smart-playlist', { items: [], theme: null });
       }
     } catch (err) {
       console.error('Erro ao buscar playlist inteligente:', err);
     }
-  }, [API_URL]);
+  }, [API_URL, layout]);
 
   const fetchWeather = useCallback(async () => {
     try {
@@ -142,6 +168,7 @@ export default function SmartMediaLayer({
     
     // Atualizar clima a cada 30 min
     const weatherInterval = setInterval(fetchWeather, 30 * 60 * 1000);
+    const playlistInterval = setInterval(fetchActivePlaylist, 60 * 1000);
     
     return () => {
       window.removeEventListener('MEDIA_CAMPAIGN_UPDATED', handleCampaignUpdate);
@@ -150,6 +177,7 @@ export default function SmartMediaLayer({
       window.removeEventListener('CONFIG_ATUALIZADA', handleConfigUpdate);
       window.removeEventListener('TELAO_ATUALIZADO', handlePerfilUpdate);
       clearInterval(weatherInterval);
+      clearInterval(playlistInterval);
     };
   }, [fetchActivePlaylist, fetchWeather, fetchConfig, fetchPerfil]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -160,6 +188,14 @@ export default function SmartMediaLayer({
     }
     if (onNext) onNext();
   }, [playlist.length, onNext]);
+
+  const markMediaFailed = useCallback((mediaId: string | number) => {
+    setFailedMediaIds(previous => {
+      const next = new Set(previous);
+      next.add(mediaId);
+      return next;
+    });
+  }, []);
 
   // Log de diagnóstico temporário para confirmar playlist ativa no telão
   useEffect(() => {
@@ -180,45 +216,74 @@ export default function SmartMediaLayer({
     const current = playlist[activeIndex];
     if (!current) return;
 
-    if (current.type === 'image' || current.type === 'imagem' || current.type === 'weather') {
-      const duration = (current.duration_seconds || 15) * 1000;
-      const timer = setTimeout(handleNext, duration);
-      return () => clearTimeout(timer);
-    } else if (current.type === 'youtube') {
-      const duration = (current.duration_seconds || 60) * 1000;
-      const timer = setTimeout(handleNext, duration);
-      return () => clearTimeout(timer);
-    }
-    // video delegates to onEnded
-  }, [activeIndex, playlist, handleNext]);
+    const type = current.type || current.tipo;
+    const hasRequiredSource = (
+      (type === 'video' || type === 'image' || type === 'imagem')
+        ? Boolean(current.local_path || current.caminho)
+        : (type === 'youtube' || type === 'url')
+          ? Boolean(current.source_url)
+          : ['weather', 'tabela', 'encarte'].includes(String(type))
+    );
+    const failed = failedMediaIds.has(current.id);
+
+    // Vídeos válidos avançam pelo evento onEnded.
+    if (type === 'video' && hasRequiredSource && !failed) return;
+
+    const durationSeconds = failed || !hasRequiredSource
+      ? 2
+      : (current.duration_seconds || 15);
+    const duration = durationSeconds * 1000;
+    const timer = setTimeout(handleNext, duration);
+    return () => clearTimeout(timer);
+  }, [activeIndex, playlist, handleNext, failedMediaIds]);
 
   useEffect(() => {
-    if (playlist[activeIndex]?.type === 'video' && videoRef.current) {
+    if (
+      playlist[activeIndex]?.type === 'video'
+      && !failedMediaIds.has(playlist[activeIndex].id)
+      && videoRef.current
+    ) {
       // Se não estiver em chamada, ou se o layout não for full, continua tocando
       videoRef.current.play().catch(e => console.warn('Autoplay bloqueado:', e));
     }
-  }, [activeIndex, playlist, isCalling, layout]);
+  }, [activeIndex, playlist, isCalling, layout, failedMediaIds]);
 
   if (playlist.length === 0) {
     return null;
   }
 
   const currentMedia = playlist[activeIndex];
+
+  const renderFallback = () => (
+    <div className="h-full w-full bg-[#041a14] text-white flex flex-col items-center justify-center gap-5 p-8 text-center">
+      {config.logo_cliente ? (
+        <img
+          src={`${API_URL}${config.logo_cliente}`}
+          className="max-h-32 max-w-[40%] object-contain"
+          alt=""
+        />
+      ) : null}
+      <span className="text-xl font-semibold tracking-wide">
+        {config.nome_estabelecimento || 'ChamaAí'}
+      </span>
+    </div>
+  );
   
   // Render based on media type
   const renderMedia = () => {
     if (!currentMedia) return null;
+    if (failedMediaIds.has(currentMedia.id)) return renderFallback();
     
     if (currentMedia.type === 'video') {
       return (
         <video 
           ref={videoRef}
-          src={assetUrlResolver(currentMedia.local_path)}
+          src={resolveMediaUrl(currentMedia.local_path)}
           className="w-full h-full object-cover"
           autoPlay
           muted
           onEnded={handleNext}
-          onError={handleNext}
+          onError={() => markMediaFailed(currentMedia.id)}
           playsInline
         />
       );
@@ -227,19 +292,15 @@ export default function SmartMediaLayer({
     if (currentMedia.type === 'image' || currentMedia.type === 'imagem') {
       return (
         <img 
-          src={assetUrlResolver(currentMedia.local_path)}
+          src={resolveMediaUrl(currentMedia.local_path)}
           alt={currentMedia.title}
           className="w-full h-full object-cover"
-          onError={handleNext}
+          onError={() => markMediaFailed(currentMedia.id)}
         />
       );
     }
 
     if (currentMedia.type === 'tabela' || currentMedia.type === 'encarte') {
-      const parsedCategories = perfil?.encarte_categorias
-        ? perfil.encarte_categorias.split(';').map((c: string) => c.trim()).filter(Boolean)
-        : [];
-      
       const EncarteComponent = config.toledo_encarte_estilo === 'granel' ? EncarteGranel : EncartePrecos;
 
       return (
@@ -248,7 +309,7 @@ export default function SmartMediaLayer({
           itensPorSlide={parseInt(String(config.toledo_itens_por_slide ?? '12'), 10)}
           onComplete={handleNext}
           config={config}
-          categoriasFiltro={parsedCategories}
+          categoriasFiltro={parsedEncarteCategories}
           produtos={encarteProdutos}
           categorias={encarteCategorias}
           temaAtivo={encarteTemaAtivo}
@@ -268,7 +329,7 @@ export default function SmartMediaLayer({
       };
       const videoId = currentMedia.source_url ? extractVideoID(currentMedia.source_url) : null;
       
-      if (!videoId) return <div className="text-white flex h-full items-center justify-center">URL do YouTube Inválida</div>;
+      if (!videoId) return renderFallback();
 
       return (
         <iframe
@@ -279,6 +340,18 @@ export default function SmartMediaLayer({
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
         ></iframe>
+      );
+    }
+
+    if (currentMedia.type === 'url' && currentMedia.source_url) {
+      return (
+        <iframe
+          className="w-full h-full border-0 bg-black"
+          src={currentMedia.source_url}
+          title={currentMedia.title || 'Conteúdo web'}
+          sandbox="allow-forms allow-presentation allow-same-origin allow-scripts"
+          referrerPolicy="no-referrer"
+        />
       );
     }
 
@@ -297,7 +370,7 @@ export default function SmartMediaLayer({
       );
     }
 
-    return null;
+    return renderFallback();
   };
 
   // Resolve styles based on layout
