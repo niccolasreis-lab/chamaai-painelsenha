@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   resolveTelaoAssetUrl,
+  quarantineTelaoAsset,
   syncTelaoAssetCache,
   type TelaoCacheStats,
 } from './telaoAssetCache';
@@ -22,6 +23,8 @@ export function useTelaoAssetCache(apiUrl: string, code: string | null) {
   }, [apiUrl, code]);
 
   useEffect(() => {
+    // A atualização de estado ocorre somente após a sincronização assíncrona do manifesto.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void sync();
   }, [sync]);
 
@@ -29,5 +32,18 @@ export function useTelaoAssetCache(apiUrl: string, code: string | null) {
     resolveTelaoAssetUrl(apiUrl, url, resolved)
   ), [apiUrl, resolved]);
 
-  return { resolve, stats, sync };
+  const evict = useCallback(async (url?: string | null) => {
+    if (!url) return;
+    try {
+      await quarantineTelaoAsset(apiUrl, url);
+    } finally {
+      setResolved(previous => {
+        const next = { ...previous };
+        delete next[url];
+        return next;
+      });
+    }
+  }, [apiUrl]);
+
+  return { resolve, evict, stats, sync };
 }

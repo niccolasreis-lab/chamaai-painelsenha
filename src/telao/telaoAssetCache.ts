@@ -30,11 +30,63 @@ type NativeSyncResult = TelaoCacheStats & { resolved: Record<string, string> };
 type NativeTelaoCache = {
   clearLegacy(): Promise<void>;
   sync(options: { baseUrl: string; manifest: TelaoAssetManifest }): Promise<NativeSyncResult>;
+  evict(options: { sha256: string }): Promise<void>;
 };
 
 const NativeCache = registerPlugin<NativeTelaoCache>('TelaoCache');
 const CACHE_NAME = 'chamaai-telao-assets-v1';
 const LEGACY_MIGRATION_KEY = 'telao_cache_migration_v1';
+const lastManifestByApi = new Map<string, TelaoAssetManifest>();
+const quarantinedUrlsByApi = new Map<string, Set<string>>();
+
+function quarantineStorageKey(apiUrl: string): string {
+  return `chamaai:telao:quarantine:${encodeURIComponent(apiUrl)}`;
+}
+
+function readPersistedQuarantine(apiUrl: string, revision: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(quarantineStorageKey(apiUrl));
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as { revision?: unknown; urls?: unknown };
+    if (parsed.revision !== revision || !Array.isArray(parsed.urls)) return new Set();
+    return new Set(parsed.urls.filter((url): url is string => typeof url === 'string'));
+  } catch {
+    return new Set();
+  }
+}
+
+function persistQuarantine(apiUrl: string, revision: string, urls: ReadonlySet<string>): void {
+  try {
+    localStorage.setItem(quarantineStorageKey(apiUrl), JSON.stringify({
+      revision,
+      urls: [...urls],
+    }));
+  } catch {
+    // A remoção em memória e no cache continua válida sem localStorage.
+  }
+}
+
+function clearPersistedQuarantine(apiUrl: string): void {
+  try {
+    if (typeof localStorage.removeItem === 'function') {
+      localStorage.removeItem(quarantineStorageKey(apiUrl));
+    } else {
+      localStorage.setItem(quarantineStorageKey(apiUrl), '');
+    }
+  } catch {
+    // O mapa em memória ainda é invalidado pela revisão do manifesto.
+  }
+}
+
+export function excludeQuarantinedAssets(
+  manifest: TelaoAssetManifest,
+  quarantinedUrls: ReadonlySet<string>,
+): TelaoAssetManifest {
+  return {
+    ...manifest,
+    assets: manifest.assets.filter((asset) => !quarantinedUrls.has(asset.url)),
+  };
+}
 
 function absoluteAssetUrl(apiUrl: string, publicUrl: string): string {
   return new URL(publicUrl, apiUrl || window.location.origin).toString();
@@ -131,6 +183,41 @@ async function syncBrowserCache(
   };
 }
 
+async function evictBrowserAsset(apiUrl: string, publicUrl: string): Promise<void> {
+  if (!('caches' in window)) return;
+  const targetPath = new URL(absoluteAssetUrl(apiUrl, publicUrl)).pathname;
+  const cache = await caches.open(CACHE_NAME);
+  for (const request of await cache.keys()) {
+    if (new URL(request.url).pathname === targetPath) await cache.delete(request);
+  }
+}
+
+/** Quarantines only the current manifest revision; server data is never mutated. */
+export async function quarantineTelaoAsset(apiUrl: string, publicUrl: string): Promise<void> {
+  if (!publicUrl) return;
+  const quarantined = quarantinedUrlsByApi.get(apiUrl) || new Set<string>();
+  quarantined.add(publicUrl);
+  quarantinedUrlsByApi.set(apiUrl, quarantined);
+
+  const currentManifest = lastManifestByApi.get(apiUrl);
+  const asset = currentManifest?.assets.find((item) => item.url === publicUrl);
+  if (currentManifest) persistQuarantine(apiUrl, currentManifest.revision, quarantined);
+  const failures: string[] = [];
+  try {
+    await evictBrowserAsset(apiUrl, publicUrl);
+  } catch (error) {
+    failures.push(`Cache Storage: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (Capacitor.isNativePlatform() && asset) {
+    try {
+      await NativeCache.evict({ sha256: asset.sha256 });
+    } catch (error) {
+      failures.push(`cache nativo: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  if (failures.length > 0) throw new Error(failures.join('; '));
+}
+
 export async function syncTelaoAssetCache(
   apiUrl: string,
   code: string,
@@ -138,6 +225,16 @@ export async function syncTelaoAssetCache(
   const response = await fetch(`${apiUrl}/api/telao/assets/${encodeURIComponent(code)}`, { cache: 'no-store' });
   if (!response.ok) throw new Error(`Manifesto de assets indisponível (HTTP ${response.status}).`);
   const manifest = await response.json() as TelaoAssetManifest;
+  const previousManifest = lastManifestByApi.get(apiUrl);
+  if (previousManifest?.revision !== manifest.revision) {
+    quarantinedUrlsByApi.delete(apiUrl);
+    clearPersistedQuarantine(apiUrl);
+  }
+  lastManifestByApi.set(apiUrl, manifest);
+  const quarantined = quarantinedUrlsByApi.get(apiUrl)
+    || readPersistedQuarantine(apiUrl, manifest.revision);
+  quarantinedUrlsByApi.set(apiUrl, quarantined);
+  const effectiveManifest = excludeQuarantinedAssets(manifest, quarantined);
 
   let result: NativeSyncResult;
   if (Capacitor.isNativePlatform()) {
@@ -151,13 +248,13 @@ export async function syncTelaoAssetCache(
       await NativeCache.clearLegacy();
       localStorage.setItem(LEGACY_MIGRATION_KEY, '1');
     }
-    result = await NativeCache.sync({ baseUrl: apiUrl, manifest });
+    result = await NativeCache.sync({ baseUrl: apiUrl, manifest: effectiveManifest });
     result.resolved = Object.fromEntries(Object.entries(result.resolved || {}).map(([url, fileUri]) => (
       [url, Capacitor.convertFileSrc(fileUri)]
     )));
   } else {
     await clearLegacyBrowserCaches();
-    result = await syncBrowserCache(apiUrl, manifest);
+    result = await syncBrowserCache(apiUrl, effectiveManifest);
   }
 
   return { manifest, stats: result, resolved: result.resolved };

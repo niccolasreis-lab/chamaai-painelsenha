@@ -105,6 +105,8 @@ Admin remoto ───────┘                                  │
 | TEL-08 | Interromper vinheta ao iniciar chamada e nunca misturá-la com TTS. | Implementado e testado |
 | TEL-09 | Exibir logo, espera, ticker, clima, encarte e mídia conforme perfil. | Implementado |
 | TEL-10 | Expor diagnóstico local do cache. | Implementado |
+| TEL-11 | Permitir `classic`, `sidebar` e `l-shape` por device, persistidos no servidor e aplicados no navegador e APK. | Implementado e testado |
+| TEL-12 | Conter cada layout em `100dvw` × `100dvh`, com painéis, header, histórico e rodapé dimensionados pela largura e altura disponíveis. | Implementado e testado |
 
 ### 5.4 TTS estrito
 
@@ -141,9 +143,20 @@ Admin remoto ───────┘                                  │
 | MID-01 | Gerenciar mídia clássica, ordem, ativação, expiração e arquivo. | Implementado |
 | MID-02 | Gerenciar itens inteligentes, campanhas, temas, prioridade e agenda. | Implementado |
 | MID-03 | Gerenciar pastas, arquivos e horários de vinhetas. | Implementado e testado parcialmente |
+| MID-04 | Exibir vídeos sem deformação ou overflow, usando `object-contain`, limites do contêiner e fundo neutro. | Implementado e testado |
+| MID-05 | Avançar ao terminar, falhar ou permanecer sem progresso; ao fim da playlist, retornar ao primeiro item reproduzível. | Implementado e testado |
+| MID-06 | Aplicar loop nativo somente quando houver um único conteúdo reproduzível e nenhum encarte intercalado. | Implementado e testado |
+| MID-07 | Não reiniciar vídeo em reprodução quando o polling receber uma playlist semanticamente idêntica. | Implementado e testado |
+| MID-08 | Remover imediatamente da rotação e do cache local a revisão de vídeo que falhar ou travar, avançando ao próximo item válido. | Implementado e testado |
+| MID-09 | Manter a quarentena durante a mesma revisão do manifesto e liberar nova tentativa somente quando o servidor publicar uma revisão diferente. | Implementado e testado |
+| MID-10 | Ao excluir mídia no servidor, removê-la da playlist e do manifesto e reconciliar os caches browser e Android na sincronização seguinte. | Implementado e testado |
+| MID-11 | Excluir o arquivo físico somente quando não houver referência ativa em mídia clássica, inteligente, configurações ou vinhetas. | Implementado e testado |
 | ENC-01 | Importar produtos/preços de arquivos suportados pelo watcher Toledo. | Implementado |
 | ENC-02 | Permitir categorias, filtros, nomes, ordem e temas. | Implementado |
 | ENC-03 | Paginar encarte conforme capacidade visual. | Implementado e testado |
+| ENC-04 | Verificar a fonte Toledo a cada 5 s, consolidar eventos por debounce e reprocessar uma alteração que ocorra durante uma importação. | Implementado e testado |
+| ENC-05 | Atualizar servidor e catálogo quando preço, descrição, categoria ou unidade mudar; não publicar evento quando o conteúdo material permanecer igual. | Implementado e testado |
+| ENC-06 | Propagar mudança por SSE e manter recuperação por polling de 60 s no telão, sem reiniciar slides quando o snapshot for idêntico. | Implementado e testado |
 
 ### 5.7 Admin e onboarding
 
@@ -226,6 +239,8 @@ Entidades principais: `usuarios`, `operadores`, `sessoes_operador`, `balcoes`, `
 - Falha cloud não deve impedir emissão, chamada, SSE local ou impressão local.
 - Download interrompido ou inválido não pode substituir cache válido.
 - Revisões inativas devem ser removidas após reconciliação.
+- Mídia quebrada deve ser colocada em quarentena local por revisão, sem apagar automaticamente o arquivo mestre por uma falha isolada de rede ou codec.
+- Exclusão administrativa deve propagar à playlist, manifesto e caches sem deixar arquivo físico ainda referenciado.
 - Backup, restore, recovery e safe mode devem permanecer operacionais.
 
 ### Desempenho
@@ -261,6 +276,11 @@ Entidades principais: `usuarios`, `operadores`, `sessoes_operador`, `balcoes`, `
 - vinhetas e agendamento;
 - paginação do encarte e descoberta Toledo;
 - regressões responsivas do destaque da senha;
+- responsividade dos layouts `classic`, `sidebar` e `l-shape`;
+- enquadramento de vídeo 16:9, 4:3, 9:16 e 21:9 em 720p, 768p, 1080p e 4K;
+- avanço circular, retorno ao primeiro item, skip de falhas e recuperação de vídeo travado;
+- quarentena e remoção de cache de vídeo quebrado, reconciliação de exclusões e proteção de referências compartilhadas;
+- detecção periódica Toledo, persistência de mudanças materiais, SSE, refetch e polling de recuperação;
 - TypeScript, build web, Capacitor e Gradle.
 
 O MCP TestSprite está configurado no ambiente de desenvolvimento para ampliar E2E, mas sua configuração não constitui evidência de testes já executados.
@@ -268,7 +288,8 @@ O MCP TestSprite está configurado no ambiente de desenvolvimento para ampliar E
 ### Homologação obrigatória
 
 - [x] TypeScript compila.
-- [x] Testes focais responsivos: 3/3.
+- [x] Testes focais de senha, layouts, playlist e enquadramento: 22/22.
+- [x] Testes focais de atualização de preços e ciclo de exclusão/quarentena de mídia: 25/25.
 - [x] Testes focais TTS/storage: 17/17.
 - [x] Build web dedicado conclui.
 - [x] APK de homologação compila e passa na assinatura v2.
@@ -276,7 +297,7 @@ O MCP TestSprite está configurado no ambiente de desenvolvimento para ampliar E
 - [ ] Validar badge de repetição, nome longo, guichê oculto/visível e todos os templates.
 - [ ] Executar soak mínimo de 48 horas nos dois runtimes.
 - [ ] Registrar disco, memória, áudio, suspensão, boot e recuperação antes/depois.
-- [ ] Restaurar dois testes bloqueados pelos arquivos ausentes do submódulo `chamacliente`.
+- [x] Inicializar o submódulo `chamacliente` e executar seus testes integrados.
 - [ ] Executar isolamento cloud/multitenant em staging.
 
 ## 10. Riscos abertos
@@ -284,9 +305,7 @@ O MCP TestSprite está configurado no ambiente de desenvolvimento para ampliar E
 | Risco | Prioridade | Tratamento |
 |---|---|---|
 | Soak e devices físicos ainda não executados | P0 | Homologar antes de produção |
-| Dois testes dependem de arquivos ausentes do submódulo | P0 | Restaurar submódulo e repetir suíte |
 | Auditoria NPM de produção contém achados críticos/altos | P0 | Atualizar com análise e regressão; não aplicar `--force` cegamente |
-| Linhagem Git 1.0.163–1.0.166 divergiu do `main` | P0 | Reconciliar históricos antes da 1.0.167 |
 | AGP 8.2.1 emite aviso com compileSdk 35 | P1 | Atualizar AGP/Gradle em ciclo controlado |
 | `server/index.ts` monolítico | P1 | Extrair rotas/services com testes de contrato |
 | Cache PWA limitado em contexto HTTP inseguro | P1 | Streaming já evita crescimento; HTTPS para offline confiável |

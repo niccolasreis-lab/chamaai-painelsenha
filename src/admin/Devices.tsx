@@ -27,7 +27,8 @@ export default function Devices() {
     modulo_painel: true,
     modulo_encarte: false,
     modulo_midia: false,
-    encarte_categorias: ''
+    encarte_categorias: '',
+    template_layout: 'classic' as 'classic' | 'sidebar' | 'l-shape'
   });
 
   const API_URL = getApiUrl();
@@ -97,7 +98,8 @@ export default function Devices() {
       modulo_painel: true,
       modulo_encarte: false,
       modulo_midia: false,
-      encarte_categorias: ''
+      encarte_categorias: '',
+      template_layout: 'classic'
     });
     setIsModalOpen(true);
   };
@@ -110,7 +112,10 @@ export default function Devices() {
       modulo_painel: !!telao.modulo_painel,
       modulo_encarte: !!telao.modulo_encarte,
       modulo_midia: !!telao.modulo_midia,
-      encarte_categorias: telao.encarte_categorias || ''
+      encarte_categorias: telao.encarte_categorias || '',
+      template_layout: ['classic', 'sidebar', 'l-shape'].includes(telao.template_layout)
+        ? telao.template_layout
+        : 'classic'
     });
     setIsModalOpen(true);
   };
@@ -212,6 +217,9 @@ export default function Devices() {
                     {device.modulo_encarte ? <span className="bg-surface-container text-ink px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">Encarte</span> : null}
                     {device.modulo_midia ? <span className="bg-surface-container text-ink px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">Mídia</span> : null}
                   </div>
+                  <div className="mt-2 text-xs text-ink-variant font-semibold">
+                    Layout: {device.template_layout === 'sidebar' ? 'Painel lateral' : device.template_layout === 'l-shape' ? 'Formato L' : 'Clássico'}
+                  </div>
                   {device.modulo_encarte && device.encarte_categorias && (
                     <div className="mt-2 text-xs text-ink-variant font-semibold">
                       Categorias: {device.encarte_categorias}
@@ -275,6 +283,27 @@ export default function Devices() {
               onChange={e => setFormData({...formData, nome: e.target.value})}
               placeholder="Nome do Telão"
             />
+            <div>
+              <label htmlFor="template-layout" className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-ink-variant">
+                Layout do telão
+              </label>
+              <select
+                id="template-layout"
+                value={formData.template_layout}
+                onChange={event => setFormData({
+                  ...formData,
+                  template_layout: event.target.value as 'classic' | 'sidebar' | 'l-shape',
+                })}
+                className="min-h-11 w-full rounded-md border border-outline-variant bg-surface px-3 text-sm font-semibold text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="classic">Clássico — mídia em tela ampla</option>
+                <option value="sidebar">Painel lateral — histórico ao lado</option>
+                <option value="l-shape">Formato L — chamada e histórico compactos</option>
+              </select>
+              <p className="mt-1.5 text-xs leading-relaxed text-ink-variant">
+                O layout é aplicado no navegador e no APK Android TV vinculados a este código.
+              </p>
+            </div>
             <div className="space-y-3 pt-4 border-t border-outline-variant/30">
               <label className="block text-xs font-bold text-ink-variant tracking-wider uppercase">Módulos ativos</label>
               

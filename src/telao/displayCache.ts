@@ -19,6 +19,49 @@ export type MediaDisplaySnapshot = {
   theme?: unknown;
 };
 
+function samePrimitiveRecord(
+  left: Record<string, unknown>,
+  right: Record<string, unknown>,
+  keys: readonly string[],
+): boolean {
+  return keys.every((key) => left[key] === right[key]);
+}
+
+function sameOrderedRecords<T extends object>(
+  left: readonly T[],
+  right: readonly T[],
+  keys: readonly string[],
+): boolean {
+  return left.length === right.length && left.every((item, index) => (
+    samePrimitiveRecord(
+      item as Record<string, unknown>,
+      right[index] as Record<string, unknown>,
+      keys,
+    )
+  ));
+}
+
+/**
+ * Prevents polling responses with identical data from replacing array
+ * references and consequently restarting the currently visible price slide.
+ */
+export function haveSameEncarteSnapshot(
+  current: EncarteDisplaySnapshot,
+  incoming: EncarteDisplaySnapshot,
+): boolean {
+  const sameProducts = sameOrderedRecords(current.produtos, incoming.produtos, [
+    'id', 'plu', 'codigo', 'descricao', 'nome', 'preco', 'categoria', 'unidade',
+  ]);
+  if (!sameProducts) return false;
+
+  const sameCategories = sameOrderedRecords(current.categorias, incoming.categorias, [
+    'id', 'nome', 'emoji', 'slug', 'ativo', 'ordem', 'descricao',
+  ]);
+  if (!sameCategories) return false;
+
+  return JSON.stringify(current.temaAtivo) === JSON.stringify(incoming.temaAtivo);
+}
+
 function getCacheKey(apiUrl: string, namespace: string): string {
   return `chamaai:telao:${encodeURIComponent(apiUrl)}:${namespace}`;
 }

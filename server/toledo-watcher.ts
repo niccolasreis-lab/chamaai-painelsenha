@@ -25,6 +25,7 @@ import {
   hasToledoSourceChanged,
   type ToledoSourceFile,
 } from './toledo-file-discovery';
+import { hasToledoItemChanged, shouldPublishToledoUpdate } from './toledo-update-policy';
 
 // Broadcast function injected by server to avoid circular dependency
 let broadcastEvent: (event: string, data: any) => void = () => {};
@@ -197,20 +198,10 @@ function processToledoItems(items: ToledoItem[]): number {
   const db = getDb();
   let updatedCount = 0;
 
-  const insertOrUpdate = db.prepare(`
-    INSERT INTO toledo_produtos (plu, descricao, preco, categoria, unidade, atualizado_em)
-    VALUES (?, ?, ?, ?, 'kg', datetime('now', 'localtime'))
-    ON CONFLICT(plu) DO UPDATE SET
-      preco = excluded.preco,
-      categoria = excluded.categoria,
-      atualizado_em = datetime('now', 'localtime')
-    WHERE toledo_produtos.preco != excluded.preco
-  `);
-
   // For new products, we need a separate insert to also set the descricao
   const insertNew = db.prepare(`
     INSERT OR IGNORE INTO toledo_produtos (plu, descricao, preco, categoria, unidade, atualizado_em)
-    VALUES (?, ?, ?, ?, 'kg', datetime('now', 'localtime'))
+    VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))
   `);
 
   // Check which products are new vs existing
@@ -225,20 +216,16 @@ function processToledoItems(items: ToledoItem[]): number {
 
       if (!existing) {
         // New product — insert with description
-        insertNew.run(item.plu, item.descricao, item.preco, item.categoria);
+        insertNew.run(item.plu, item.descricao, item.preco, item.categoria, item.unidade || 'kg');
         syncToCatalogoProduto(db, item);
         updatedCount++;
-      } else if (
-        existing.preco !== item.preco || 
-        existing.categoria !== item.categoria || 
-        existing.descricao !== item.descricao
-      ) {
+      } else if (hasToledoItemChanged(existing, item)) {
         // Existing product — update if price, description OR category changed
         db.prepare(`
           UPDATE toledo_produtos 
-          SET preco = ?, descricao = ?, categoria = ?, atualizado_em = datetime('now', 'localtime') 
+          SET preco = ?, descricao = ?, categoria = ?, unidade = ?, atualizado_em = datetime('now', 'localtime')
           WHERE plu = ?
-        `).run(item.preco, item.descricao, item.categoria, item.plu);
+        `).run(item.preco, item.descricao, item.categoria, item.unidade || 'kg', item.plu);
         syncToCatalogoProduto(db, item);
         updatedCount++;
       }
@@ -272,6 +259,7 @@ function processToledoItems(items: ToledoItem[]): number {
 let lastSource: ToledoSourceFile | null = null;
 let debounceTimer: NodeJS.Timeout | null = null;
 let isProcessing = false;
+let pendingFilePath: string | null = null;
 let watcherActive = false;
  
 async function waitForFileToStabilize(filePath: string): Promise<boolean> {
@@ -294,7 +282,8 @@ async function waitForFileToStabilize(filePath: string): Promise<boolean> {
  
 async function processFile(filePath: string) {
   if (isProcessing) {
-    console.log('[TOLEDO] Processamento já em andamento, ignorando...');
+    pendingFilePath = filePath;
+    console.log('[TOLEDO] Processamento já em andamento; revisão mais recente enfileirada.');
     return;
   }
 
@@ -352,7 +341,7 @@ async function processFile(filePath: string) {
     }
 
     // Broadcast update event so the Telão refreshes the encarte
-    if (updatedCount > 0) {
+    if (shouldPublishToledoUpdate(updatedCount)) {
       broadcastEvent('TOLEDO_PRECOS_ATUALIZADOS', {
         total: items.length,
         atualizados: updatedCount,
@@ -381,6 +370,11 @@ async function processFile(filePath: string) {
     }
   } finally {
     isProcessing = false;
+    if (pendingFilePath) {
+      const nextFilePath = pendingFilePath;
+      pendingFilePath = null;
+      setTimeout(() => void processFile(nextFilePath), 0);
+    }
   }
 }
 
@@ -449,6 +443,7 @@ export function startToledoWatcher() {
   return () => {
     clearInterval(pollTimer);
     if (debounceTimer) clearTimeout(debounceTimer);
+    pendingFilePath = null;
     watcherActive = false;
     console.log('[TOLEDO] Watcher desativado.');
   };

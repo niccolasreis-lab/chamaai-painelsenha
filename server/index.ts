@@ -1046,16 +1046,25 @@ export function startServer() {
     }
   });
 
+  const normalizeTelaoLayout = (value: unknown): 'classic' | 'sidebar' | 'l-shape' | null => {
+    if (value === undefined || value === null || value === '') return 'classic';
+    return value === 'classic' || value === 'sidebar' || value === 'l-shape' ? value : null;
+  };
+
   app.post('/api/telao/vincular', requireMaster, (req, res) => {
     try {
       const db = getDb();
-      const { code, nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias } = req.body;
+      const { code, nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias, template_layout } = req.body;
+      const templateLayout = normalizeTelaoLayout(template_layout);
+      if (!templateLayout) {
+        return res.status(400).json({ error: 'Layout inválido. Use classic, sidebar ou l-shape.' });
+      }
       const stmt = db.prepare(`
         UPDATE teloes 
-        SET nome = ?, status = 'vinculado', modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = 'classic', vinculado_em = datetime('now')
+        SET nome = ?, status = 'vinculado', modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = ?, vinculado_em = datetime('now')
         WHERE code = ?
       `);
-      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', code.toUpperCase());
+      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', templateLayout, code.toUpperCase());
       
       const perfil = db.prepare('SELECT * FROM teloes WHERE code = ?').get(code.toUpperCase());
       broadcastToTelao(code.toUpperCase(), 'TELAO_VINCULADO', perfil);
@@ -1069,13 +1078,17 @@ export function startServer() {
     try {
       const db = getDb();
       const code = (req.params.code as string).toUpperCase();
-      const { nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias } = req.body;
+      const { nome, modulo_painel, modulo_encarte, modulo_midia, encarte_categorias, template_layout } = req.body;
+      const templateLayout = normalizeTelaoLayout(template_layout);
+      if (!templateLayout) {
+        return res.status(400).json({ error: 'Layout inválido. Use classic, sidebar ou l-shape.' });
+      }
       const stmt = db.prepare(`
         UPDATE teloes 
-        SET nome = ?, modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = 'classic'
+        SET nome = ?, modulo_painel = ?, modulo_encarte = ?, modulo_midia = ?, encarte_categorias = ?, template_layout = ?
         WHERE code = ?
       `);
-      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', code);
+      stmt.run(nome, modulo_painel ? 1 : 0, modulo_encarte ? 1 : 0, modulo_midia ? 1 : 0, encarte_categorias || '', templateLayout, code);
       
       const perfil = db.prepare('SELECT * FROM teloes WHERE code = ?').get(code);
       broadcastToTelao(code, 'TELAO_ATUALIZADO', perfil);

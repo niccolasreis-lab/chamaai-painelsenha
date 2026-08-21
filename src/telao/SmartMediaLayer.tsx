@@ -5,6 +5,12 @@ import { getApiUrl } from '../shared/apiConfig';
 import EncartePrecos from './EncartePrecos';
 import EncarteGranel from './EncarteGranel';
 import { readDisplayCache, writeDisplayCache } from './displayCache';
+import {
+  nextPlayableIndex,
+  playlistFingerprint,
+  shouldLoopVideo,
+  VIDEO_STALL_TIMEOUT_MS,
+} from './mediaPlayback';
 import type { ProdutoToledo, Categoria, TemaEncarte, EstablishmentConfig, PerfilTelao, MediaItem } from '../shared/types';
 
 interface SmartMediaLayerProps {
@@ -19,6 +25,7 @@ interface SmartMediaLayerProps {
   encarteError?: string | null;
   lowPerformanceMode?: boolean;
   assetUrlResolver?: (url?: string | null) => string;
+  assetEvictor?: (url?: string | null) => Promise<void>;
 }
 
 type WeatherData = {
@@ -40,6 +47,7 @@ export default function SmartMediaLayer({
   encarteError = null,
   lowPerformanceMode = false,
   assetUrlResolver = (url) => url || '',
+  assetEvictor = async () => {},
 }: SmartMediaLayerProps) {
   const API_URL = getApiUrl();
   const [playlist, setPlaylist] = useState<MediaItem[]>(() => (
@@ -57,9 +65,19 @@ export default function SmartMediaLayer({
     perfil?.encarte_categorias
       ? perfil.encarte_categorias.split(';').map((category: string) => category.trim()).filter(Boolean)
       : []
-  ), [perfil?.encarte_categorias]);
+  ), [perfil]);
   
   const videoRef = useRef<HTMLVideoElement>(null);
+  const videoStallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playlistRef = useRef(playlist);
+  const activeIndexRef = useRef(0);
+
+  const clearVideoStallTimer = useCallback(() => {
+    if (videoStallTimerRef.current) {
+      clearTimeout(videoStallTimerRef.current);
+      videoStallTimerRef.current = null;
+    }
+  }, []);
 
   const resolveMediaUrl = useCallback((value?: string | null) => {
     if (!value) return '';
@@ -81,12 +99,23 @@ export default function SmartMediaLayer({
           items = items.filter((item: MediaItem) => item.type !== 'encarte' && item.type !== 'tabela');
         }
         const nextTheme = (data.theme || null) as TemaEncarte | null;
-        setPlaylist(items);
+        const previousItems = playlistRef.current;
+        const playlistChanged = playlistFingerprint(previousItems) !== playlistFingerprint(items);
+        if (playlistChanged) {
+          const currentId = previousItems[activeIndexRef.current]?.id;
+          const preservedIndex = items.findIndex((item) => item.id === currentId);
+          const nextIndex = preservedIndex >= 0 ? preservedIndex : 0;
+          playlistRef.current = items;
+          activeIndexRef.current = nextIndex;
+          setPlaylist(items);
+          setActiveIndex(nextIndex);
+          setFailedMediaIds(new Set());
+        }
         setTheme(nextTheme);
-        setActiveIndex(0);
-        setFailedMediaIds(new Set());
         writeDisplayCache(API_URL, 'smart-playlist', { items, theme: nextTheme });
       } else {
+        playlistRef.current = [];
+        activeIndexRef.current = 0;
         setPlaylist([]);
         setTheme(null);
         setActiveIndex(0);
@@ -144,6 +173,7 @@ export default function SmartMediaLayer({
     
     // Configurar listener para o evento SSE de atualização de campanha
     const handleCampaignUpdate = () => {
+      setFailedMediaIds(new Set());
       fetchActivePlaylist();
     };
     
@@ -184,18 +214,41 @@ export default function SmartMediaLayer({
 
   const handleNext = useCallback(() => {
     if (playlist.length > 0) {
-      setActiveIndex((prev) => (prev + 1) % playlist.length);
+      setActiveIndex((previous) => {
+        const next = nextPlayableIndex(playlist, previous, failedMediaIds);
+        activeIndexRef.current = next;
+        return next;
+      });
     }
     if (onNext) onNext();
-  }, [playlist.length, onNext]);
+  }, [playlist, failedMediaIds, onNext]);
 
   const markMediaFailed = useCallback((mediaId: string | number) => {
-    setFailedMediaIds(previous => {
-      const next = new Set(previous);
-      next.add(mediaId);
+    clearVideoStallTimer();
+    const failedMedia = playlist.find((item) => item.id === mediaId);
+    void assetEvictor(failedMedia?.local_path || failedMedia?.caminho).catch((error) => {
+      console.warn('[MEDIA CACHE] Não foi possível remover o asset quebrado do cache local:', error);
+    });
+    const nextFailures = new Set(failedMediaIds);
+    nextFailures.add(mediaId);
+    setFailedMediaIds(nextFailures);
+    setActiveIndex((previous) => {
+      const next = nextPlayableIndex(playlist, previous, nextFailures);
+      activeIndexRef.current = next;
       return next;
     });
-  }, []);
+  }, [assetEvictor, clearVideoStallTimer, failedMediaIds, playlist]);
+
+  const scheduleVideoStallRecovery = useCallback((mediaId: string | number) => {
+    clearVideoStallTimer();
+    videoStallTimerRef.current = setTimeout(() => {
+      const video = videoRef.current;
+      if (video && !video.ended && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+        console.warn('[MEDIA WATCHDOG] Vídeo indisponível ou sem progresso. Avançando a playlist.');
+        markMediaFailed(mediaId);
+      }
+    }, VIDEO_STALL_TIMEOUT_MS);
+  }, [clearVideoStallTimer, markMediaFailed]);
 
   // Log de diagnóstico temporário para confirmar playlist ativa no telão
   useEffect(() => {
@@ -244,9 +297,14 @@ export default function SmartMediaLayer({
       && videoRef.current
     ) {
       // Se não estiver em chamada, ou se o layout não for full, continua tocando
-      videoRef.current.play().catch(e => console.warn('Autoplay bloqueado:', e));
+      clearVideoStallTimer();
+      videoRef.current.play().catch(e => {
+        console.warn('Autoplay bloqueado:', e);
+        scheduleVideoStallRecovery(playlist[activeIndex].id);
+      });
     }
-  }, [activeIndex, playlist, isCalling, layout, failedMediaIds]);
+    return clearVideoStallTimer;
+  }, [activeIndex, playlist, isCalling, layout, failedMediaIds, clearVideoStallTimer, scheduleVideoStallRecovery]);
 
   if (playlist.length === 0) {
     return null;
@@ -255,11 +313,11 @@ export default function SmartMediaLayer({
   const currentMedia = playlist[activeIndex];
 
   const renderFallback = () => (
-    <div className="h-full w-full bg-[#041a14] text-white flex flex-col items-center justify-center gap-5 p-8 text-center">
+    <div className="h-full w-full bg-[#041a14] text-white flex flex-col items-center justify-center gap-[clamp(0.75rem,2vh,1.25rem)] p-[clamp(1rem,3vmin,2rem)] text-center">
       {config.logo_cliente ? (
         <img
           src={`${API_URL}${config.logo_cliente}`}
-          className="max-h-32 max-w-[40%] object-contain"
+          className="max-h-[35%] max-w-[70%] object-contain"
           alt=""
         />
       ) : null}
@@ -275,16 +333,24 @@ export default function SmartMediaLayer({
     if (failedMediaIds.has(currentMedia.id)) return renderFallback();
     
     if (currentMedia.type === 'video') {
+      const source = currentMedia.local_path || currentMedia.caminho;
       return (
         <video 
+          key={`${currentMedia.id}:${source || ''}`}
           ref={videoRef}
-          src={resolveMediaUrl(currentMedia.local_path)}
-          className="w-full h-full object-cover"
+          src={resolveMediaUrl(source)}
+          className="block w-full h-full max-w-full max-h-full object-contain bg-black"
           autoPlay
           muted
+          loop={shouldLoopVideo(playlist, failedMediaIds, false)}
           onEnded={handleNext}
           onError={() => markMediaFailed(currentMedia.id)}
+          onStalled={() => scheduleVideoStallRecovery(currentMedia.id)}
+          onWaiting={() => scheduleVideoStallRecovery(currentMedia.id)}
+          onCanPlay={clearVideoStallTimer}
+          onPlaying={clearVideoStallTimer}
           playsInline
+          preload="auto"
         />
       );
     }
@@ -377,26 +443,26 @@ export default function SmartMediaLayer({
   let baseClasses = '';
   switch(layout) {
     case 'lateral':
-      baseClasses = 'w-[30%] h-full border-l border-outline-variant/30 bg-black shrink-0 relative z-10';
+      baseClasses = 'w-[clamp(18rem,30vw,72rem)] max-w-[42vw] h-full min-h-0 border-l border-outline-variant/30 bg-black shrink-0 relative z-10';
       break;
     case 'rodape':
-      baseClasses = 'w-full h-64 border-t border-outline-variant/30 bg-black shrink-0 relative z-10';
+      baseClasses = 'w-full h-[clamp(10rem,25vh,34rem)] min-w-0 border-t border-outline-variant/30 bg-black shrink-0 relative z-10';
       break;
     case 'background':
-      baseClasses = 'w-full h-full absolute inset-0 -z-10 opacity-30';
+      baseClasses = 'w-full h-full min-w-0 min-h-0 absolute inset-0 -z-10 opacity-30';
       break;
     case 'full':
       // Se estiver full screen e chamando senha, baixa o z-index para não esconder a senha
       baseClasses = isCalling 
-        ? 'w-full h-full absolute inset-0 z-0 opacity-20' 
-        : 'w-full h-full absolute inset-0 z-50 bg-black';
+        ? 'w-full h-full min-w-0 min-h-0 absolute inset-0 z-0 opacity-20'
+        : 'w-full h-full min-w-0 min-h-0 absolute inset-0 z-50 bg-black';
       break;
   }
 
   const cssStyle = theme?.custom_css || {};
 
   return (
-    <div className={`${baseClasses} overflow-hidden animate-fade-in transition-all duration-500`} style={cssStyle}>
+    <div data-smart-media-layout={layout} className={`${baseClasses} overflow-hidden animate-fade-in transition-opacity duration-200`} style={cssStyle}>
       {renderMedia()}
     </div>
   );

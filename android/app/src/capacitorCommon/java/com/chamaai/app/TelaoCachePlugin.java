@@ -87,6 +87,32 @@ public class TelaoCachePlugin extends Plugin {
         });
     }
 
+    @PluginMethod
+    public void evict(PluginCall call) {
+        String sha256 = call.getString("sha256");
+        if (sha256 == null || !sha256.toLowerCase(Locale.ROOT).matches("[0-9a-f]{64}")) {
+            call.reject("sha256 inválido.");
+            return;
+        }
+
+        String normalizedHash = sha256.toLowerCase(Locale.ROOT);
+        ioExecutor.execute(() -> {
+            try {
+                File[] files = cacheRoot().listFiles();
+                if (files != null) {
+                    for (File file : files) {
+                        if (file.getName().startsWith(normalizedHash)) {
+                            deleteRecursively(file);
+                        }
+                    }
+                }
+                call.resolve();
+            } catch (Exception error) {
+                call.reject("Falha ao remover asset do cache: " + safeMessage(error), error);
+            }
+        });
+    }
+
     private JSObject syncInternal(String baseUrl, JSObject manifest) throws Exception {
         long maxCacheBytes = manifest.optLong("maxCacheBytes", -1L);
         JSONArray rawAssets = manifest.optJSONArray("assets");

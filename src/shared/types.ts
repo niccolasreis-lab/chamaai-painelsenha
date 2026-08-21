@@ -48,6 +48,7 @@ export type PerfilTelao = {
   modulo_encarte?: boolean | number;
   modulo_midia?: boolean | number;
   encarte_categorias?: string | null;
+  template_layout?: 'classic' | 'sidebar' | 'l-shape';
 };
 
 export type MediaItem = {

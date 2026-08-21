@@ -12,6 +12,12 @@ import { invalidateTtsAudioRevision, useAudioPlayer } from '../hooks/useAudioPla
 import { VignetteAudioCoordinator } from './vignetteAudioCoordinator';
 import { useTelaoAssetCache } from './useTelaoAssetCache';
 import {
+  nextPlayableIndex,
+  shouldLoopVideo,
+  VIDEO_STALL_TIMEOUT_MS,
+} from './mediaPlayback';
+import {
+  haveSameEncarteSnapshot,
   isMediaAvailableForDisplay,
   readDisplayCache,
   writeDisplayCache,
@@ -154,7 +160,7 @@ export default function MediaIndoor() {
     perfil?.encarte_categorias
       ? perfil.encarte_categorias.split(';').map((category: string) => category.trim()).filter(Boolean)
       : []
-  ), [perfil?.encarte_categorias]);
+  ), [perfil]);
   const [perfilLoading, setPerfilLoading] = useState(true);
   const [connectionError, setConnectionError] = useState(false);
   const [serverAddress, setServerAddress] = useState(localStorage.getItem('server_ip_override') || '');
@@ -169,7 +175,6 @@ export default function MediaIndoor() {
   const [activeModules, setActiveModules] = useState<string[]>([]);
   const activeModulesRef = useRef<string[]>([]);
   const [showingEncarte, setShowingEncarte] = useState(false);
-  const [encarteRefreshKey, setEncarteRefreshKey] = useState(0);
 
   // Normal ticket and media state
   const [historico, setHistorico] = useState<RecentCall[]>([]);
@@ -186,10 +191,11 @@ export default function MediaIndoor() {
   const [pessoasAguardando, setPessoasAguardando] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const videoStallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isRepeticao, setIsRepeticao] = useState(false);
   const repeticaoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  const { resolve: resolveAssetUrl, sync: syncAssetCache } = useTelaoAssetCache(API_URL, telaoCode);
+  const { resolve: resolveAssetUrl, evict: evictAsset, sync: syncAssetCache } = useTelaoAssetCache(API_URL, telaoCode);
   const [encarteCache, setEncarteCache] = useState<{
     produtos: ProdutoToledo[];
     categorias: Categoria[];
@@ -208,6 +214,7 @@ export default function MediaIndoor() {
       loadedAt: cached?.savedAt || null,
     };
   });
+  const encarteCacheRef = useRef(encarteCache);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -234,7 +241,12 @@ export default function MediaIndoor() {
     const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
 
     console.log(`[TELAO] Buscando dados do Encarte. Motivo: ${reason}`);
-    setEncarteCache(prev => ({ ...prev, loading: true }));
+    setEncarteCache(prev => {
+      if (prev.produtos.length > 0 || prev.loading) return prev;
+      const next = { ...prev, loading: true };
+      encarteCacheRef.current = next;
+      return next;
+    });
 
     try {
       const [prodRes, catRes, temaRes] = await Promise.all([
@@ -264,34 +276,61 @@ export default function MediaIndoor() {
         temaAtivo: temaRes as TemaEncarte | null,
       };
 
-      setEncarteCache({
+      const current = encarteCacheRef.current;
+      const currentSnapshot: EncarteDisplaySnapshot = {
+        produtos: current.produtos,
+        categorias: current.categorias,
+        temaAtivo: current.temaAtivo,
+      };
+
+      if (haveSameEncarteSnapshot(currentSnapshot, snapshot)) {
+        if (current.loading || current.error) {
+          const settled = { ...current, loading: false, error: null };
+          encarteCacheRef.current = settled;
+          setEncarteCache(settled);
+        }
+        console.log(`[TELAO] Encarte revalidado sem alterações (${prodRes.length} produtos).`);
+        return;
+      }
+
+      const nextCache = {
         ...snapshot,
         loading: false,
         error: null,
         loadedAt: Date.now(),
-      });
+      };
+      encarteCacheRef.current = nextCache;
+      setEncarteCache(nextCache);
       writeDisplayCache(API_URL, 'encarte', snapshot);
-      console.log(`[TELAO] Dados do encarte carregados com sucesso: ${prodRes.length} produtos.`);
+      console.log(`[TELAO] Dados do encarte atualizados: ${prodRes.length} produtos.`);
     } catch (err: unknown) {
       const errorObj = err as Error;
       if (errorObj.name === 'AbortError') {
         if (abortControllerRef.current === controller && isMountedRef.current) {
-          setEncarteCache(prev => ({
-            ...prev,
-            loading: false,
-            error: 'Não foi possível atualizar o encarte agora.',
-          }));
+          setEncarteCache(prev => {
+            const next = {
+              ...prev,
+              loading: false,
+              error: 'Não foi possível atualizar o encarte agora.',
+            };
+            encarteCacheRef.current = next;
+            return next;
+          });
         }
         console.log('[TELAO] Fetch do encarte abortado por nova requisição.');
         return;
       }
       console.error('[TELAO] Erro ao carregar dados do Encarte:', err);
       if (!isMountedRef.current) return;
-      setEncarteCache(prev => ({
-        ...prev,
-        loading: false,
-        error: errorObj.message || 'Erro de rede',
-      }));
+      setEncarteCache(prev => {
+        const next = {
+          ...prev,
+          loading: false,
+          error: errorObj.message || 'Erro de rede',
+        };
+        encarteCacheRef.current = next;
+        return next;
+      });
     } finally {
       window.clearTimeout(timeoutId);
       if (abortControllerRef.current === controller) {
@@ -300,7 +339,6 @@ export default function MediaIndoor() {
     }
   }, [API_URL]);
 
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const modulo_encarte = activeModules.includes('encarte');
     console.log("MODULO ENCARTES:", modulo_encarte);
@@ -316,7 +354,6 @@ export default function MediaIndoor() {
       }
     }
   }, [activeModules, encarteCache.loadedAt, encarteCache.loading, encarteCache.error, encarteCache.produtos, refreshEncarteData]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const {
     initAudioContext,
@@ -797,13 +834,17 @@ export default function MediaIndoor() {
     };
 
     const handleMidiasAtualizadas = () => {
+      setFailedMidiaIds(new Set());
       fetchMidias();
+      void syncAssetCache();
+    };
+
+    const handleSmartMediaUpdated = () => {
       void syncAssetCache();
     };
 
     const handleToledoPrecosAtualizados = () => {
       autoRecoverAttemptsRef.current = 0;
-      setEncarteRefreshKey(prev => prev + 1);
       refreshEncarteData('SSE: TOLEDO_PRECOS_ATUALIZADOS');
     };
 
@@ -863,6 +904,8 @@ export default function MediaIndoor() {
     window.addEventListener('MEDIA_SETTINGS_UPDATED', handleMediaSettingsUpdated);
     window.addEventListener('MEDIA_THEME_UPDATED', handleMediaThemeUpdated);
     window.addEventListener('MIDIAS_ATUALIZADAS', handleMidiasAtualizadas);
+    window.addEventListener('MEDIA_ITEMS_UPDATED', handleSmartMediaUpdated);
+    window.addEventListener('MEDIA_CAMPAIGN_UPDATED', handleSmartMediaUpdated);
     window.addEventListener('TOLEDO_PRECOS_ATUALIZADOS', handleToledoPrecosAtualizados);
     window.addEventListener('SISTEMA_RESETADO', handleSistemaResetado);
     window.addEventListener('TELAO_VINCULADO', handleTelaoVinculado);
@@ -880,6 +923,8 @@ export default function MediaIndoor() {
       window.removeEventListener('MEDIA_SETTINGS_UPDATED', handleMediaSettingsUpdated);
       window.removeEventListener('MEDIA_THEME_UPDATED', handleMediaThemeUpdated);
       window.removeEventListener('MIDIAS_ATUALIZADAS', handleMidiasAtualizadas);
+      window.removeEventListener('MEDIA_ITEMS_UPDATED', handleSmartMediaUpdated);
+      window.removeEventListener('MEDIA_CAMPAIGN_UPDATED', handleSmartMediaUpdated);
       window.removeEventListener('TOLEDO_PRECOS_ATUALIZADOS', handleToledoPrecosAtualizados);
       window.removeEventListener('SISTEMA_RESETADO', handleSistemaResetado);
       window.removeEventListener('TELAO_VINCULADO', handleTelaoVinculado);
@@ -892,9 +937,15 @@ export default function MediaIndoor() {
   /* eslint-enable react-hooks/exhaustive-deps */
 
   // Rotate between media and active modules
+  const clearNativeVideoStallTimer = useCallback(() => {
+    if (videoStallTimerRef.current) {
+      clearTimeout(videoStallTimerRef.current);
+      videoStallTimerRef.current = null;
+    }
+  }, []);
+
   const nextMedia = useCallback(() => {
     if (activeModules.includes('midia') && midias.length > 0) {
-      const nextIndex = (activeMidiaIndex + 1) % midias.length;
       const encartePos = Math.max(0, Math.min(parseInt(String(config.toledo_encarte_posicao ?? '0'), 10) || 0, midias.length - 1));
       
       if (activeModules.includes('encarte') && !showingEncarte && activeMidiaIndex === encartePos) {
@@ -902,32 +953,46 @@ export default function MediaIndoor() {
         return;
       }
       
-      setActiveMidiaIndex(nextIndex);
+      setActiveMidiaIndex(current => nextPlayableIndex(midias, current, failedMidiaIds));
     } else if (activeModules.includes('encarte') && !showingEncarte) {
       setShowingEncarte(true);
     }
-  }, [midias.length, activeMidiaIndex, activeModules, showingEncarte, config.toledo_encarte_posicao]);
+  }, [midias, failedMidiaIds, activeMidiaIndex, activeModules, showingEncarte, config.toledo_encarte_posicao]);
 
-  const handleNativeMediaError = useCallback((mediaId: string | number, error: unknown) => {
+  const handleNativeMediaError = useCallback((mediaId: string | number, assetUrl: string | undefined, error: unknown) => {
     console.error('[MEDIA ERROR] Arquivo inválido ou indisponível. Pulando...', error);
-    setFailedMidiaIds(previous => {
-      const next = new Set(previous);
-      next.add(mediaId);
-      return next;
+    clearNativeVideoStallTimer();
+    void evictAsset(assetUrl).catch((cacheError) => {
+      console.warn('[MEDIA CACHE] Não foi possível remover o asset quebrado do cache local:', cacheError);
     });
-    nextMedia();
-  }, [nextMedia]);
+    const nextFailures = new Set(failedMidiaIds);
+    nextFailures.add(mediaId);
+    setFailedMidiaIds(nextFailures);
+    setActiveMidiaIndex(current => nextPlayableIndex(midias, current, nextFailures));
+  }, [clearNativeVideoStallTimer, evictAsset, failedMidiaIds, midias]);
+
+  const scheduleNativeVideoStallRecovery = useCallback((mediaId: string | number) => {
+    clearNativeVideoStallTimer();
+    videoStallTimerRef.current = setTimeout(() => {
+      const video = videoRef.current;
+      if (video && !video.ended && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+        console.warn('[MEDIA WATCHDOG] Vídeo indisponível ou sem progresso. Pulando o asset.');
+        const media = midias.find((item) => item.id === mediaId);
+        handleNativeMediaError(mediaId, media?.caminho, new Error('Vídeo sem dados suficientes para continuar.'));
+      }
+    }, VIDEO_STALL_TIMEOUT_MS);
+  }, [clearNativeVideoStallTimer, handleNativeMediaError, midias]);
 
   const onEncarteComplete = useCallback(() => {
     setShowingEncarte(false);
     if (midias.length > 0) {
-      setActiveMidiaIndex(prev => (prev + 1) % midias.length);
+      setActiveMidiaIndex(current => nextPlayableIndex(midias, current, failedMidiaIds));
     }
     // If multiple modules, we alternate Encarte and Midia
     if (activeModules.includes('midia') && activeModules.includes('encarte')) {
       // Completed encarte slide, now switch to midia carousel
     }
-  }, [midias.length, activeModules]);
+  }, [midias, failedMidiaIds, activeModules]);
 
   // Handle transition timers
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -943,13 +1008,6 @@ export default function MediaIndoor() {
       if (current.tipo === 'imagem') {
         const timer = setTimeout(nextMedia, 10000);
         return () => clearTimeout(timer);
-      } else if (current.tipo === 'video') {
-        // Fallback watchdog case the video completely freezes and onEnded never fires
-        const watchdogTimer = setTimeout(() => {
-          console.warn('[MEDIA WATCHDOG] Vídeo não completou no tempo esperado. Avançando...');
-          nextMedia();
-        }, 120000); // 2 minutos máximo por vídeo
-        return () => clearTimeout(watchdogTimer);
       }
     } else if ((midias.length === 0 || !activeModules.includes('midia')) && activeModules.includes('encarte') && !showingEncarte && showMedia) {
       const timer = setTimeout(() => setShowingEncarte(true), 2000);
@@ -974,9 +1032,14 @@ export default function MediaIndoor() {
     if (showMedia && currentMidia && currentMidia.tipo === 'video' && videoRef.current) {
       // We do not call load() blindly because it resets the video if it's the same src.
       // But we always ensure it's playing if showMedia is true.
-      videoRef.current.play().catch(e => console.warn('Autoplay bloqueado pelo navegador:', e));
+      clearNativeVideoStallTimer();
+      videoRef.current.play().catch(e => {
+        console.warn('Autoplay bloqueado pelo navegador:', e);
+        scheduleNativeVideoStallRecovery(currentMidia.id);
+      });
     }
-  }, [midias, activeMidiaIndex, showMedia, smartMediaSettings.midia_indoor_ativa]);
+    return clearNativeVideoStallTimer;
+  }, [midias, activeMidiaIndex, showMedia, smartMediaSettings.midia_indoor_ativa, clearNativeVideoStallTimer, scheduleNativeVideoStallRecovery]);
 
   // Apply real-time consolidated waiting count
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -1040,19 +1103,33 @@ export default function MediaIndoor() {
   const activeMidia = activeMidiaCandidate && !failedMidiaIds.has(activeMidiaCandidate.id)
     ? activeMidiaCandidate
     : undefined;
+  const nativeVideoShouldLoop = shouldLoopVideo(
+    midias,
+    failedMidiaIds,
+    activeModules.includes('encarte'),
+  );
   const showingPriceEncarte = activeModules.includes('encarte') && showingEncarte;
   
   const isSmartMediaFull = smartMediaSettings.midia_indoor_ativa && smartMediaSettings.midia_indoor_layout === 'full';
   const shouldShowNativeContent = !isSmartMediaFull;
 
-  // A composição antiga por dispositivo foi removida. O posicionamento da
-  // mídia agora possui uma única fonte: Configurações > Mídia Indoor.
-  const layout: string = 'classic';
+  const templateParam = new URLSearchParams(window.location.search).get('template')
+    || new URLSearchParams(window.location.search).get('layout');
+  const supportedLayouts = ['classic', 'sidebar', 'l-shape'] as const;
+  type TelaoLayout = typeof supportedLayouts[number];
+  const isSupportedLayout = (value: unknown): value is TelaoLayout => (
+    typeof value === 'string' && supportedLayouts.includes(value as TelaoLayout)
+  );
+  const layout: TelaoLayout = isSupportedLayout(templateParam)
+    ? templateParam
+    : isSupportedLayout(perfil.template_layout)
+      ? perfil.template_layout
+      : 'classic';
 
   return (
-    <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-sans text-ink relative">
-      <header className="h-32 bg-white border-b border-outline-variant/30 flex items-center justify-between px-8 shrink-0">
-        <div className="flex items-center gap-4">
+    <div data-testid="telao-layout-root" className="h-[100dvh] w-[100dvw] min-h-0 min-w-0 bg-background flex flex-col overflow-hidden font-sans text-ink relative">
+      <header className="h-[clamp(5.5rem,12vh,12rem)] bg-white border-b border-outline-variant/30 flex items-center justify-between px-[clamp(1rem,2.5vw,4rem)] gap-[clamp(1rem,2vw,3rem)] shrink-0">
+        <div className="flex min-w-0 items-center gap-[clamp(0.5rem,1.2vw,1rem)]">
           {!isDedicatedTelao && <Link
             to="/" 
             onClick={() => localStorage.removeItem('app_mode')}
@@ -1062,32 +1139,32 @@ export default function MediaIndoor() {
             <ArrowLeft className="h-6 w-6" />
           </Link>}
           {config.logo_cliente ? (
-            <img src={resolveAssetUrl(config.logo_cliente)} className="h-20 object-contain" alt="Logo" />
+            <img src={resolveAssetUrl(config.logo_cliente)} className="h-[clamp(3rem,8vh,8rem)] max-w-[28vw] object-contain" alt="Logo" />
           ) : (
             <div className="flex flex-col">
-              <h1 className="font-sans text-3xl font-bold text-primary leading-none uppercase tracking-tighter">ChamaAí</h1>
-              <p className="font-sans text-sm font-bold text-ink-secondary uppercase">Sistema de Gestão de Atendimento</p>
+              <h1 className="font-sans text-[clamp(1.5rem,min(3vw,4vh),4rem)] font-bold text-primary leading-none uppercase tracking-tight">ChamaAí</h1>
+              <p className="hidden min-[1180px]:block font-sans text-[clamp(0.75rem,1vw,1.25rem)] font-bold text-ink-secondary uppercase">Sistema de Gestão de Atendimento</p>
             </div>
           )}
           {config.logo_cliente && (
-            <div className="border-l border-outline-variant/30 pl-4">
-              <h1 className="font-sans text-2xl font-bold text-ink-secondary leading-none uppercase tracking-tight">{config.nome_estabelecimento || 'ChamaAí'}</h1>
+            <div className="min-w-0 border-l border-outline-variant/30 pl-[clamp(0.5rem,1vw,1rem)]">
+              <h1 className="max-w-[34vw] truncate font-sans text-[clamp(1rem,min(2vw,3vh),2.5rem)] font-bold text-ink-secondary leading-none uppercase tracking-tight">{config.nome_estabelecimento || 'ChamaAí'}</h1>
             </div>
           )}
         </div>
-        <div className="flex items-center gap-8">
+        <div className="flex shrink-0 items-center gap-[clamp(0.75rem,2vw,2rem)]">
           {/* Active paired screen indicator */}
-          <div className="hidden lg:flex items-center gap-2 bg-[#041a14]/5 border border-emerald-500/10 px-4 py-2 rounded-2xl">
+          <div className="hidden 2xl:flex items-center gap-2 bg-[#041a14]/5 border border-emerald-500/10 px-4 py-2 rounded-xl">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
             <span className="text-xs font-bold text-ink-secondary uppercase tracking-widest leading-none">{perfil.nome}</span>
           </div>
 
           {/* Aguardando Badge */}
-          <div className="flex items-center gap-6 bg-blue-500/5 px-8 py-3 rounded-3xl">
-            <Users className="text-blue-500 h-14 w-14" />
+          <div className="flex items-center gap-[clamp(0.5rem,1.5vw,1.5rem)] bg-blue-500/5 px-[clamp(0.75rem,2vw,2rem)] py-[clamp(0.35rem,1vh,0.75rem)] rounded-xl">
+            <Users className="text-blue-500 h-[clamp(2rem,6vh,6rem)] w-[clamp(2rem,6vh,6rem)]" />
             <div className="flex flex-col items-center">
-              <span className="text-sm font-bold text-ink-secondary uppercase tracking-[0.2em] mb-1">Aguardando</span>
-              <span className="font-sans text-[4.5rem] font-black tracking-tighter text-blue-600 leading-none">{pessoasAguardando}</span>
+              <span className="text-[clamp(0.65rem,1.2vw,1rem)] font-bold text-ink-secondary uppercase tracking-[0.12em]">Aguardando</span>
+              <span className="font-sans text-[clamp(2.5rem,min(6vw,8vh),7rem)] font-black tabular-nums tracking-tight text-blue-600 leading-[0.82]">{pessoasAguardando}</span>
             </div>
           </div>
         </div>
@@ -1108,6 +1185,7 @@ export default function MediaIndoor() {
             encarteError={encarteCache.error}
             lowPerformanceMode={isLowPerformanceMode}
             assetUrlResolver={resolveAssetUrl}
+            assetEvictor={evictAsset}
           />
         )}
 
@@ -1115,7 +1193,7 @@ export default function MediaIndoor() {
           {/* Main Body Area */}
           <div className="flex-1 flex overflow-hidden relative">
         {layout === 'l-shape' ? (
-          <div className="flex-1 flex flex-col overflow-hidden bg-[#041a14]">
+          <div data-testid="layout-l-shape" className="w-full h-full min-w-0 min-h-0 flex-1 flex flex-col overflow-hidden bg-[#041a14]">
             <div className="flex-1 flex overflow-hidden">
               {/* Media Area (Centralizada) */}
               <div className="flex-[72] relative bg-[#041a14] overflow-hidden flex items-center justify-center border-r border-outline-variant/10">
@@ -1123,7 +1201,6 @@ export default function MediaIndoor() {
                   {shouldShowNativeContent && showingPriceEncarte ? (
                     config.toledo_encarte_estilo === 'granel' ? (
                       <EncarteGranel
-                        key={`encarte-granel-${encarteRefreshKey}`}
                         duracao={parseInt(String(config.toledo_encarte_duracao ?? '15'), 10)}
                         itensPorSlide={parseInt(String(config.toledo_itens_por_slide ?? '12'), 10)}
                         onComplete={onEncarteComplete}
@@ -1138,7 +1215,6 @@ export default function MediaIndoor() {
                       />
                     ) : (
                       <EncartePrecos
-                        key={`encarte-${encarteRefreshKey}`}
                         duracao={parseInt(String(config.toledo_encarte_duracao ?? '15'), 10)}
                         itensPorSlide={parseInt(String(config.toledo_itens_por_slide ?? '12'), 10)}
                         onComplete={onEncarteComplete}
@@ -1153,25 +1229,30 @@ export default function MediaIndoor() {
                       />
                     )
                   ) : shouldShowNativeContent && activeModules.includes('midia') && activeMidia ? (
-                    <div className="h-full w-full animate-fade-in relative">
+                    <div className="h-full w-full min-h-0 min-w-0 overflow-hidden animate-fade-in relative flex items-center justify-center bg-black">
                       {activeMidia.tipo === 'video' ? (
                         <video 
+                          key={`${activeMidia.id}:${resolveAssetUrl(activeMidia.caminho)}`}
                           ref={videoRef}
                           src={resolveAssetUrl(activeMidia.caminho)}
-                          className="w-full h-full object-cover"
+                          className="block w-full h-full max-w-full max-h-full object-contain bg-black"
                           autoPlay
                           muted
-                          loop={midias.length === 1 && !activeModules.includes('encarte')}
-                          onEnded={nextMedia}
+                          loop={nativeVideoShouldLoop}
+                          onEnded={() => nextMedia()}
                           onPause={(e) => {
                             const video = e.target as HTMLVideoElement;
-                            if (!video.ended && showMedia) {
+                            if (!video.ended && showMedia && !smartMediaSettings.midia_indoor_ativa) {
                               video.play().catch(() => {});
                             }
                           }}
                           onError={(e) => {
-                            handleNativeMediaError(activeMidia.id, e);
+                            handleNativeMediaError(activeMidia.id, activeMidia.caminho, e);
                           }}
+                          onStalled={() => scheduleNativeVideoStallRecovery(activeMidia.id)}
+                          onWaiting={() => scheduleNativeVideoStallRecovery(activeMidia.id)}
+                          onCanPlay={clearNativeVideoStallTimer}
+                          onPlaying={clearNativeVideoStallTimer}
                           playsInline
                           preload="auto"
                         />
@@ -1180,24 +1261,24 @@ export default function MediaIndoor() {
                           key={activeMidia.id}
                           src={resolveAssetUrl(activeMidia.caminho)}
                           alt={activeMidia.nome}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain bg-black"
                           onError={(e) => {
-                            handleNativeMediaError(activeMidia.id, e);
+                            handleNativeMediaError(activeMidia.id, activeMidia.caminho, e);
                           }}
                         />
                       )}
                     </div>
                   ) : (
-                    <div className="h-full w-full flex flex-col items-center justify-center p-20">
+                    <div className="h-full w-full flex flex-col items-center justify-center p-[clamp(1.5rem,5vmin,5rem)]">
                       <div className="text-center">
                         {config.logo_cliente ? (
-                          <img src={resolveAssetUrl(config.logo_cliente)} className="h-40 object-contain mb-8 drop-shadow-2xl" alt="Logo" />
+                          <img src={resolveAssetUrl(config.logo_cliente)} className="h-[clamp(5rem,18vh,14rem)] max-w-[65vw] object-contain mb-[clamp(1rem,3vh,2rem)] drop-shadow-lg" alt="Logo" />
                         ) : (
-                          <h2 className="font-sans text-6xl font-bold text-white mb-6 uppercase tracking-widest drop-shadow-lg">
+                          <h2 className="font-sans text-[clamp(2rem,min(6vw,8vh),7rem)] font-bold text-white mb-[clamp(0.75rem,2vh,1.5rem)] uppercase tracking-[0.08em] drop-shadow-lg">
                             {config.nome_estabelecimento || 'ChamaAí'}
                           </h2>
                         )}
-                        <p className="font-sans text-3xl font-medium text-white/70 uppercase tracking-widest">
+                        <p className="font-sans text-[clamp(1.25rem,min(3vw,4vh),3rem)] font-medium text-white/80 uppercase tracking-[0.08em]">
                           {config.logo_cliente ? (config.nome_estabelecimento || 'ChamaAí') : 'Sua Fila Digital'}
                         </p>
                       </div>
@@ -1207,12 +1288,12 @@ export default function MediaIndoor() {
               </div>
 
               {/* Chamada no Canto (Last Called Ticket Card + Recent History) */}
-              <div className="flex-[28] flex flex-col bg-surface shadow-[-10px_0_30px_rgba(0,0,0,0.05)] border-l border-outline-variant/30 p-6 overflow-hidden">
-                <div className="bg-primary/5 border-2 border-primary/20 rounded-[2rem] p-6 text-center shadow-sm mb-6">
+              <div className="w-[clamp(18rem,28vw,67rem)] max-w-[38vw] shrink-0 flex flex-col bg-surface border-l border-outline-variant/30 p-[clamp(0.75rem,2vh,2rem)] overflow-hidden">
+                <div className="bg-primary/5 border border-primary/20 rounded-xl p-[clamp(0.75rem,2vh,2rem)] text-center mb-[clamp(0.75rem,2vh,1.5rem)]">
                   <span className="text-xs font-bold text-primary uppercase tracking-[0.2em] block mb-2">Última Chamada</span>
                   {ultimaSenha ? (
                     <div>
-                      <span className="font-sans text-[4.5rem] font-black tracking-tighter text-primary leading-none block">
+                      <span className="font-sans text-[clamp(3rem,min(6vw,8vh),7rem)] font-black tabular-nums tracking-tight text-primary leading-none block">
                         {String(ultimaSenha.numero).padStart(3, '0')}
                         {isRepeticao && (
                           <span className="text-xs text-orange-400 font-medium ml-2">↩ repetida</span>
@@ -1223,7 +1304,7 @@ export default function MediaIndoor() {
                           {ultimaSenha.nome_cliente.trim()}
                         </span>
                       )}
-                      <span className="font-sans text-2xl font-bold text-ink block mt-3 uppercase leading-none">
+                      <span className="font-sans text-[clamp(1.25rem,min(2.5vw,3.5vh),2.5rem)] font-bold text-ink block mt-2 uppercase leading-none truncate">
                         {ultimaSenha.guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
                       </span>
                       <span className="text-xs font-bold text-ink-secondary uppercase tracking-widest block mt-2">
@@ -1238,18 +1319,18 @@ export default function MediaIndoor() {
                 </div>
 
                 <div className="flex-1 overflow-hidden flex flex-col">
-                  <div className="flex items-center gap-2 mb-4 border-b border-outline-variant/30 pb-2">
+                  <div className="flex items-center gap-2 mb-[clamp(0.5rem,1.3vh,1rem)] border-b border-outline-variant/30 pb-2">
                     <History className="text-primary h-5 w-5" />
                     <h3 className="font-sans text-sm font-bold text-ink uppercase tracking-widest">Histórico</h3>
                   </div>
                   
-                  <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+                  <div className="space-y-[clamp(0.4rem,1vh,0.75rem)] overflow-hidden flex-1 pr-1">
                     {historico.slice(1, 5).map(senha => (
-                      <div key={senha.id} className="flex items-center justify-between px-4 py-3 bg-white rounded-2xl border border-outline-variant/50 shadow-sm opacity-80">
-                        <span className="font-sans text-2xl font-black text-ink">
+                      <div key={senha.id} className="flex min-w-0 items-center justify-between gap-2 px-[clamp(0.6rem,1.2vw,1rem)] py-[clamp(0.4rem,1vh,0.75rem)] bg-white rounded-lg border border-outline-variant/50 opacity-80">
+                        <span className="font-sans text-[clamp(1.5rem,min(2.5vw,3.5vh),3rem)] font-black tabular-nums text-ink">
                           {String(senha.numero).padStart(3, '0')}
                         </span>
-                        <span className="font-sans text-sm font-bold text-ink-secondary uppercase">
+                        <span className="min-w-0 truncate font-sans text-[clamp(0.75rem,1.4vw,1.25rem)] font-bold text-ink-secondary uppercase">
                           {senha.guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
                         </span>
                       </div>
@@ -1284,12 +1365,11 @@ export default function MediaIndoor() {
         ) : (
           <>
             {/* Media / Call Focus Area */}
-            <div className={`${layout === 'classic' ? 'flex-1' : 'flex-[78]'} relative bg-[#041a14] overflow-hidden border-r border-outline-variant/20`}>
+            <div data-testid="layout-classic" className={`${layout === 'classic' ? 'flex-1' : 'flex-[78]'} w-full h-full min-w-0 min-h-0 relative bg-[#041a14] overflow-hidden border-r border-outline-variant/20`}>
               <div className="h-full w-full">
                 {shouldShowNativeContent && showingPriceEncarte ? (
                   config.toledo_encarte_estilo === 'granel' ? (
                     <EncarteGranel
-                      key={`encarte-granel-${encarteRefreshKey}`}
                       duracao={parseInt(String(config.toledo_encarte_duracao ?? '15'), 10)}
                       itensPorSlide={parseInt(String(config.toledo_itens_por_slide ?? '12'), 10)}
                       onComplete={onEncarteComplete}
@@ -1304,7 +1384,6 @@ export default function MediaIndoor() {
                     />
                   ) : (
                     <EncartePrecos
-                      key={`encarte-${encarteRefreshKey}`}
                       duracao={parseInt(String(config.toledo_encarte_duracao ?? '15'), 10)}
                       itensPorSlide={parseInt(String(config.toledo_itens_por_slide ?? '12'), 10)}
                       onComplete={onEncarteComplete}
@@ -1319,25 +1398,30 @@ export default function MediaIndoor() {
                     />
                   )
                 ) : shouldShowNativeContent && activeModules.includes('midia') && activeMidia ? (
-                  <div className="h-full w-full animate-fade-in relative">
+                  <div className="h-full w-full min-h-0 min-w-0 overflow-hidden animate-fade-in relative flex items-center justify-center bg-black">
                     {activeMidia.tipo === 'video' ? (
                       <video 
+                        key={`${activeMidia.id}:${resolveAssetUrl(activeMidia.caminho)}`}
                         ref={videoRef}
                         src={resolveAssetUrl(activeMidia.caminho)}
-                        className="w-full h-full object-cover"
+                        className="block w-full h-full max-w-full max-h-full object-contain bg-black"
                         autoPlay
                         muted
-                        loop={midias.length === 1 && !activeModules.includes('encarte')}
-                        onEnded={nextMedia}
+                        loop={nativeVideoShouldLoop}
+                        onEnded={() => nextMedia()}
                         onPause={(e) => {
                           const video = e.target as HTMLVideoElement;
-                          if (!video.ended && showMedia) {
+                          if (!video.ended && showMedia && !smartMediaSettings.midia_indoor_ativa) {
                             video.play().catch(() => {});
                           }
                         }}
                         onError={(e) => {
-                          handleNativeMediaError(activeMidia.id, e);
+                          handleNativeMediaError(activeMidia.id, activeMidia.caminho, e);
                         }}
+                        onStalled={() => scheduleNativeVideoStallRecovery(activeMidia.id)}
+                        onWaiting={() => scheduleNativeVideoStallRecovery(activeMidia.id)}
+                        onCanPlay={clearNativeVideoStallTimer}
+                        onPlaying={clearNativeVideoStallTimer}
                         playsInline
                         preload="auto"
                       />
@@ -1346,24 +1430,24 @@ export default function MediaIndoor() {
                         key={activeMidia.id}
                         src={resolveAssetUrl(activeMidia.caminho)}
                         alt={activeMidia.nome}
-                        className="w-full h-full object-cover"
+                          className="w-full h-full object-contain bg-black"
                         onError={(e) => {
-                          handleNativeMediaError(activeMidia.id, e);
+                          handleNativeMediaError(activeMidia.id, activeMidia.caminho, e);
                         }}
                       />
                     )}
                   </div>
                 ) : (
-                  <div className="h-full w-full flex flex-col items-center justify-center p-20">
+                    <div className="h-full w-full flex flex-col items-center justify-center p-[clamp(1.5rem,5vmin,5rem)]">
                     <div className="text-center">
                       {config.logo_cliente ? (
-                        <img src={resolveAssetUrl(config.logo_cliente)} className="h-40 object-contain mb-8 drop-shadow-2xl" alt="Logo" />
+                          <img src={resolveAssetUrl(config.logo_cliente)} className="h-[clamp(5rem,18vh,14rem)] max-w-[65vw] object-contain mb-[clamp(1rem,3vh,2rem)] drop-shadow-lg" alt="Logo" />
                       ) : (
-                        <h2 className="font-sans text-6xl font-bold text-white mb-6 uppercase tracking-widest drop-shadow-lg">
+                          <h2 className="font-sans text-[clamp(2rem,min(6vw,8vh),7rem)] font-bold text-white mb-[clamp(0.75rem,2vh,1.5rem)] uppercase tracking-[0.08em] drop-shadow-lg">
                           {config.nome_estabelecimento || 'ChamaAí'}
                         </h2>
                       )}
-                      <p className="font-sans text-3xl font-medium text-white/70 uppercase tracking-widest">
+                        <p className="font-sans text-[clamp(1.25rem,min(3vw,4vh),3rem)] font-medium text-white/80 uppercase tracking-[0.08em]">
                         {config.logo_cliente ? (config.nome_estabelecimento || 'ChamaAí') : 'Sua Fila Digital'}
                       </p>
                     </div>
@@ -1374,36 +1458,37 @@ export default function MediaIndoor() {
 
             {/* Sidebar History Area */}
             {layout === 'sidebar' && activeModules.includes('painel') && (
-              <div className="flex-[28] flex flex-col bg-surface shadow-[-10px_0_30px_rgba(0,0,0,0.05)] border-l border-outline-variant/30">
-                <div className="p-8 flex-1 overflow-hidden">
-                  <div className="flex items-center gap-3 mb-8 border-b border-outline-variant/30 pb-4">
-                    <History className="text-primary h-8 w-8" />
-                    <h2 className="font-sans text-2xl font-bold text-ink uppercase tracking-widest">Histórico</h2>
+              <div className="w-[clamp(20rem,28vw,67rem)] max-w-[40vw] shrink-0 flex flex-col bg-surface border-l border-outline-variant/30">
+                <div data-testid="layout-sidebar" className="w-full h-full min-w-0 min-h-0 flex flex-col overflow-hidden">
+                <div className="p-[clamp(0.75rem,2vh,2rem)] flex-1 overflow-hidden">
+                  <div className="flex items-center gap-3 mb-[clamp(0.5rem,1.5vh,2rem)] border-b border-outline-variant/30 pb-[clamp(0.4rem,1vh,1rem)]">
+                    <History className="text-primary h-[clamp(1.25rem,3vh,2rem)] w-[clamp(1.25rem,3vh,2rem)]" />
+                    <h2 className="font-sans text-[clamp(1rem,min(1.8vw,2.5vh),2rem)] font-bold text-ink uppercase tracking-[0.08em]">Histórico</h2>
                   </div>
                   
-                  <div className="space-y-5">
+                  <div className="space-y-[clamp(0.4rem,1vh,1rem)]">
                     {historico.length > 0 ? (
                       historico.slice(0, 5).map((senha, idx) => (
-                        <div key={senha.id} className={`flex items-center gap-6 px-8 py-5 bg-white rounded-[2rem] border shadow-sm transition-all ${idx === 0 ? 'border-primary ring-4 ring-primary/10 bg-primary/5 scale-[1.03] mb-6' : 'border-outline-variant/50 opacity-60'}`}>
-                          <span className={`font-sans text-[5.5rem] font-black leading-none tracking-tighter ${idx === 0 ? 'text-primary' : 'text-ink'}`}>
+                        <div key={senha.id} className={`flex min-w-0 items-center gap-[clamp(0.5rem,1vw,1.5rem)] px-[clamp(0.75rem,1.5vw,2rem)] py-[clamp(0.5rem,1.3vh,1.25rem)] bg-white rounded-xl border transition-colors ${idx === 0 ? 'border-primary bg-primary/5 mb-[clamp(0.4rem,1vh,1rem)]' : 'border-outline-variant/50 opacity-70'}`}>
+                          <span className={`font-sans text-[clamp(2.25rem,min(4vw,7vh),5.5rem)] font-black tabular-nums leading-none tracking-tight ${idx === 0 ? 'text-primary' : 'text-ink'}`}>
                             {String(senha.numero).padStart(3, '0')}
                             {idx === 0 && isRepeticao && (
                               <span className="text-xs text-orange-400 font-medium ml-2">↩ repetida</span>
                             )}
                           </span>
                           
-                          <div className="w-[4px] h-16 bg-primary/20 rounded-full shrink-0"></div>
+                          <div className="w-px h-[clamp(2rem,6vh,4rem)] bg-primary/20 shrink-0"></div>
 
-                          <div className="flex flex-col leading-tight">
+                          <div className="min-w-0 flex flex-col leading-tight">
                             {senha.nome_cliente && (
-                              <span className="font-sans text-lg font-medium text-ink-secondary/70 mb-1 select-none">
+                              <span className="truncate font-sans text-[clamp(0.75rem,1.2vw,1.125rem)] font-medium text-ink-secondary/80 mb-1 select-none">
                                 {senha.nome_cliente.trim()}
                               </span>
                             )}
-                            <span className="font-sans text-[1.3rem] font-bold text-ink-secondary uppercase tracking-widest">
+                            <span className="truncate font-sans text-[clamp(0.75rem,1.3vw,1.3rem)] font-bold text-ink-secondary uppercase tracking-[0.08em]">
                               {senha.balcao_nome || config.rotulo_local || 'Balcão'}
                             </span>
-                            <span className="font-sans text-[2.5rem] font-bold text-ink uppercase leading-none">
+                            <span className="truncate font-sans text-[clamp(1.25rem,min(2.2vw,3.5vh),2.5rem)] font-bold text-ink uppercase leading-none">
                               {senha.guiche.replace(/guichê[:\s]*/gi, '').replace(/balcão[:\s]*/gi, '').trim()}
                             </span>
                           </div>
@@ -1418,17 +1503,18 @@ export default function MediaIndoor() {
                   </div>
                 </div>
 
-                <div className="mt-auto p-10 flex flex-col items-center text-center gap-6 border-t border-outline-variant/20">
-                   <div className={`p-6 rounded-full flex items-center justify-center ${!showMedia ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-ink-secondary/30'}`}>
+                <div className="mt-auto p-[clamp(0.75rem,2vh,2.5rem)] flex flex-col items-center text-center gap-[clamp(0.5rem,1.5vh,1.5rem)] border-t border-outline-variant/20">
+                   <div className={`p-[clamp(0.5rem,1.5vh,1.5rem)] rounded-full flex items-center justify-center ${!showMedia ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-ink-secondary/40'}`}>
                       {showMedia ? (
-                         <Ticket className="h-16 w-16" />
+                         <Ticket className="h-[clamp(2rem,5vh,4rem)] w-[clamp(2rem,5vh,4rem)]" />
                       ) : (
-                         <Megaphone className="h-16 w-16 animate-bounce" />
+                         <Megaphone className="h-[clamp(2rem,5vh,4rem)] w-[clamp(2rem,5vh,4rem)] animate-pulse" />
                       )}
                    </div>
-                   <p className={`font-sans text-2xl font-bold uppercase tracking-widest ${showMedia ? 'text-ink-secondary/40' : 'text-primary animate-pulse'}`}>
+                   <p className={`font-sans text-[clamp(0.875rem,min(1.8vw,2.5vh),1.5rem)] font-bold uppercase tracking-[0.08em] ${showMedia ? 'text-ink-secondary/60' : 'text-primary animate-pulse'}`}>
                       {showMedia ? 'Aguardando chamada...' : 'Senha Chamada!'}
                    </p>
+                </div>
                 </div>
               </div>
             )}
@@ -1438,10 +1524,10 @@ export default function MediaIndoor() {
 
       {/* Bottom Footer Area (Letreiro Digital) */}
       {layout !== 'l-shape' && config.mostrar_rodape !== '0' && (
-        <footer className="h-14 bg-ink text-white flex items-center justify-between shrink-0 relative overflow-hidden">
+        <footer className="h-[clamp(3rem,6vh,5rem)] bg-ink text-white flex items-center justify-between shrink-0 relative overflow-hidden">
           <div className="flex-1 overflow-hidden relative h-full flex items-center">
             <div 
-              className="whitespace-nowrap inline-block font-sans text-[1.1rem] font-bold uppercase tracking-[0.1em] text-white/90"
+              className="whitespace-nowrap inline-block font-sans text-[clamp(0.8rem,1.4vw,1.4rem)] font-bold uppercase tracking-[0.08em] text-white/90"
               style={{ animation: 'marquee 25s linear infinite' }}
             >
               <span className="text-primary mx-6">⚡</span>
@@ -1450,7 +1536,7 @@ export default function MediaIndoor() {
               {config.texto_rodape || 'Aproveite nossas promoções exclusivas! • Peça já o seu cartão ChamaAí e ganhe 10% de desconto.'}
             </div>
           </div>
-          <div className="font-sans text-lg font-bold shrink-0 flex items-center gap-2 bg-ink pl-8 pr-8 z-10 h-full border-l border-white/10 shadow-[-10px_0_15px_rgba(0,0,0,0.5)]">
+          <div className="font-sans text-[clamp(0.75rem,1.4vw,1.25rem)] font-bold shrink-0 flex items-center gap-2 bg-ink px-[clamp(0.75rem,2vw,2rem)] z-10 h-full border-l border-white/10">
             <span className="lowercase font-sans opacity-60">{currentTime.toLocaleDateString('pt-BR', { weekday: 'short' })}.</span>
             {currentTime.toLocaleDateString('pt-BR')} <span className="opacity-40 mx-1">•</span> {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </div>
@@ -1470,6 +1556,7 @@ export default function MediaIndoor() {
             encarteError={encarteCache.error}
             lowPerformanceMode={isLowPerformanceMode}
             assetUrlResolver={resolveAssetUrl}
+            assetEvictor={evictAsset}
           />
         )}
       </div>

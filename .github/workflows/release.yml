@@ -29,20 +29,26 @@ jobs:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Instalar Dependências
-        run: npm install
+        shell: pwsh
+        run: |
+          $maximumAttempts = 3
+          for ($attempt = 1; $attempt -le $maximumAttempts; $attempt++) {
+            npm ci
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($attempt -eq $maximumAttempts) { exit $LASTEXITCODE }
+            Write-Warning "Instalação falhou na tentativa $attempt. Tentando novamente..."
+            Start-Sleep -Seconds (10 * $attempt)
+          }
 
       - name: Configurar Git e Incrementar Versão (SemVer)
         shell: bash
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Descarta alterações em arquivos rastreados (como package-lock.json gerado por npm install)
-          git reset --hard HEAD
           
           # Puxa possíveis modificações concorrentes
           git pull origin main --rebase
@@ -53,7 +59,7 @@ jobs:
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "Nova versão gerada: $NEW_VERSION"
           
-          git add package.json
+          git add package.json package-lock.json
           git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
           git push origin main
         id: versioning
