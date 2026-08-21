@@ -23,6 +23,7 @@ import {
 import { Button } from '../shared/components/Button';
 import { Input } from '../shared/components/Input';
 import { Dialog } from '../shared/components/Dialog';
+import { readMediaApiError, validateMediaUpload } from './mediaUpload';
 import { StatusBadge } from '../shared/components/StatusBadge';
 import VignetteSchedulerAdmin from './VignetteSchedulerAdmin';
 
@@ -229,6 +230,7 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [formError, setFormError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const confirm = useConfirm();
 
@@ -251,15 +253,25 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
-  const openCreate = () => { setForm(BLANK_ITEM); setEditing(null); setUploadFile(null); setShowForm(true); };
+  const openCreate = () => { setForm(BLANK_ITEM); setEditing(null); setUploadFile(null); setFormError(''); setShowForm(true); };
   const openEdit = (item: MediaItem) => {
-    setForm({ ...item }); setEditing(item); setUploadFile(null); setShowForm(true);
+    setForm({ ...item }); setEditing(item); setUploadFile(null); setFormError(''); setShowForm(true);
   };
 
   const handleSave = async () => {
-    if (!form.title.trim()) { alert('Informe um título.'); return; }
+    setFormError('');
+    if (!form.title.trim()) { setFormError('Informe um título para o conteúdo.'); return; }
+    if (uploadFile && (form.type === 'image' || form.type === 'video')) {
+      const validationError = validateMediaUpload(uploadFile, form.type);
+      if (validationError) { setFormError(validationError); return; }
+    }
+    if (needsFile(form.type) && !uploadFile && !form.local_path?.trim()) {
+      setFormError('Selecione um arquivo ou informe um caminho existente em /uploads/.');
+      return;
+    }
     setSaving(true);
     let submissionForm = { ...form };
+    let uploadedLegacyId: string | number | null = null;
     try {
       if (uploadFile && (form.type === 'image' || form.type === 'video')) {
         const fd = new FormData();
@@ -268,8 +280,9 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
         fd.append('tipo', form.type === 'video' ? 'video' : 'imagem');
         fd.append('duracao', String(form.duration_seconds));
         const up = await fetch(`${API_URL}/api/midias`, { method: 'POST', body: fd });
-        if (!up.ok) throw new Error('Falha no upload');
-        const upData = await up.json() as { caminho?: string; path?: string };
+        if (!up.ok) throw new Error(await readMediaApiError(up, 'Falha ao enviar o arquivo'));
+        const upData = await up.json() as { id?: string | number; caminho?: string; path?: string };
+        uploadedLegacyId = upData.id ?? null;
         submissionForm = {
           ...submissionForm,
           local_path: upData.caminho || upData.path || '',
@@ -284,12 +297,17 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(submissionForm),
       });
-      if (!res.ok) throw new Error('Falha ao salvar');
+      if (!res.ok) throw new Error(await readMediaApiError(res, 'Falha ao cadastrar o conteúdo'));
       showToast(editing ? 'Item atualizado!' : 'Item criado!');
       setShowForm(false);
       fetchItems();
     } catch (error: unknown) {
-      showToast('Erro: ' + (error instanceof Error ? error.message : 'desconhecido'));
+      if (uploadedLegacyId !== null) {
+        await fetch(`${API_URL}/api/midias/${uploadedLegacyId}`, { method: 'DELETE' }).catch(() => undefined);
+      }
+      const message = error instanceof Error ? error.message : 'Erro desconhecido durante o upload.';
+      setFormError(message);
+      showToast('Erro ao salvar mídia');
     } finally {
       setSaving(false);
     }
@@ -419,7 +437,12 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
                   <button 
                     key={k} 
                     type="button"
-                    onClick={() => setForm(f => ({ ...f, type: k as MediaItem['type'], source_url: '', local_path: '' }))}
+                    onClick={() => {
+                      setUploadFile(null);
+                      setFormError('');
+                      if (fileRef.current) fileRef.current.value = '';
+                      setForm(f => ({ ...f, type: k as MediaItem['type'], source_url: '', local_path: '' }));
+                    }}
                     className={`flex items-center gap-2 px-3 py-2 rounded-md border text-xs font-bold transition-all ${
                       form.type === k 
                         ? 'border-primary bg-primary/5 text-primary' 
@@ -458,7 +481,11 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
                   </p>
                   <input ref={fileRef} type="file" className="hidden"
                     accept={form.type === 'video' ? 'video/*' : 'image/*'}
-                    onChange={e => { if (e.target.files?.[0]) setUploadFile(e.target.files[0]); }} />
+                    onChange={e => {
+                      const file = e.target.files?.[0] || null;
+                      setUploadFile(file);
+                      setFormError('');
+                    }} />
                 </div>
                 <div className="relative flex py-2 items-center">
                   <div className="flex-grow border-t border-outline-variant/30"></div>
@@ -533,6 +560,11 @@ function TabItems({ API_URL, campaigns }: { API_URL: string; campaigns: Campaign
                 <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${form.is_active ? 'translate-x-4' : 'translate-x-0'}`} />
               </button>
             </div>
+            {formError && (
+              <div role="alert" className="rounded-md border border-error/30 bg-error/10 px-4 py-3 text-sm font-semibold text-error">
+                {formError}
+              </div>
+            )}
           </div>
           <div className="flex gap-3 justify-end mt-6">
             <Button 
