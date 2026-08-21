@@ -27,6 +27,9 @@ import LicenseGate from './shared/LicenseGate';
 import GlobalUpdateNotification from './shared/GlobalUpdateNotification';
 import { Ticket, Monitor, User, Tablet, Shield, Network, Loader2 } from 'lucide-react';
 import { Dialog, Input, Button } from './shared/components';
+import TelaoConnectionDialog from './telao/TelaoConnectionDialog';
+
+const IS_DEDICATED_TELAO = import.meta.env.VITE_APP_MODE === 'telao';
 
 function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) {
   const [checking, setChecking] = useState(true);
@@ -391,6 +394,17 @@ export default function App() {
     window.addEventListener('CONFIG_ATUALIZADA', handleConfigUpdated);
     return () => window.removeEventListener('CONFIG_ATUALIZADA', handleConfigUpdated);
   }, []);
+
+  if (IS_DEDICATED_TELAO) {
+    return (
+      <HashRouter>
+        <TelaoConnectionDialog />
+        <Routes>
+          <Route path="*" element={<MediaIndoor />} />
+        </Routes>
+      </HashRouter>
+    );
+  }
 
   return (
     <LicenseGate>

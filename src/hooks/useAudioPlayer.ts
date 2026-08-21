@@ -3,7 +3,46 @@ import type { PlaybackResult } from '../telao/audioCallFlow';
 
 let globalAudioContext: AudioContext | null = null;
 const audioBuffers = new Map<string, AudioBuffer>();
+const audioBufferAccess = new Map<string, number>();
 const stateChangeListeners = new Set<(state: AudioContextState) => void>();
+const MAX_DECODED_AUDIO_BYTES = 32 * 1024 * 1024;
+const MAX_DECODED_AUDIO_ENTRIES = 128;
+
+function bufferBytes(buffer: AudioBuffer): number {
+  return buffer.length * buffer.numberOfChannels * 4;
+}
+
+function getCachedBuffer(key: string): AudioBuffer | undefined {
+  const buffer = audioBuffers.get(key);
+  if (buffer) audioBufferAccess.set(key, Date.now());
+  return buffer;
+}
+
+function putCachedBuffer(key: string, buffer: AudioBuffer): void {
+  audioBuffers.set(key, buffer);
+  audioBufferAccess.set(key, Date.now());
+  let usedBytes = Array.from(audioBuffers.values()).reduce((sum, item) => sum + bufferBytes(item), 0);
+  const evictionOrder = Array.from(audioBufferAccess.entries()).sort((a, b) => a[1] - b[1]);
+  for (const [candidate] of evictionOrder) {
+    if (usedBytes <= MAX_DECODED_AUDIO_BYTES && audioBuffers.size <= MAX_DECODED_AUDIO_ENTRIES) break;
+    if (candidate.startsWith('system:')) continue;
+    const removed = audioBuffers.get(candidate);
+    if (!removed) continue;
+    audioBuffers.delete(candidate);
+    audioBufferAccess.delete(candidate);
+    usedBytes -= bufferBytes(removed);
+  }
+}
+
+export function invalidateTtsAudioRevision(revision: string): void {
+  const expected = `v=${encodeURIComponent(revision || 'initial')}`;
+  for (const key of audioBuffers.keys()) {
+    if (key.includes('/tts/') && !key.includes(expected)) {
+      audioBuffers.delete(key);
+      audioBufferAccess.delete(key);
+    }
+  }
+}
 
 function getAudioContext(): AudioContext | null {
   if (!globalAudioContext) {
@@ -196,7 +235,7 @@ export function useAudioPlayer() {
     if (audioBuffers.has(key)) return;
     try {
       const ctx = await ensureReadyAudioContext();
-      audioBuffers.set(key, await decodeSource(ctx, source));
+      putCachedBuffer(key, await decodeSource(ctx, source));
       setIsInitialized(true);
       console.log(`[AudioPlayer] Áudio carregado: ${key}`);
     } catch (error) {
@@ -207,12 +246,12 @@ export function useAudioPlayer() {
   const preloadSystemSound = useCallback(async (key: string, type: string): Promise<void> => {
     try {
       const cacheKey = `system:${type}`;
-      let buffer = audioBuffers.get(cacheKey);
+      let buffer = getCachedBuffer(cacheKey);
       if (!buffer) {
         buffer = await renderSystemSound(type);
-        audioBuffers.set(cacheKey, buffer);
+        putCachedBuffer(cacheKey, buffer);
       }
-      audioBuffers.set(key, buffer);
+      putCachedBuffer(key, buffer);
       console.log(`[AudioPlayer] Som de sistema carregado: ${type}`);
     } catch (error) {
       console.warn(`[AudioPlayer] Falha ao criar som de sistema: ${type}`, error);
@@ -223,7 +262,7 @@ export function useAudioPlayer() {
     const playbackId = beginPlaybackRequest();
     const ctx = await ensureReadyAudioContext();
     setIsInitialized(true);
-    const buffer = audioBuffers.get(key);
+    const buffer = getCachedBuffer(key);
     if (!buffer) throw new Error(`Áudio não encontrado no cache: ${key}`);
     console.log(`[AudioPlayer] Reproduzindo cache: ${key}`);
     return playBuffer(ctx, buffer, playbackId, volume);
@@ -237,10 +276,10 @@ export function useAudioPlayer() {
     const ctx = await ensureReadyAudioContext();
     setIsInitialized(true);
     const cacheKey = `system:${type}`;
-    let buffer = audioBuffers.get(cacheKey);
+    let buffer = getCachedBuffer(cacheKey);
     if (!buffer) {
       buffer = await renderSystemSound(type);
-      audioBuffers.set(cacheKey, buffer);
+      putCachedBuffer(cacheKey, buffer);
     }
     if (playbackId !== currentPlaybackId) return 'interrupted';
     console.log(`[AudioPlayer] Reproduzindo som de sistema: ${type}`);
@@ -256,10 +295,10 @@ export function useAudioPlayer() {
     const playbackId = beginPlaybackRequest();
     const ctx = await ensureReadyAudioContext();
     setIsInitialized(true);
-    let buffer = audioBuffers.get(url);
+    let buffer = getCachedBuffer(url);
     if (!buffer) {
       buffer = await decodeSource(ctx, url);
-      audioBuffers.set(url, buffer);
+      putCachedBuffer(url, buffer);
     }
     if (playbackId !== currentPlaybackId) return 'interrupted';
     const safeSource = url.startsWith('data:')

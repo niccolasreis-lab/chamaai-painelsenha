@@ -8,4 +8,7 @@ export const TELAO_TTS_MODE_MIGRATION_SQL = `
         ELSE 'desativado'
       END,
       datetime('now');
+  UPDATE configuracoes
+    SET valor = 'mp3', atualizado_em = datetime('now')
+    WHERE chave = 'telao_tts_modo' AND valor = 'ambos';
 `;

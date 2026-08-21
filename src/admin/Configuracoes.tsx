@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
 import { getApiUrl } from '../shared/apiConfig';
-import { SOUND_OPTIONS, playNotificationSound } from '../shared/sounds';
 import { 
   AlertTriangle,
   RotateCcw,
@@ -111,6 +110,7 @@ export default function Configuracoes() {
     telao_tts_template_nome: 'Senha {senha}, {nome}, dirija-se ao {guiche}.',
     telao_tts_velocidade: '0.95',
     telao_tts_tom: '1.0',
+    telao_cache_limite_mb: '256',
     painel_habilitar_repetir: '1',
     painel_habilitar_devolver: '1',
     painel_habilitar_nao_compareceu: '1',
@@ -538,11 +538,6 @@ export default function Configuracoes() {
     }
     
     window.open(targetUrl, '_blank');
-  };
-
-  const handleTestSound = () => {
-    const customUrl = config.som_personalizado ? `${API_URL}${config.som_personalizado}` : undefined;
-    playNotificationSound(config.tipo_som as any || 'bell', parseInt(config.volume_audio || '80'), customUrl);
   };
 
   const handleTestTts = () => {
@@ -1055,6 +1050,15 @@ export default function Configuracoes() {
                       onChange={handleChange}
                       type="text"
                     />
+                    <Input
+                      name="telao_cache_limite_mb"
+                      label="Limite de cache por telão (MiB)"
+                      value={config.telao_cache_limite_mb || '256'}
+                      onChange={handleChange}
+                      type="number"
+                      min={32}
+                      max={2048}
+                    />
 
                     <div className="col-span-2 flex flex-col sm:flex-row gap-3">
                       <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-sm border border-outline-variant/35 flex-1">
@@ -1083,43 +1087,13 @@ export default function Configuracoes() {
                           onChange={handleChange}
                           className="w-full bg-surface border border-outline-variant rounded-sm px-3 h-11 text-ink font-bold focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary focus:border-primary"
                         >
-                          <option value="desativado">🔇 Chamada por voz Desativada (Apenas campainha)</option>
+                          <option value="desativado">🔇 Chamada por voz desativada</option>
                           <option value="sintetizador">🗣️ Sintetizador de Voz (TTS Padrão do Navegador)</option>
                           <option value="mp3">🎵 Arquivos de Áudio MP3 Pré-gravados</option>
-                          <option value="ambos">🔊 Ambos (Tenta MP3, usa Sintetizador como Fallback)</option>
                         </select>
                       </div>
 
-                      <div className="p-4 bg-surface-container-low border border-outline-variant/50 rounded-sm">
-                        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-                          <div className="flex-1">
-                            <label className="block font-medium text-xs text-ink mb-1.5 uppercase">
-                              Campainha antes da chamada
-                            </label>
-                            <select
-                              name="tipo_som"
-                              value={config.tipo_som || 'bell'}
-                              onChange={handleChange}
-                              className="w-full bg-surface border border-outline-variant rounded-sm px-3 h-11 text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary focus:border-primary"
-                            >
-                              {SOUND_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.label}</option>)}
-                            </select>
-                          </div>
-                          <Button
-                            variant="secondary"
-                            onClick={handleTestSound}
-                            className="px-3 h-11"
-                            icon={<Volume2 className="h-4 w-4" />}
-                          >
-                            Testar campainha
-                          </Button>
-                        </div>
-                        <p className="text-[10px] text-ink-variant mt-2 leading-relaxed">
-                          Esta é a campainha original do telão. Ela toca primeiro e, ao terminar, inicia o MP3 ou o sintetizador configurado como fallback.
-                        </p>
-                      </div>
-
-                      {(config.telao_tts_modo === 'sintetizador' || config.telao_tts_modo === 'ambos') && (
+                      {config.telao_tts_modo === 'sintetizador' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-surface-container-low border border-outline-variant/50 rounded-sm animate-fade-in">
                           <div className="col-span-2 font-bold text-ink text-sm border-b border-outline-variant/30 pb-2">
                             Configurações do Sintetizador de Voz (TTS)
@@ -1200,7 +1174,7 @@ export default function Configuracoes() {
                         </div>
                       )}
 
-                      {(config.telao_tts_modo === 'mp3' || config.telao_tts_modo === 'ambos') && (
+                      {config.telao_tts_modo === 'mp3' && (
                         <div className="grid grid-cols-1 gap-4 p-4 bg-surface-container-low border border-outline-variant/50 rounded-sm animate-fade-in">
                           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-outline-variant/30 pb-3 gap-3">
                             <div>

@@ -82,12 +82,20 @@ export default function Dashboard() {
     };
     checkStatus();
     
-    if (!localStorage.getItem('onboarding_completed')) {
-      setShowWizard(true);
-    }
+    const checkOnboarding = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/configuracoes`, { cache: 'no-store' });
+        if (!response.ok) return;
+        const serverConfig = await response.json();
+        setShowWizard(serverConfig.onboarding_completed === '0');
+      } catch (error) {
+        console.error('Falha ao verificar onboarding no servidor:', error);
+      }
+    };
+    void checkOnboarding();
     
     return () => clearInterval(interval);
-  }, []);
+  }, [API_URL]);
 
   return (
     <AdminLayout>

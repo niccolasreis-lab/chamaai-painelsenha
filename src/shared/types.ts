@@ -1,4 +1,4 @@
-export type TelaoTtsMode = 'desativado' | 'sintetizador' | 'mp3' | 'ambos';
+export type TelaoTtsMode = 'desativado' | 'sintetizador' | 'mp3';
 
 export type RecentCall = {
   id: string | number;
@@ -141,6 +141,8 @@ export type EstablishmentConfig = {
   telao_tts_tom?: string | null;
   telao_tts_velocidade?: string | null;
   telao_tts_voz?: string | null;
+  telao_tts_revision?: string | null;
+  telao_cache_limite_mb?: string | number | null;
   volume_audio?: string | number | null;
   portal_som_sua_vez?: string | null;
   rotulo_atendimento_geral?: string | null;

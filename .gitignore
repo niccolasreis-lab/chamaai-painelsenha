@@ -66,3 +66,5 @@ tts/
 .impeccable/live/deferred-svelte-component-accepts.json
 .impeccable/live/*.png
 # impeccable-ignore-end
+testsprite_tests/tmp/
+testsprite_tests/tmp/config.json

@@ -239,6 +239,9 @@ export default defineConfig(() => {
     esToolkitShimPlugin,
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        cleanupOutdatedCaches: true,
+      },
       includeAssets: ['favicon.svg', 'icon.png', 'icon.ico', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'ChamaAi - Operador',
@@ -322,4 +325,3 @@ export default defineConfig(() => {
     base: './',
   }
 })
-

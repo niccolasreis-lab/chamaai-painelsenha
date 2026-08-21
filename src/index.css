@@ -496,6 +496,14 @@
   animation: slideDownFade 0.3s ease-out forwards;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-call-once,
+  .animate-pulse-orange,
+  .badge-segunda-chamada {
+    animation: none !important;
+  }
+}
+
 /* TV Broadcast Style Classes */
 .broadcast-scanlines {
   position: absolute;

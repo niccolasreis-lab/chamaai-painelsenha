@@ -4,20 +4,16 @@ import { normalizeTtsMode } from '../shared/ttsMode';
 export type PlaybackResult = 'completed' | 'interrupted';
 
 export type AudioCallOutcome =
-  | 'chime_only'
+  | 'voice_disabled'
   | 'mp3_completed'
   | 'synth_completed'
   | 'voice_unavailable'
   | 'interrupted';
 
 export type AudioCallPhase =
-  | 'chime_start'
-  | 'chime_complete'
-  | 'chime_error'
   | 'mp3_try'
   | 'mp3_complete'
   | 'mp3_error'
-  | 'synth_fallback'
   | 'synth_start'
   | 'synth_complete'
   | 'synth_error'
@@ -27,15 +23,10 @@ export type AudioCallPhase =
 
 export type AudioCallPlan = {
   mode: TelaoTtsMode;
-  chime: {
-    type: 'ding' | 'bell' | 'chime' | 'bip';
-    customUrl: string | null;
-  };
   mp3Candidates: string[];
 };
 
 type AudioCallExecutor = {
-  playChime: () => Promise<PlaybackResult>;
   playMp3: (url: string) => Promise<PlaybackResult>;
   speak: () => Promise<PlaybackResult>;
   isCurrent: () => boolean;
@@ -93,23 +84,25 @@ export function buildMp3Candidates(
   apiUrl: string,
   number: string | number,
   isRepeat: boolean,
+  revision = 'initial',
 ): string[] {
   const baseUrl = apiUrl.replace(/\/$/, '');
   const numericNumber = Number(number);
   const normalizedNumber = Number.isFinite(numericNumber) ? String(numericNumber) : String(number);
   const safeNumber = encodeURIComponent(normalizedNumber);
+  const version = `?v=${encodeURIComponent(revision || 'initial')}`;
 
   if (isRepeat) {
     return [
-      `${baseUrl}/tts/tipo2/Senha_${safeNumber}_2_chamada.mp3`,
-      `${baseUrl}/tts/tipo2/Senha_${safeNumber}_2.mp3`,
-      `${baseUrl}/tts/tipo1/Senha_${safeNumber}_1.mp3`,
+      `${baseUrl}/tts/tipo2/Senha_${safeNumber}_2_chamada.mp3${version}`,
+      `${baseUrl}/tts/tipo2/Senha_${safeNumber}_2.mp3${version}`,
+      `${baseUrl}/tts/tipo1/Senha_${safeNumber}_1.mp3${version}`,
     ];
   }
 
   return [
-    `${baseUrl}/tts/tipo1/Senha_${safeNumber}_1.mp3`,
-    `${baseUrl}/tts/tipo3/Senha_${safeNumber}_3.mp3`,
+    `${baseUrl}/tts/tipo1/Senha_${safeNumber}_1.mp3${version}`,
+    `${baseUrl}/tts/tipo3/Senha_${safeNumber}_3.mp3${version}`,
   ];
 }
 
@@ -119,30 +112,16 @@ export function createAudioCallPlan(
   apiUrl: string,
 ): AudioCallPlan {
   const mode = normalizeTtsMode(config.telao_tts_modo);
-  const configuredChime = config.tipo_som || 'bell';
-  const systemChime = configuredChime === 'ding'
-    || configuredChime === 'bell'
-    || configuredChime === 'chime'
-    || configuredChime === 'bip'
-    ? configuredChime
-    : 'bell';
-  const customSound = configuredChime === 'custom'
-    ? config.som_personalizado?.trim()
-    : '';
-  const customUrl = customSound
-    ? /^(?:data:|blob:|https?:\/\/)/i.test(customSound)
-      ? customSound
-      : `${apiUrl.replace(/\/$/, '')}${customSound.startsWith('/') ? '' : '/'}${customSound}`
-    : null;
 
   return {
     mode,
-    chime: {
-      type: systemChime,
-      customUrl,
-    },
-    mp3Candidates: mode === 'mp3' || mode === 'ambos'
-      ? buildMp3Candidates(apiUrl, payload.numero, payload.repeticao === true)
+    mp3Candidates: mode === 'mp3'
+      ? buildMp3Candidates(
+        apiUrl,
+        payload.numero,
+        payload.repeticao === true,
+        config.telao_tts_revision || 'initial',
+      )
       : [],
   };
 }
@@ -162,19 +141,9 @@ export async function executeAudioCall(
     return outcome;
   };
 
-  emit('chime_start');
-  try {
-    const result = await executor.playChime();
-    if (result === 'interrupted' || interrupted()) return finishInterrupted();
-    emit('chime_complete');
-  } catch (error) {
-    if (interrupted()) return finishInterrupted();
-    emit('chime_error', { error });
-  }
+  if (plan.mode === 'desativado') return finish('voice_disabled');
 
-  if (plan.mode === 'desativado') return finish('chime_only');
-
-  if (plan.mode === 'mp3' || plan.mode === 'ambos') {
+  if (plan.mode === 'mp3') {
     for (const url of plan.mp3Candidates) {
       if (interrupted()) return finishInterrupted();
       emit('mp3_try', { url });
@@ -189,8 +158,7 @@ export async function executeAudioCall(
       }
     }
 
-    if (plan.mode === 'mp3') return finish('voice_unavailable');
-    emit('synth_fallback');
+    return finish('voice_unavailable');
   }
 
   if (interrupted()) return finishInterrupted();

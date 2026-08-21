@@ -1,5 +1,6 @@
 import express from 'express';
 import { getDb } from '../electron/services/database';
+import { unlinkManagedAsset } from './storage';
 
 const safeJsonParse = (str: string, fallback: any = {}) => {
   try {
@@ -8,6 +9,24 @@ const safeJsonParse = (str: string, fallback: any = {}) => {
     return fallback;
   }
 };
+
+function cleanupUnreferencedLocalAsset(localPath: unknown): void {
+  if (typeof localPath !== 'string' || !localPath.startsWith('/uploads/')) return;
+  const db = getDb();
+  const stillUsed = db.prepare('SELECT id FROM media_items WHERE local_path = ? LIMIT 1').get(localPath);
+  if (stillUsed) return;
+  const configReference = db.prepare('SELECT chave FROM configuracoes WHERE valor = ? LIMIT 1').get(localPath);
+  if (configReference) return;
+  const vignetteReference = db.prepare('SELECT id FROM vignette_files WHERE local_path = ? LIMIT 1').get(localPath);
+  if (vignetteReference) return;
+  const legacyReference = db.prepare(
+    'SELECT id FROM midias WHERE caminho = ? AND deleted_at IS NULL LIMIT 1',
+  ).get(localPath);
+  // Sem uma coluna explícita de propriedade não é seguro inferir que um registro
+  // legado pertence ao item inteligente. Ele permanece até sua própria exclusão.
+  if (legacyReference) return;
+  unlinkManagedAsset(localPath);
+}
 
 export function setupMediaIndoorRoutes(app: express.Express, broadcastEvent: (event: string, data: any) => void, requireMaster: express.RequestHandler) {
   
@@ -97,6 +116,7 @@ export function setupMediaIndoorRoutes(app: express.Express, broadcastEvent: (ev
   app.put('/api/media/items/:id', requireMaster, (req, res) => {
     try {
       const db = getDb();
+      const previous = db.prepare('SELECT local_path FROM media_items WHERE id = ?').get(req.params.id) as any;
       const { title, type, source_url, local_path, duration_seconds, sort_order, is_active, start_at, end_at, weekdays, campaign_id, priority, metadata } = req.body;
       
       db.prepare(`
@@ -108,6 +128,9 @@ export function setupMediaIndoorRoutes(app: express.Express, broadcastEvent: (ev
         start_at || null, end_at || null, weekdays || null, campaign_id || null, priority || 0, metadata ? JSON.stringify(metadata) : null,
         req.params.id
       );
+      if (previous?.local_path && previous.local_path !== (local_path || null)) {
+        cleanupUnreferencedLocalAsset(previous.local_path);
+      }
       
       broadcastEvent('MEDIA_ITEMS_UPDATED', { action: 'update', id: req.params.id });
       res.json({ success: true });
@@ -119,7 +142,9 @@ export function setupMediaIndoorRoutes(app: express.Express, broadcastEvent: (ev
   app.delete('/api/media/items/:id', requireMaster, (req, res) => {
     try {
       const db = getDb();
+      const previous = db.prepare('SELECT local_path FROM media_items WHERE id = ?').get(req.params.id) as any;
       db.prepare('DELETE FROM media_items WHERE id = ?').run(req.params.id);
+      cleanupUnreferencedLocalAsset(previous?.local_path);
       broadcastEvent('MEDIA_ITEMS_UPDATED', { action: 'delete', id: req.params.id });
       res.json({ success: true });
     } catch (err: any) {

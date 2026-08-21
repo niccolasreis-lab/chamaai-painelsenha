@@ -105,6 +105,12 @@ export async function initDatabase({ appVersion }: { appVersion: string }): Prom
       );
     `);
 
+    // Bancos anteriores guardavam o onboarding apenas por navegador. Preserve
+    // se esta migração servidor-autoritativo já foi aplicada.
+    const onboardingAuthorityAlreadyMigrated = Boolean(db.prepare(
+      "SELECT 1 FROM configuracoes WHERE chave = 'onboarding_server_authority_v1' LIMIT 1",
+    ).get());
+
     // ── Inline migrations (run safely on every startup) ──────────────────────
     // Configurações
     db.exec(`
@@ -150,6 +156,10 @@ export async function initDatabase({ appVersion }: { appVersion: string }): Prom
       INSERT OR IGNORE INTO configuracoes VALUES ('totem_solicita_nome', '0', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_ativo', '0', datetime('now'));
       ${TELAO_TTS_MODE_MIGRATION_SQL}
+      INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_revision', 'initial', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('telao_cache_limite_mb', '256', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('onboarding_completed', '${isFreshInstall ? '0' : '1'}', datetime('now'));
+      INSERT OR IGNORE INTO configuracoes VALUES ('onboarding_server_authority_v1', '1', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('telao_tts_voz', 'Feminina', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('telao_ticker_texto', '', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('sync_pendente_cor_primaria', '0', datetime('now'));
@@ -168,6 +178,15 @@ export async function initDatabase({ appVersion }: { appVersion: string }): Prom
       INSERT OR IGNORE INTO configuracoes VALUES ('midia_indoor_ativa', '1', datetime('now'));
       INSERT OR IGNORE INTO configuracoes VALUES ('midia_indoor_layout', 'lateral', datetime('now'));
     `);
+
+    // Migração única: uma instalação que já possuía banco é, por definição,
+    // um servidor existente. Assim outro computador não reabre o assistente.
+    // Instalações novas permanecem em 0 até concluírem o wizard de verdade.
+    if (!isFreshInstall && !onboardingAuthorityAlreadyMigrated) {
+      db.prepare(
+        "UPDATE configuracoes SET valor = '1', atualizado_em = datetime('now') WHERE chave = 'onboarding_completed'",
+      ).run();
+    }
 
     db.exec(`
       CREATE TABLE IF NOT EXISTS balcoes (

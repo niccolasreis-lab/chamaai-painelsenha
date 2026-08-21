@@ -17,6 +17,7 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
   const [showIpModal, setShowIpModal] = useState(false);
   const [tempIp, setTempIp] = useState(localStorage.getItem('server_ip_override') || '');
   const API_URL = getApiUrl();
+  const isDedicatedTelao = import.meta.env.VITE_APP_MODE === 'telao';
   const isLowPerformanceMode = 
     localStorage.getItem('telao_low_performance') === '1' || 
     new URLSearchParams(window.location.search).get('low_perf') === '1' ||
@@ -158,21 +159,27 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
 
           <div className="flex items-center gap-4 mt-2">
             <button
-              onClick={() => setShowIpModal(true)}
+              onClick={() => isDedicatedTelao
+                ? window.dispatchEvent(new CustomEvent('TELAO_OPEN_SETTINGS'))
+                : setShowIpModal(true)}
               className="text-[10px] text-white/40 hover:text-white/80 font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
             >
               <Network className="h-3 w-3" />
               Configurar Conexão (Atual: {localStorage.getItem('server_ip_override') || 'Localhost'})
             </button>
-            <span className="text-white/20 text-[10px] font-bold">|</span>
-            <Link
-              to="/"
-              onClick={() => localStorage.removeItem('app_mode')}
-              className="text-[10px] text-white/40 hover:text-white/80 font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
-            >
-              <ArrowLeft className="h-3 w-3" />
-              Voltar ao Menu
-            </Link>
+            {!isDedicatedTelao && (
+              <>
+                <span className="text-white/20 text-[10px] font-bold">|</span>
+                <Link
+                  to="/"
+                  onClick={() => localStorage.removeItem('app_mode')}
+                  className="text-[10px] text-white/40 hover:text-white/80 font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  Voltar ao Menu
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -183,7 +190,7 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
       </div>
 
       {/* Connection IP Setup Modal */}
-      <Dialog
+      {!isDedicatedTelao && <Dialog
         open={showIpModal}
         onClose={() => setShowIpModal(false)}
         title="Conectar ao Servidor"
@@ -225,7 +232,7 @@ export default function TelaoEspera({ code }: TelaoEsperaProps) {
             </Button>
           </div>
         </div>
-      </Dialog>
+      </Dialog>}
     </div>
   );
 }

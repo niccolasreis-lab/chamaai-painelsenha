@@ -17,6 +17,7 @@ interface SmartMediaLayerProps {
   encarteLoading?: boolean;
   encarteError?: string | null;
   lowPerformanceMode?: boolean;
+  assetUrlResolver?: (url?: string | null) => string;
 }
 
 type WeatherData = {
@@ -36,7 +37,8 @@ export default function SmartMediaLayer({
   encarteTemaAtivo = null,
   encarteLoading = false,
   encarteError = null,
-  lowPerformanceMode = false
+  lowPerformanceMode = false,
+  assetUrlResolver = (url) => url || '',
 }: SmartMediaLayerProps) {
   const [playlist, setPlaylist] = useState<MediaItem[]>([]);
   const [theme, setTheme] = useState<TemaEncarte | null>(null);
@@ -211,7 +213,7 @@ export default function SmartMediaLayer({
       return (
         <video 
           ref={videoRef}
-          src={`${API_URL}${currentMedia.local_path}`} 
+          src={assetUrlResolver(currentMedia.local_path)}
           className="w-full h-full object-cover"
           autoPlay
           muted
@@ -225,7 +227,7 @@ export default function SmartMediaLayer({
     if (currentMedia.type === 'image' || currentMedia.type === 'imagem') {
       return (
         <img 
-          src={`${API_URL}${currentMedia.local_path}`} 
+          src={assetUrlResolver(currentMedia.local_path)}
           alt={currentMedia.title}
           className="w-full h-full object-cover"
           onError={handleNext}

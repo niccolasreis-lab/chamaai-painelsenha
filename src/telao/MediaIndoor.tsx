@@ -8,8 +8,9 @@ import TelaoEspera from './TelaoEspera';
 import SmartMediaLayer from './SmartMediaLayer';
 import { useSSE } from '../shared/useSSE';
 import { getApiUrl } from '../shared/apiConfig';
-import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import { invalidateTtsAudioRevision, useAudioPlayer } from '../hooks/useAudioPlayer';
 import { VignetteAudioCoordinator } from './vignetteAudioCoordinator';
+import { useTelaoAssetCache } from './useTelaoAssetCache';
 import {
   buildSpeechText,
   createAudioCallPlan,
@@ -134,6 +135,7 @@ function normalizeAudioVolume(value: unknown): number {
 }
 
 export default function MediaIndoor() {
+  const isDedicatedTelao = import.meta.env.VITE_APP_MODE === 'telao';
   // Session / Pairing state
   const [telaoCode, setTelaoCode] = useState<string | null>(localStorage.getItem('telao_code'));
   const [perfil, setPerfil] = useState<PerfilTelao | null>(null);
@@ -165,6 +167,7 @@ export default function MediaIndoor() {
   const repeticaoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const API_URL = getApiUrl();
+  const { resolve: resolveAssetUrl, sync: syncAssetCache } = useTelaoAssetCache(API_URL, telaoCode);
 
   const [encarteCache, setEncarteCache] = useState<{
     produtos: ProdutoToledo[];
@@ -266,7 +269,6 @@ export default function MediaIndoor() {
 
   const {
     initAudioContext,
-    playSystemSound,
     playDynamicUrl,
     stopAudio,
     isInitialized,
@@ -405,6 +407,7 @@ export default function MediaIndoor() {
       const res = await fetch(`${API_URL}/api/configuracoes`);
       if (res.ok) {
         const data = await res.json();
+        invalidateTtsAudioRevision(data.telao_tts_revision || 'initial');
         setConfig(data);
       }
     } catch (err) {
@@ -610,7 +613,6 @@ export default function MediaIndoor() {
           }
 
           const volume = normalizeAudioVolume(config.volume_audio);
-          const chimeSource = plan.chime.customUrl ? 'custom' : plan.chime.type;
           const numericSetting = (
             value: string | null | undefined,
             fallback: number,
@@ -625,9 +627,6 @@ export default function MediaIndoor() {
 
           await executeAudioCall(plan, {
             isCurrent,
-            playChime: () => plan.chime.customUrl
-              ? playDynamicUrl(plan.chime.customUrl, volume)
-              : playSystemSound(plan.chime.type, volume),
             playMp3: (url) => playDynamicUrl(url, volume),
             speak: () => falarSenha(
               buildSpeechText(payload, config),
@@ -638,7 +637,6 @@ export default function MediaIndoor() {
             ),
             onPhase: (phase, details) => logAudioPhase(payload.id, sequence, phase, {
               ...details,
-              ...(phase.startsWith('chime_') ? { source: chimeSource } : {}),
             }),
           });
         }).catch((error) => {
@@ -701,6 +699,7 @@ export default function MediaIndoor() {
     const handleConfigAtualizada = () => {
       autoRecoverAttemptsRef.current = 0;
       fetchConfig();
+      void syncAssetCache();
       refreshEncarteData('SSE: CONFIG_ATUALIZADA');
     };
 
@@ -717,6 +716,7 @@ export default function MediaIndoor() {
 
     const handleMidiasAtualizadas = () => {
       fetchMidias();
+      void syncAssetCache();
     };
 
     const handleToledoPrecosAtualizados = () => {
@@ -806,7 +806,7 @@ export default function MediaIndoor() {
       window.removeEventListener('DIA_RESETADO', handleDiaResetado);
       window.removeEventListener('RECARREGAR_PAGINA', handleRecarregarPagina);
     };
-  }, [API_URL, config, playDynamicUrl, playSystemSound, refreshEncarteData]);
+  }, [API_URL, config, playDynamicUrl, refreshEncarteData, syncAssetCache]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
   // Rotate between media and active modules
@@ -932,16 +932,16 @@ export default function MediaIndoor() {
     <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-sans text-ink relative">
       <header className="h-32 bg-white border-b border-outline-variant/30 flex items-center justify-between px-8 shrink-0">
         <div className="flex items-center gap-4">
-          <Link 
+          {!isDedicatedTelao && <Link
             to="/" 
             onClick={() => localStorage.removeItem('app_mode')}
             className="p-2 mr-2 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center outline-none" 
             title="Voltar ao Menu Principal"
           >
             <ArrowLeft className="h-6 w-6" />
-          </Link>
+          </Link>}
           {config.logo_cliente ? (
-            <img src={`${API_URL}${config.logo_cliente}`} className="h-20 object-contain" alt="Logo" />
+            <img src={resolveAssetUrl(config.logo_cliente)} className="h-20 object-contain" alt="Logo" />
           ) : (
             <div className="flex flex-col">
               <h1 className="font-sans text-3xl font-bold text-primary leading-none uppercase tracking-tighter">ChamaAí</h1>
@@ -986,6 +986,7 @@ export default function MediaIndoor() {
             encarteLoading={encarteCache.loading}
             encarteError={encarteCache.error}
             lowPerformanceMode={isLowPerformanceMode}
+            assetUrlResolver={resolveAssetUrl}
           />
         )}
 
@@ -1035,7 +1036,7 @@ export default function MediaIndoor() {
                       {activeMidia.tipo === 'video' ? (
                         <video 
                           ref={videoRef}
-                          src={`${API_URL}${activeMidia.caminho}`} 
+                          src={resolveAssetUrl(activeMidia.caminho)}
                           className="w-full h-full object-cover"
                           autoPlay
                           muted
@@ -1057,7 +1058,7 @@ export default function MediaIndoor() {
                       ) : (
                         <img 
                           key={activeMidia.id}
-                          src={`${API_URL}${activeMidia.caminho}`} 
+                          src={resolveAssetUrl(activeMidia.caminho)}
                           alt={activeMidia.nome}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -1071,7 +1072,7 @@ export default function MediaIndoor() {
                     <div className="h-full w-full flex flex-col items-center justify-center p-20">
                       <div className="text-center">
                         {config.logo_cliente ? (
-                          <img src={`${API_URL}${config.logo_cliente}`} className="h-40 object-contain mb-8 drop-shadow-2xl" alt="Logo" />
+                          <img src={resolveAssetUrl(config.logo_cliente)} className="h-40 object-contain mb-8 drop-shadow-2xl" alt="Logo" />
                         ) : (
                           <h2 className="font-sans text-6xl font-bold text-white mb-6 uppercase tracking-widest drop-shadow-lg">
                             {config.nome_estabelecimento || 'ChamaAí'}
@@ -1203,7 +1204,7 @@ export default function MediaIndoor() {
                     {activeMidia.tipo === 'video' ? (
                       <video 
                         ref={videoRef}
-                        src={`${API_URL}${activeMidia.caminho}`} 
+                        src={resolveAssetUrl(activeMidia.caminho)}
                         className="w-full h-full object-cover"
                         autoPlay
                         muted
@@ -1225,7 +1226,7 @@ export default function MediaIndoor() {
                     ) : (
                       <img 
                         key={activeMidia.id}
-                        src={`${API_URL}${activeMidia.caminho}`} 
+                        src={resolveAssetUrl(activeMidia.caminho)}
                         alt={activeMidia.nome}
                         className="w-full h-full object-cover"
                         onError={(e) => {
@@ -1239,7 +1240,7 @@ export default function MediaIndoor() {
                   <div className="h-full w-full flex flex-col items-center justify-center p-20">
                     <div className="text-center">
                       {config.logo_cliente ? (
-                        <img src={`${API_URL}${config.logo_cliente}`} className="h-40 object-contain mb-8 drop-shadow-2xl" alt="Logo" />
+                        <img src={resolveAssetUrl(config.logo_cliente)} className="h-40 object-contain mb-8 drop-shadow-2xl" alt="Logo" />
                       ) : (
                         <h2 className="font-sans text-6xl font-bold text-white mb-6 uppercase tracking-widest drop-shadow-lg">
                           {config.nome_estabelecimento || 'ChamaAí'}
@@ -1351,6 +1352,7 @@ export default function MediaIndoor() {
             encarteLoading={encarteCache.loading}
             encarteError={encarteCache.error}
             lowPerformanceMode={isLowPerformanceMode}
+            assetUrlResolver={resolveAssetUrl}
           />
         )}
       </div>

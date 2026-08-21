@@ -23,6 +23,15 @@ import {
   stopVignetteScheduler,
 } from './services/vignette-scheduler.service';
 import { isTelaoTtsMode, TELAO_TTS_MODES } from '../src/shared/ttsMode';
+import {
+  CHAMAAI_DATA_DIR,
+  TTS_DIR,
+  UPLOADS_DIR,
+  ensureStorageDirectories,
+  resolveManagedAssetPath,
+  unlinkManagedAsset,
+} from './storage';
+import { setupTelaoAssetRoutes } from './telao-assets';
 
 const app = express();
 app.set('trust proxy', true);
@@ -393,15 +402,7 @@ let heartbeatInterval: NodeJS.Timeout | null = null;
 
 export function startServer() {
   const PORT = 3001;
-  
-  // Resolve o caminho para uma pasta local visível e fácil de gerenciar
-  const userDataPath = 'C:\\ChamaAi';
-  const UPLOADS_DIR = path.join(userDataPath, 'uploads');
-
-  // Ensure uploads directory exists
-  if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-  }
+  ensureStorageDirectories();
 
   // Configure Multer for local storage
   const storage = multer.diskStorage({
@@ -424,8 +425,8 @@ export function startServer() {
       let missingCount = 0;
       
       for (const m of activeMidias) {
-        const filePath = path.join(process.cwd(), m.caminho.replace(/^[\\/\\\\]/, ''));
-        const exists = fs.existsSync(filePath);
+        const filePath = resolveManagedAssetPath(m.caminho);
+        const exists = !!filePath && fs.existsSync(filePath);
         
         if (!exists && m.file_status !== 'missing') {
           db.prepare("UPDATE midias SET file_status = 'missing' WHERE id = ?").run(m.id);
@@ -465,28 +466,22 @@ export function startServer() {
     limits: { fileSize: 500 * 1024 * 1024 } // Limite rígido de 500MB
   });
 
-  // Serve static files from uploads folder with aggressive caching to avoid client media freezing
+  // O cache persistente é controlado pelo telão; evite o cache HTTP ilimitado do WebView.
   app.use('/uploads', express.static(UPLOADS_DIR, {
-    maxAge: 31536000000, // 1 year in milliseconds
-    immutable: true,
     setHeaders: (res) => {
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('Cache-Control', 'no-store');
     }
   }));
 
   // Serve static files from tts folder
-  const TTS_DIR = path.join(UPLOADS_DIR, 'tts');
-  if (!fs.existsSync(TTS_DIR)) {
-    fs.mkdirSync(TTS_DIR, { recursive: true });
-    fs.mkdirSync(path.join(TTS_DIR, 'tipo1'), { recursive: true });
-    fs.mkdirSync(path.join(TTS_DIR, 'tipo2'), { recursive: true });
-    fs.mkdirSync(path.join(TTS_DIR, 'tipo3'), { recursive: true });
-  }
 
-  // Automatic migration of old tts folders from project root
+  // Migração única: depois de concluída, uma limpeza intencional no Admin não
+  // pode ser revertida por uma cópia silenciosa no próximo boot.
   const rootTtsDir = path.join(process.cwd(), 'tts');
-  if (fs.existsSync(rootTtsDir)) {
+  const ttsMigrationMarker = path.join(TTS_DIR, '.legacy-migration-v1-complete');
+  if (fs.existsSync(rootTtsDir) && !fs.existsSync(ttsMigrationMarker)) {
     try {
+      let copiedLegacyTts = false;
       const p1 = path.join(rootTtsDir, 'senha_1_100');
       const p2 = path.join(rootTtsDir, 'senha_1_100_2_chamada');
       const t1 = path.join(TTS_DIR, 'tipo1');
@@ -499,6 +494,7 @@ export function startServer() {
             const dest = path.join(t1, file);
             if (!fs.existsSync(dest)) {
               fs.copyFileSync(path.join(p1, file), dest);
+              copiedLegacyTts = true;
             }
           }
         }
@@ -510,10 +506,15 @@ export function startServer() {
             const dest = path.join(t2, file);
             if (!fs.existsSync(dest)) {
               fs.copyFileSync(path.join(p2, file), dest);
+              copiedLegacyTts = true;
             }
           }
         }
       }
+      if (copiedLegacyTts) {
+        getDb().prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('telao_tts_revision', ?, datetime('now'))").run(crypto.randomUUID());
+      }
+      fs.writeFileSync(ttsMigrationMarker, new Date().toISOString(), 'utf8');
       console.log('[TTS MIGRATION] Migração automática de áudios TTS concluída.');
     } catch (migErr) {
       console.error('[TTS MIGRATION] Erro ao migrar pastas antigas:', migErr);
@@ -521,10 +522,8 @@ export function startServer() {
   }
 
   app.use('/tts', express.static(TTS_DIR, {
-    maxAge: 31536000000,
-    immutable: true,
     setHeaders: (res) => {
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('Cache-Control', 'no-store');
     }
   }));
 
@@ -2188,12 +2187,17 @@ export function startServer() {
       const midia = db.prepare('SELECT caminho FROM midias WHERE id = ?').get(id) as any;
       
       if (midia) {
-        const filePath = path.join(process.cwd(), midia.caminho.replace(/^[\\/\\\\]/, ''));
-        console.log('Deleting file:', filePath);
+        const filePath = resolveManagedAssetPath(midia.caminho);
+        console.log('Deleting managed file:', filePath || '[caminho inválido]');
         try {
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-          }
+          const sharedReference = db.prepare(`
+            SELECT 1 AS found WHERE
+              EXISTS (SELECT 1 FROM midias WHERE caminho = ? AND deleted_at IS NULL)
+              OR EXISTS (SELECT 1 FROM media_items WHERE local_path = ?)
+              OR EXISTS (SELECT 1 FROM configuracoes WHERE valor = ?)
+              OR EXISTS (SELECT 1 FROM vignette_files WHERE local_path = ?)
+          `).get(midia.caminho, midia.caminho, midia.caminho, midia.caminho);
+          if (!sharedReference) unlinkManagedAsset(midia.caminho);
         } catch (fileErr) {
           console.error('Erro ao deletar arquivo físico (pode estar em uso):', fileErr);
           try {
@@ -2263,6 +2267,14 @@ export function startServer() {
         return res.status(400).json({
           error: `Modo de TTS inválido. Valores aceitos: ${TELAO_TTS_MODES.join(', ')}.`,
         });
+      }
+
+      if (Object.prototype.hasOwnProperty.call(configuracoes, 'telao_cache_limite_mb')) {
+        const cacheMb = Number(configuracoes.telao_cache_limite_mb);
+        if (!Number.isFinite(cacheMb) || cacheMb < 32 || cacheMb > 2048) {
+          return res.status(400).json({ error: 'telao_cache_limite_mb deve estar entre 32 e 2048.' });
+        }
+        configuracoes.telao_cache_limite_mb = String(Math.round(cacheMb));
       }
 
       // Validação de tamanhos de fonte CSS
@@ -2353,7 +2365,7 @@ export function startServer() {
 
       // Converter imagem pra base64 e enviar pro portal do cliente no Supabase
       try {
-        const filePath = path.join(process.cwd(), req.file.path);
+        const filePath = req.file.path;
         const base64 = fs.readFileSync(filePath, 'base64');
         const mimeType = req.file.mimetype;
         const dataUrl = `data:${mimeType};base64,${base64}`;
@@ -2411,7 +2423,7 @@ export function startServer() {
   // TTS STATUS AND MANAGEMENT ROUTES
   app.get('/api/tts/status', (req, res) => {
     try {
-      const dataDir = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+      const dataDir = CHAMAAI_DATA_DIR;
       const ttsBaseDir = path.join(dataDir, 'uploads', 'tts');
       const response: Record<string, { count: number; range: string }> = {};
 
@@ -2450,10 +2462,11 @@ export function startServer() {
   app.post('/api/tts/upload', requireMaster, upload.single('file'), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+      const db = getDb();
 
       const { execSync } = require('child_process');
       const zipFilePath = req.file.path;
-      const dataDir = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+      const dataDir = CHAMAAI_DATA_DIR;
       const uploadsDir = path.join(dataDir, 'uploads');
       const ttsBaseDir = path.join(uploadsDir, 'tts');
       const tempDir = path.join(dataDir, 'Backups', `_extract_tts_${Date.now()}`);
@@ -2519,7 +2532,11 @@ export function startServer() {
         console.error('[TTS UPLOAD] Erro ao limpar arquivos temporários:', e);
       }
 
-      broadcastEvent('CONFIG_ATUALIZADA', { tts_updated: Date.now().toString() });
+      const ttsRevision = crypto.randomUUID();
+      db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('telao_tts_revision', ?, datetime('now'))")
+        .run(ttsRevision);
+
+      broadcastEvent('CONFIG_ATUALIZADA', { tts_updated: Date.now().toString(), telao_tts_revision: ttsRevision });
       res.json({ success: true, count: successCount });
     } catch (err: any) {
       console.error('[TTS UPLOAD] Erro geral:', err);
@@ -2529,12 +2546,13 @@ export function startServer() {
 
   app.delete('/api/tts/clear/:tipo', requireMaster, (req, res) => {
     try {
+      const db = getDb();
       const tipo = req.params.tipo;
       if (typeof tipo !== 'string' || !['tipo1', 'tipo2', 'tipo3'].includes(tipo)) {
         return res.status(400).json({ error: 'Tipo inválido.' });
       }
 
-      const dataDir = process.env.CHAMAAI_DATA_DIR ?? 'C:\\ChamaAi';
+      const dataDir = CHAMAAI_DATA_DIR;
       const tipoDir = path.join(dataDir, 'uploads', 'tts', tipo);
       
       if (fs.existsSync(tipoDir)) {
@@ -2546,7 +2564,11 @@ export function startServer() {
         }
       }
 
-      broadcastEvent('CONFIG_ATUALIZADA', { tts_cleared: Date.now().toString() });
+      const ttsRevision = crypto.randomUUID();
+      db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor, atualizado_em) VALUES ('telao_tts_revision', ?, datetime('now'))")
+        .run(ttsRevision);
+
+      broadcastEvent('CONFIG_ATUALIZADA', { tts_cleared: Date.now().toString(), telao_tts_revision: ttsRevision });
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -4030,6 +4052,7 @@ export function startServer() {
   // ═══════════════════════════════════════════════════════════════════
   
   setupMediaIndoorRoutes(app, broadcastEvent, requireMaster);
+  setupTelaoAssetRoutes(app);
   setupVignetteRoutes(app, broadcastEvent, requireMaster);
 
   // Catch-all 404 handler for API
@@ -4070,7 +4093,7 @@ export function startServer() {
     app.use(express.static(frontendPath));
     // Middleware para SPA: se não for API, uploads ou atualizações locais, manda o index.html
     app.use((req, res, next) => {
-      if (req.url.startsWith('/api') || req.url.startsWith('/uploads') || req.url.startsWith('/local-updates')) {
+      if (req.url.startsWith('/api') || req.url.startsWith('/uploads') || req.url.startsWith('/tts') || req.url.startsWith('/local-updates')) {
         return next();
       }
       res.sendFile(path.join(frontendPath, 'index.html'));

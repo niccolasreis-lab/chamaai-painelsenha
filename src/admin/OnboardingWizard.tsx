@@ -58,7 +58,8 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
           nome_estabelecimento: formData.nome_estabelecimento,
           cor_primaria: formData.cor_primaria,
           cnpj_estabelecimento: formData.cnpj,
-          categoria_estabelecimento: formData.categoria
+          categoria_estabelecimento: formData.categoria,
+          onboarding_completed: '1'
         })
       });
       if (!res.ok) {
@@ -66,11 +67,11 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
       }
     } catch (e: any) {
       console.error('Erro ao salvar onboarding:', e);
-      alert('Aviso: Não foi possível salvar as configurações no servidor local, mas seu progresso foi marcado como concluído localmente.');
+      alert('Não foi possível salvar as configurações no servidor. O assistente permanecerá aberto para evitar perda de dados.');
+      return;
     }
-    
-    // Marca como completo no storage
-    localStorage.setItem('onboarding_completed', 'true');
+
+    localStorage.removeItem('onboarding_completed');
     // Remove dados temporários
     localStorage.removeItem('onboarding_step');
     localStorage.removeItem('onboarding_data');

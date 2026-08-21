@@ -4,7 +4,6 @@ export const TELAO_TTS_MODES: readonly TelaoTtsMode[] = [
   'desativado',
   'sintetizador',
   'mp3',
-  'ambos',
 ];
 
 export function isTelaoTtsMode(value: unknown): value is TelaoTtsMode {
