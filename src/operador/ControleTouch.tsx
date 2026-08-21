@@ -22,6 +22,7 @@ export default function ControleTouch() {
   const [isValidating, setIsValidating] = useState(false);
   const [senhaAtual, setSenhaAtual] = useState<Ticket | null>(null);
   const [aguardando, setAguardando] = useState(0);
+  const [hasAuthoritativeSnapshot, setHasAuthoritativeSnapshot] = useState(false);
   const [connectivity, setConnectivity] = useState<ConnectivityState>('checking');
   const [showSettings, setShowSettings] = useState(false);
   const [showConfirmDevolver, setShowConfirmDevolver] = useState(false);
@@ -34,13 +35,11 @@ export default function ControleTouch() {
   const recoveryLockRef = useRef(false);
   const actionLockRef = useRef(false);
   const actionIdRef = useRef(0);
-  const wasSseConnected = useRef(false);
   const hadOutageRef = useRef(false);
   const connectivityRef = useRef<ConnectivityState>('checking');
-  const sseConnectedRef = useRef(false);
   const API_URL = getApiUrl();
   const announce = useCallback((kind: Feedback['kind'], message: string) => setFeedback({ kind, message }), []);
-  const { data: sseData, connected: sseConnected, reconnectNow } = useSSE(isSetup ? `${API_URL}/events` : null);
+  const { data: sseData, status: sseStatus, reconnectNow } = useSSE(isSetup ? `${API_URL}/events` : null);
 
   const setPending = useCallback((pending: PendingAction | null) => {
     queuedActionRef.current = pending;
@@ -50,18 +49,26 @@ export default function ControleTouch() {
   const refreshData = useCallback(async (showError = true, targetGuiche = guiche): Promise<OperatorSnapshot | null> => {
     if (!isSetup) return null;
     try {
-      const [queueRes, ticketsRes] = await Promise.all([fetch(`${API_URL}/api/fila`), fetch(`${API_URL}/api/senhas`)]);
-      if (!queueRes.ok || !ticketsRes.ok) throw new Error();
-      const queue = await queueRes.json();
-      const tickets = await ticketsRes.json();
-      const waitingCount = Array.isArray(queue) ? queue.length : 0;
-      const active = Array.isArray(tickets) ? tickets.find((ticket: any) => ticket.status === 'chamada' && formatGuiche(ticket.guiche) === formatGuiche(targetGuiche)) : null;
+      const response = await fetch(`${API_URL}/api/operador/estado?guiche=${encodeURIComponent(targetGuiche)}`, { cache: 'no-store' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `Servidor respondeu ${response.status}.`);
+      const waitingCount = Number(payload.data?.aguardando || 0);
+      const active = payload.data?.ticket || null;
       const activeTicket = active ? { id: active.id, numero: `${active.preferencial ? 'P' : 'A'}-${String(active.numero).padStart(3, '0')}`, preferencial: active.preferencial, guiche: formatGuiche(targetGuiche) } : null;
       setAguardando(waitingCount);
       setSenhaAtual(activeTicket);
+      setHasAuthoritativeSnapshot(true);
       return { waitingCount, hasActiveTicket: Boolean(activeTicket) };
     } catch {
-      if (showError) announce('error', 'Servidor indisponível. Reconexão automática ativa.');
+      setHasAuthoritativeSnapshot(false);
+      // Compatibilidade durante a atualização do servidor: /api/fila já era
+      // uma leitura pública. Ela mantém o contador útil sem confundir falha do
+      // snapshot com queda de conectividade.
+      void fetch(`${API_URL}/api/fila`, { cache: 'no-store' })
+        .then((response) => response.ok ? response.json() : null)
+        .then((queue) => { if (Array.isArray(queue)) setAguardando(queue.length); })
+        .catch(() => undefined);
+      if (showError) announce('error', 'Não foi possível atualizar os dados do atendimento. Tente novamente.');
       return null;
     }
   }, [API_URL, announce, guiche, isSetup]);
@@ -78,7 +85,7 @@ export default function ControleTouch() {
         const response = await fetch(`${API_URL}/health`, { signal: controller.signal, cache: 'no-store' });
         if (!response.ok) throw new Error();
         setConnectivity('connected');
-        reconnectNow();
+        if (sseStatus === 'backoff' || sseStatus === 'idle') reconnectNow();
         return true;
       } catch {
         hadOutageRef.current = true;
@@ -92,7 +99,7 @@ export default function ControleTouch() {
     })();
     healthCheckRef.current = operation;
     return operation;
-  }, [API_URL, isSetup, reconnectNow]);
+  }, [API_URL, isSetup, reconnectNow, sseStatus]);
 
   const executeAction = useCallback(async (action: OperatorAction, recovered = false, targetGuiche = guiche): Promise<boolean> => {
     if (actionLockRef.current) return false;
@@ -130,22 +137,26 @@ export default function ControleTouch() {
   const runAction = useCallback(async (action: OperatorAction) => {
     if (queuedActionRef.current || actionInFlight) return;
     if (connectivity !== 'connected') return queueOfflineAction(action);
-    const localMessage = operatorFeedback(action, Boolean(senhaAtual), aguardando);
+    const localMessage = hasAuthoritativeSnapshot
+      ? operatorFeedback(action, Boolean(senhaAtual), aguardando)
+      : null;
     if (localMessage) return announce('warning', localMessage);
     await executeAction(action);
-  }, [actionInFlight, aguardando, announce, connectivity, executeAction, queueOfflineAction, senhaAtual]);
+  }, [actionInFlight, aguardando, announce, connectivity, executeAction, hasAuthoritativeSnapshot, queueOfflineAction, senhaAtual]);
 
   useEffect(() => { if (isSetup) void checkHealth(); }, [checkHealth, isSetup]);
 
   useEffect(() => {
-    if (!isSetup || connectivity === 'connected') return;
+    if (!isSetup || (connectivity === 'connected' && sseStatus === 'open')) return;
     const timer = window.setInterval(() => void checkHealth(), HEALTH_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [checkHealth, connectivity, isSetup]);
+  }, [checkHealth, connectivity, isSetup, sseStatus]);
 
   useEffect(() => {
     if (!isSetup) return;
-    const recoverOnInteraction = () => { if (connectivity !== 'connected') void checkHealth(); };
+    const recoverOnInteraction = () => {
+      if (connectivity !== 'connected' || sseStatus !== 'open') void checkHealth();
+    };
     const recoverOnVisibility = () => { if (document.visibilityState === 'visible') recoverOnInteraction(); };
     document.addEventListener('pointerdown', recoverOnInteraction, { capture: true, passive: true });
     document.addEventListener('visibilitychange', recoverOnVisibility);
@@ -157,25 +168,27 @@ export default function ControleTouch() {
       window.removeEventListener('online', recoverOnInteraction);
       window.removeEventListener('focus', recoverOnInteraction);
     };
-  }, [checkHealth, connectivity, isSetup]);
+  }, [checkHealth, connectivity, isSetup, sseStatus]);
 
   useEffect(() => {
-    sseConnectedRef.current = sseConnected;
-    if (sseConnected) setConnectivity('connected');
-    else if (wasSseConnected.current) { hadOutageRef.current = true; setConnectivity('disconnected'); }
-    wasSseConnected.current = sseConnected;
-  }, [sseConnected]);
+    if (sseStatus === 'open') void refreshData(false);
+  }, [refreshData, sseStatus]);
 
   useEffect(() => { connectivityRef.current = connectivity; }, [connectivity]);
 
   useEffect(() => {
-    if (connectivity !== 'connected' || !sseConnected || recoveryLockRef.current) return;
+    if (connectivity !== 'connected' || recoveryLockRef.current) return;
     recoveryLockRef.current = true;
     void (async () => {
       const pending = queuedActionRef.current;
       const snapshot = await refreshData(false, pending?.guiche || guiche);
-      if (!snapshot) { setConnectivity('disconnected'); recoveryLockRef.current = false; return; }
-      if (connectivityRef.current !== 'connected' || !sseConnectedRef.current) { recoveryLockRef.current = false; return; }
+      if (!snapshot) {
+        // /health é a autoridade de conexão. Um snapshot 401/404/500 não pode
+        // rotular um servidor alcançável como desconectado nem bloquear ações.
+        recoveryLockRef.current = false;
+        return;
+      }
+      if (connectivityRef.current !== 'connected') { recoveryLockRef.current = false; return; }
       if (!pending) {
         if (hadOutageRef.current) announce('success', 'Conexão restabelecida. Dados atualizados.');
         hadOutageRef.current = false;
@@ -190,7 +203,7 @@ export default function ControleTouch() {
       hadOutageRef.current = false;
       recoveryLockRef.current = false;
     })();
-  }, [announce, connectivity, executeAction, guiche, refreshData, setPending, sseConnected]);
+  }, [announce, connectivity, executeAction, guiche, refreshData, setPending]);
 
   useEffect(() => () => { healthAbortRef.current?.abort(); queuedActionRef.current = null; }, []);
 

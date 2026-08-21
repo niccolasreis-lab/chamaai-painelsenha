@@ -15,6 +15,7 @@ import { createSupabaseAnonClient } from './services/supabase-config.service';
 import { migrateDatabaseAndConfigs } from './categorizador';
 import { planMediaFileReconciliation, resolveUploadPath } from './media-files';
 import { isPublicDisplayReadRequest } from './public-display-routes';
+import { isPublicOperatorRequest } from './public-operator-routes';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -352,6 +353,13 @@ function remoteAuthMiddleware(req: express.Request, res: express.Response, next:
     reqPath.startsWith('/api/telao/sse') ||
     reqPath.startsWith('/api/portal')
   ) {
+    return next();
+  }
+
+  // O APK Operador é um appliance de LAN sem login. Libere somente seu
+  // snapshot e as três ações dedicadas; rotas administrativas continuam
+  // protegidas pelo mesmo middleware.
+  if (isPublicOperatorRequest(method, reqPath)) {
     return next();
   }
 
@@ -1605,6 +1613,30 @@ export function startServer() {
     const normalized = value.trim().replace(/^(guich[eê]|balc[aã]o)\s*:?\s*/i, '');
     return normalized.length > 0 && normalized.length <= 40 ? normalized : null;
   };
+
+  app.get('/api/operador/estado', (req: express.Request, res: express.Response) => {
+    try {
+      const guiche = parseOperatorGuiche(req.query.guiche);
+      if (!guiche) return res.status(400).json({ error: 'Guichê inválido.' });
+      const db = getDb();
+      const active = db.prepare(`
+        SELECT s.id, s.numero, s.preferencial, c.guiche
+        FROM chamadas c
+        JOIN senhas s ON s.id = c.senha_id
+        WHERE c.guiche = ? AND s.status = 'chamada'
+        ORDER BY c.id DESC LIMIT 1
+      `).get(`Guichê ${guiche}`) as any;
+      const waiting = db.prepare("SELECT COUNT(*) AS count FROM senhas WHERE status = 'aguardando'").get() as any;
+      res.json({
+        data: {
+          ticket: active || null,
+          aguardando: Number(waiting?.count || 0),
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   app.post('/api/operador/proximo', (req: express.Request, res: express.Response) => {
     try {
@@ -4332,7 +4364,7 @@ export function startServer() {
 
   // Heartbeat para manter as conexões SSE ativas e evitar timeouts
   heartbeatInterval = setInterval(() => {
-    const pingPayload = `:\n\n`;
+    const pingPayload = `data: ${JSON.stringify({ event: 'HEARTBEAT', data: { timestamp: Date.now() } })}\n\n`;
     sseClients.forEach(client => {
       try { client.write(pingPayload); } catch (e) {}
     });
@@ -4802,6 +4834,17 @@ export function stopServer(): Promise<void> {
         }
       });
       sseClients = [];
+    }
+
+    for (const code of Object.keys(telaoSseClients)) {
+      for (const client of telaoSseClients[code]) {
+        try {
+          client.end();
+        } catch (e) {
+          console.error(`[SERVER] Erro ao fechar SSE do telão ${code}:`, e);
+        }
+      }
+      delete telaoSseClients[code];
     }
 
     // Fechar todos os sockets HTTP/TCP ativos

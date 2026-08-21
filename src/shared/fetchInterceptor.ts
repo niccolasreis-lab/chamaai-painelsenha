@@ -7,6 +7,7 @@ export function installFetchInterceptor() {
   const originalFetch = window.fetch.bind(window);
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const isDedicatedAppliance = ['operador', 'telao'].includes(import.meta.env.VITE_APP_MODE || '');
     const masterToken = localStorage.getItem('master_remote_token');
     const userToken = localStorage.getItem('user_token');
     let userSession = null;
@@ -17,7 +18,7 @@ export function installFetchInterceptor() {
     
     const operatorToken = userSession?.token;
 
-    if (masterToken || operatorToken || userToken) {
+    if (!isDedicatedAppliance && (masterToken || operatorToken || userToken)) {
       const headers = new Headers(init?.headers);
       if (masterToken && !headers.has('X-Master-Token')) {
         headers.set('X-Master-Token', masterToken);
@@ -34,7 +35,7 @@ export function installFetchInterceptor() {
     const response = await originalFetch(input, init);
 
     // If server says token is invalid/expired, force logout
-    if (response.status === 401 && (masterToken || operatorToken)) {
+    if (!isDedicatedAppliance && response.status === 401 && (masterToken || operatorToken)) {
       if (masterToken) localStorage.removeItem('master_remote_token');
       if (operatorToken) localStorage.removeItem('user_session');
       window.location.reload();

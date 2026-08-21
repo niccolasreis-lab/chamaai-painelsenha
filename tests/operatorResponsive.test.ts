@@ -29,3 +29,9 @@ test('operator recovery polls every three seconds and reacts to foreground inter
   assert.match(component, /addEventListener\('focus'/);
   assert.match(component, /validateRecoveredAction/);
 });
+
+test('health permanece autoridade de conexão quando o snapshot falha', () => {
+  assert.match(component, /if \(!snapshot\) \{[\s\S]*recoveryLockRef\.current = false;[\s\S]*return;/);
+  assert.doesNotMatch(component, /if \(!snapshot\) \{\s*setConnectivity\('disconnected'\)/);
+  assert.match(component, /hasAuthoritativeSnapshot\s*\?\s*operatorFeedback/);
+});

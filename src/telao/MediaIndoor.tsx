@@ -220,6 +220,8 @@ export default function MediaIndoor() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const isMountedRef = useRef(true);
+  const lastRenderedCallIdRef = useRef<string | null>(null);
+  const hasHydratedRecentCallsRef = useRef(false);
   const audioSequenceRef = useRef(0);
   const autoRecoverAttemptsRef = useRef(0);
 
@@ -589,7 +591,7 @@ export default function MediaIndoor() {
     }
   };
 
-  const fetchRecentCalls = async () => {
+  const fetchRecentCalls = async (replayMissedCall = false) => {
     try {
       const res = await fetch(`${API_URL}/api/chamadas/recentes`);
       if (res.ok) {
@@ -604,8 +606,16 @@ export default function MediaIndoor() {
           });
           setHistorico(unique.slice(0, 5));
           if (unique.length > 0) {
-            setUltimaSenha(unique[0]);
+            const latest = unique[0];
+            const latestId = String(latest.id);
+            if (replayMissedCall && hasHydratedRecentCallsRef.current && lastRenderedCallIdRef.current !== latestId) {
+              window.dispatchEvent(new CustomEvent('NOVA_SENHA_CHAMADA', { detail: latest }));
+            } else {
+              setUltimaSenha(latest);
+            }
+            lastRenderedCallIdRef.current = latestId;
           }
+          hasHydratedRecentCallsRef.current = true;
         }
       }
     } catch (err) {
@@ -648,7 +658,48 @@ export default function MediaIndoor() {
 
   // Connect only to paired screen SSE channel (which receives all pairing + queue events)
   const sseUrl = telaoCode ? `${API_URL}/api/telao/sse/${telaoCode}` : null;
-  const { data: telaoSseEvent, connected: sseConnected } = useSSE(sseUrl);
+  const { data: telaoSseEvent, connected: sseConnected, status: sseStatus, reconnectNow: reconnectTelaoNow } = useSSE(sseUrl);
+  const telaoHealthCheckRef = useRef<Promise<void> | null>(null);
+
+  // A queda do canal de eventos não deve recarregar o WebView. Enquanto o SSE
+  // estiver em backoff, confirme o servidor a cada 3 s e antecipe a tentativa
+  // ao retornar para o app/rede. reconnectNow é idempotente durante CONNECTING.
+  useEffect(() => {
+    if (!telaoCode || sseStatus === 'open') return;
+
+    const checkAndReconnect = () => {
+      if (telaoHealthCheckRef.current) return telaoHealthCheckRef.current;
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 2200);
+      const operation = fetch(`${API_URL}/health`, { cache: 'no-store', signal: controller.signal })
+        .then((response) => {
+          if (response.ok) reconnectTelaoNow();
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          window.clearTimeout(timeout);
+          if (telaoHealthCheckRef.current === operation) telaoHealthCheckRef.current = null;
+        });
+      telaoHealthCheckRef.current = operation;
+      return operation;
+    };
+
+    const recoverOnVisibility = () => {
+      if (document.visibilityState === 'visible') void checkAndReconnect();
+    };
+    const recoverNow = () => void checkAndReconnect();
+    const timer = window.setInterval(recoverNow, 3000);
+    window.addEventListener('online', recoverNow);
+    window.addEventListener('focus', recoverNow);
+    document.addEventListener('visibilitychange', recoverOnVisibility);
+    void checkAndReconnect();
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('online', recoverNow);
+      window.removeEventListener('focus', recoverNow);
+      document.removeEventListener('visibilitychange', recoverOnVisibility);
+    };
+  }, [API_URL, reconnectTelaoNow, sseStatus, telaoCode]);
 
   // Buscar perfil atualizado sempre que o telão se reconectar
   /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
@@ -659,6 +710,8 @@ export default function MediaIndoor() {
       fetchConfig();
       fetchSmartMediaSettings();
       fetchMidias();
+      fetchAguardando();
+      fetchRecentCalls(true);
       refreshEncarteData('SSE reconectado');
       window.dispatchEvent(new CustomEvent('MEDIA_CAMPAIGN_UPDATED'));
     }
@@ -688,6 +741,7 @@ export default function MediaIndoor() {
   useEffect(() => {
     const handleNovaSenhaChamada = (e: Event) => {
       const payload = (e as CustomEvent).detail as RecentCall;
+      lastRenderedCallIdRef.current = String(payload.id);
       const sequence = ++audioSequenceRef.current;
       
       // PASSO 1: Atualizar o estado React imediatamente (agenda o re-render)
