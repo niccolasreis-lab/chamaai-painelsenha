@@ -1,3 +1,33 @@
+export function normalizePortalBaseUrl(portalBase: string): string {
+  const raw = String(portalBase ?? '').trim();
+  if (!raw) return '';
+
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error('URL do Portal do Cliente inválida. Informe uma URL completa, incluindo https://.');
+  }
+
+  if (!/^https?:$/.test(url.protocol)) {
+    throw new Error('A URL do Portal do Cliente deve usar HTTP ou HTTPS.');
+  }
+
+  // Ticket IDs belong to each printed ticket and must never be persisted in
+  // the configured base URL. The public store token, when present, is kept.
+  url.searchParams.delete('ticket');
+  url.searchParams.delete('senha_id');
+  if (url.hash) {
+    const [route, rawQuery = ''] = url.hash.slice(1).split('?', 2);
+    const params = new URLSearchParams(rawQuery);
+    params.delete('ticket');
+    params.delete('senha_id');
+    url.hash = params.size > 0 ? `${route}?${params.toString()}` : route;
+  }
+
+  return url.toString();
+}
+
 export function buildPortalTicketUrl(portalBase: string, ticketId: string | number): string {
   const normalizedTicket = String(ticketId ?? '').trim();
   if (!/^\d+$/.test(normalizedTicket) || Number(normalizedTicket) <= 0) {
@@ -6,7 +36,7 @@ export function buildPortalTicketUrl(portalBase: string, ticketId: string | numb
 
   let url: URL;
   try {
-    url = new URL(portalBase);
+    url = new URL(normalizePortalBaseUrl(portalBase));
   } catch {
     throw new Error('URL do Portal do Cliente inválida.');
   }

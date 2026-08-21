@@ -11,6 +11,9 @@ export type AudioCallOutcome =
   | 'interrupted';
 
 export type AudioCallPhase =
+  | 'chime_start'
+  | 'chime_complete'
+  | 'chime_error'
   | 'mp3_try'
   | 'mp3_complete'
   | 'mp3_error'
@@ -22,11 +25,14 @@ export type AudioCallPhase =
   | 'call_interrupted';
 
 export type AudioCallPlan = {
+  chime: { kind: 'system'; type: 'ding' | 'bell' | 'chime' | 'bip' }
+    | { kind: 'custom'; url: string };
   mode: TelaoTtsMode;
   mp3Candidates: string[];
 };
 
 type AudioCallExecutor = {
+  playChime: (chime: AudioCallPlan['chime']) => Promise<PlaybackResult>;
   playMp3: (url: string) => Promise<PlaybackResult>;
   speak: () => Promise<PlaybackResult>;
   isCurrent: () => boolean;
@@ -112,8 +118,28 @@ export function createAudioCallPlan(
   apiUrl: string,
 ): AudioCallPlan {
   const mode = normalizeTtsMode(config.telao_tts_modo);
+  const configuredSound = String(config.tipo_som || 'bell').toLowerCase();
+  const systemSound = ['ding', 'bell', 'chime', 'bip'].includes(configuredSound)
+    ? configuredSound as 'ding' | 'bell' | 'chime' | 'bip'
+    : 'bell';
+  let chime: AudioCallPlan['chime'] = { kind: 'system', type: systemSound };
+
+  if (configuredSound === 'custom' && config.som_personalizado) {
+    try {
+      const configuredUrl = String(config.som_personalizado).trim();
+      const resolvedUrl = configuredUrl.startsWith('data:audio/')
+        ? configuredUrl
+        : new URL(configuredUrl, `${apiUrl.replace(/\/$/, '')}/`).toString();
+      if (resolvedUrl.startsWith('data:audio/') || /^https?:\/\//i.test(resolvedUrl)) {
+        chime = { kind: 'custom', url: resolvedUrl };
+      }
+    } catch {
+      // Configuração antiga/inválida: mantém a campainha padrão com segurança.
+    }
+  }
 
   return {
+    chime,
     mode,
     mp3Candidates: mode === 'mp3'
       ? buildMp3Candidates(
@@ -140,6 +166,18 @@ export async function executeAudioCall(
     emit('call_complete', { outcome });
     return outcome;
   };
+
+  if (interrupted()) return finishInterrupted();
+  emit('chime_start', { kind: plan.chime.kind });
+  try {
+    const result = await executor.playChime(plan.chime);
+    if (result === 'interrupted' || interrupted()) return finishInterrupted();
+    emit('chime_complete', { kind: plan.chime.kind });
+  } catch (error) {
+    if (interrupted()) return finishInterrupted();
+    // A campainha é um aviso independente: uma falha nela não deve suprimir a voz.
+    emit('chime_error', { kind: plan.chime.kind, error });
+  }
 
   if (plan.mode === 'desativado') return finish('voice_disabled');
 

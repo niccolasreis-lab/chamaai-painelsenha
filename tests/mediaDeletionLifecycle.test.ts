@@ -126,7 +126,7 @@ test('versão quebrada permanece fora do cache até a revisão do manifesto muda
 
     await quarantineTelaoAsset(apiUrl, publicUrl);
     assert.equal(bucket.size, 0);
-    assert.match(values.get(`chamaai:telao:quarantine:${encodeURIComponent(apiUrl)}`) || '', /broken\.mp4/);
+    assert.match(values.get(`chamaai:telao:quarantine:${encodeURIComponent(`${apiUrl}::TESTE`)}`) || '', /broken\.mp4/);
 
     const sameRevision = await syncTelaoAssetCache(apiUrl, 'TESTE');
     assert.equal(sameRevision.stats.entries, 0);

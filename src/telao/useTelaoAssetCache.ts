@@ -35,7 +35,7 @@ export function useTelaoAssetCache(apiUrl: string, code: string | null) {
   const evict = useCallback(async (url?: string | null) => {
     if (!url) return;
     try {
-      await quarantineTelaoAsset(apiUrl, url);
+      await quarantineTelaoAsset(apiUrl, url, code);
     } finally {
       setResolved(previous => {
         const next = { ...previous };
@@ -43,7 +43,7 @@ export function useTelaoAssetCache(apiUrl: string, code: string | null) {
         return next;
       });
     }
-  }, [apiUrl]);
+  }, [apiUrl, code]);
 
   return { resolve, evict, stats, sync };
 }

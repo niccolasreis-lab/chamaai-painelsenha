@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Produto | ChamaAí — Gestão de filas e comunicação em loja |
-| Baseline | `1.0.167` |
+| Baseline | `1.0.168` |
 | Atualização | 21 de agosto de 2026 |
 | Estado | Release candidate / homologação |
 | Plataformas | Windows/Electron, navegador/PWA e Android TV |
@@ -114,7 +114,7 @@ Admin remoto ───────┘                                  │
 |---|---|---|
 | TTS-01 | Aceitar apenas `desativado`, `mp3` ou `sintetizador`. | Implementado |
 | TTS-02 | Migrar o legado `ambos` para `mp3`. | Implementado |
-| TTS-03 | Não executar campainha no fluxo de chamada. | Implementado e testado |
+| TTS-03 | Executar a campainha configurada antes da voz, como fase independente, sem alterar a exclusividade entre MP3, sintetizador e modo desativado. | Implementado e testado |
 | TTS-04 | Em `mp3`, tentar somente candidatos MP3 e não sintetizar como fallback. | Implementado e testado |
 | TTS-05 | Em `sintetizador`, não solicitar MP3. | Implementado e testado |
 | TTS-06 | Em `desativado`, não executar voz. | Implementado e testado |
@@ -135,6 +135,7 @@ Admin remoto ───────┘                                  │
 | CAC-08 | Limpar cache legado preservando IP, vínculo e preferências locais. | Implementado |
 | CAC-09 | Sem Cache Storage/`crypto.subtle`, transmitir sem persistir e informar limitação. | Implementado; offline não garantido |
 | CAC-10 | Confinar arquivos gerenciados a `C:\ChamaAi\uploads`. | Implementado e testado |
+| CAC-11 | Permitir que telões vinculados na LAN consultem seu manifesto autenticado por código, sem exigir sessão administrativa. | Implementado e testado |
 
 ### 5.6 Mídia e encarte
 
@@ -168,6 +169,7 @@ Admin remoto ───────┘                                  │
 | ADM-04 | Migrar banco existente uma única vez para não reabrir onboarding remotamente. | Implementado |
 | ADM-05 | Manter instalação nova pendente até confirmação do POST. | Implementado |
 | ADM-06 | Não concluir localmente quando a gravação no servidor falhar. | Implementado |
+| ADM-07 | Validar e normalizar a URL pública do Portal do Cliente antes de persistir, preservando token e removendo identificadores de ticket antigos. | Implementado e testado |
 
 ### 5.8 APK Android TV dedicado
 

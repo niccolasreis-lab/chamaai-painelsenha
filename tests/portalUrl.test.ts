@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertPublicPortalUrl, buildPortalTicketUrl } from '../electron/services/portal-url';
+import { assertPublicPortalUrl, buildPortalTicketUrl, normalizePortalBaseUrl } from '../electron/services/portal-url';
 import { resolvePortalParams } from '../chamacliente/src/services/portalParams';
 
 test('preserva token cloud e usa o parâmetro canônico ticket', () => {
@@ -21,6 +21,20 @@ test('rejeita URL, ticket ausente e caracteres inválidos', () => {
   assert.throws(() => buildPortalTicketUrl('não é url', 1), /URL/);
   assert.throws(() => buildPortalTicketUrl('https://example.com', ''), /senha/);
   assert.throws(() => buildPortalTicketUrl('https://example.com', '1&admin=true'), /senha/);
+});
+
+test('normaliza a URL configurada e remove identificadores de tickets antigos', () => {
+  assert.equal(
+    normalizePortalBaseUrl('  https://chasmaaicliente.vercel.app?token=loja&senha_id=9  '),
+    'https://chasmaaicliente.vercel.app/?token=loja',
+  );
+  assert.equal(
+    normalizePortalBaseUrl('http://localhost:3001/#/cliente?ticket=8&modo=teste'),
+    'http://localhost:3001/#/cliente?modo=teste',
+  );
+  assert.equal(normalizePortalBaseUrl('   '), '');
+  assert.throws(() => normalizePortalBaseUrl('chasmaaicliente.vercel.app'), /https:\/\//);
+  assert.throws(() => normalizePortalBaseUrl('javascript:alert(1)'), /HTTP/);
 });
 
 test('impressão aceita somente URL pública HTTPS', () => {

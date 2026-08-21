@@ -437,6 +437,9 @@ export default function Configuracoes() {
             width: config.impressora_width
           });
         }
+      } else {
+        const payload = await res.json().catch(() => null);
+        alert(payload?.error || `Não foi possível salvar as configurações (HTTP ${res.status}).`);
       }
     } catch (err: any) {
       alert(`Erro de conexão: ${err.message}`);
@@ -1540,7 +1543,7 @@ export default function Configuracoes() {
                       label="Url do portal do cliente (QR Code)"
                       value={config.portal_cliente_url || ''}
                       onChange={handleChange}
-                      placeholder="Ex: https://chamacliente.vercel.app"
+                      placeholder="Ex: https://chasmaaicliente.vercel.app/"
                       type="text"
                     />
 

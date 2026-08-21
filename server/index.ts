@@ -25,6 +25,7 @@ import {
   stopVignetteScheduler,
 } from './services/vignette-scheduler.service';
 import { isTelaoTtsMode, TELAO_TTS_MODES } from '../src/shared/ttsMode';
+import { normalizePortalBaseUrl } from '../electron/services/portal-url';
 import {
   CHAMAAI_DATA_DIR,
   TTS_DIR,
@@ -2232,6 +2233,14 @@ export function startServer() {
         return res.status(400).json({ error: 'Configurações devem ser enviadas como objeto.' });
       }
 
+      if (Object.prototype.hasOwnProperty.call(configuracoes, 'portal_cliente_url')) {
+        try {
+          configuracoes.portal_cliente_url = normalizePortalBaseUrl(configuracoes.portal_cliente_url);
+        } catch (err: any) {
+          return res.status(400).json({ error: err.message });
+        }
+      }
+
       if (
         Object.prototype.hasOwnProperty.call(configuracoes, 'telao_tts_modo')
         && !isTelaoTtsMode(configuracoes.telao_tts_modo)
@@ -4196,6 +4205,7 @@ export function startServer() {
       } catch (errOrdem) {
         console.error('[STARTUP] Erro ao sincronizar ordem das categorias no startup:', errOrdem);
       }
+
       if (cfg['logo_cliente']) {
         const fullLogoPath = resolveManagedAssetPath(cfg['logo_cliente']);
         if (fullLogoPath && fs.existsSync(fullLogoPath)) {

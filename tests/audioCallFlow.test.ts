@@ -110,7 +110,7 @@ test('som do portal não interfere na decisão de voz do telão', () => {
   assert.ok(plan.mp3Candidates.every((url) => url.endsWith('?v=server-revision')));
 });
 
-test('o plano de chamada não contém campainha nem usa configurações de som legado', () => {
+test('o plano de chamada restaura a campainha personalizada sem alterar o modo de voz', () => {
   const plan = createAudioCallPlan(
     { id: 7, numero: 7, guiche: '2' },
     {
@@ -121,8 +121,27 @@ test('o plano de chamada não contém campainha nem usa configurações de som l
     'http://localhost:3000',
   );
 
-  assert.deepEqual(Object.keys(plan).sort(), ['mode', 'mp3Candidates']);
-  assert.equal('chime' in plan, false);
+  assert.deepEqual(plan.chime, {
+    kind: 'custom',
+    url: 'http://localhost:3000/uploads/campainha.mp3',
+  });
+  assert.equal(plan.mode, 'mp3');
+});
+
+test('campainha usa contrato seguro e fallback bell para configuração inválida', () => {
+  const system = createAudioCallPlan(
+    { id: 7, numero: 7, guiche: '2' },
+    { telao_tts_modo: 'sintetizador', tipo_som: 'chime' },
+    'http://localhost:3000',
+  );
+  const invalid = createAudioCallPlan(
+    { id: 8, numero: 8, guiche: '2' },
+    { telao_tts_modo: 'desativado', tipo_som: 'qualquer-coisa' },
+    'http://localhost:3000',
+  );
+
+  assert.deepEqual(system.chime, { kind: 'system', type: 'chime' });
+  assert.deepEqual(invalid.chime, { kind: 'system', type: 'bell' });
 });
 
 test('modo sintetizador não gera candidatos MP3', () => {
@@ -145,6 +164,7 @@ test('modo MP3 tenta os candidatos na ordem até o primeiro sucesso sem sintetiz
   );
 
   const outcome = await executeAudioCall(plan, {
+    playChime: async () => { events.push('chime'); return 'completed'; },
     playMp3: async (url) => {
       events.push(url.includes('tipo1') ? 'tipo1' : 'tipo3');
       if (url.includes('tipo1')) throw new Error('arquivo ausente');
@@ -158,7 +178,7 @@ test('modo MP3 tenta os candidatos na ordem até o primeiro sucesso sem sintetiz
   });
 
   assert.equal(outcome, 'mp3_completed');
-  assert.deepEqual(events, ['tipo1', 'tipo3']);
+  assert.deepEqual(events, ['chime', 'tipo1', 'tipo3']);
 });
 
 test('modo MP3 indisponível termina em silêncio sem fallback para sintetizador', async () => {
@@ -171,6 +191,7 @@ test('modo MP3 indisponível termina em silêncio sem fallback para sintetizador
   );
 
   const outcome = await executeAudioCall(plan, {
+    playChime: async () => { events.push('chime'); return 'completed'; },
     playMp3: async (url) => {
       events.push(url.includes('tipo1') ? 'tipo1' : 'tipo3');
       throw new Error('arquivo ausente');
@@ -184,7 +205,7 @@ test('modo MP3 indisponível termina em silêncio sem fallback para sintetizador
   });
 
   assert.equal(outcome, 'voice_unavailable');
-  assert.deepEqual(events, ['tipo1', 'tipo3']);
+  assert.deepEqual(events, ['chime', 'tipo1', 'tipo3']);
   assert.equal(phases.filter((phase) => phase === 'mp3_error').length, 2);
   assert.equal(phases.includes('synth_start'), false);
 });
@@ -199,6 +220,7 @@ test('modo sintetizador é exclusivo e nunca solicita MP3', async () => {
   );
 
   const outcome = await executeAudioCall(plan, {
+    playChime: async () => 'completed',
     playMp3: async () => {
       mp3Calls += 1;
       return 'completed';
@@ -226,6 +248,7 @@ test('uma sequência obsoleta interrompe o MP3 e não tenta o próximo candidato
   );
 
   const outcome = await executeAudioCall(plan, {
+    playChime: async () => 'completed',
     playMp3: async () => {
       mp3Calls += 1;
       current = false;
@@ -243,7 +266,7 @@ test('uma sequência obsoleta interrompe o MP3 e não tenta o próximo candidato
   assert.equal(synthCalls, 0);
 });
 
-test('modo desativado não executa nenhum mecanismo de áudio', async () => {
+test('modo desativado mantém a campainha, mas não executa voz', async () => {
   let calls = 0;
   const plan = createAudioCallPlan(
     { id: 7, numero: 7, guiche: '2' },
@@ -252,6 +275,10 @@ test('modo desativado não executa nenhum mecanismo de áudio', async () => {
   );
 
   const outcome = await executeAudioCall(plan, {
+    playChime: async () => {
+      calls += 1;
+      return 'completed';
+    },
     playMp3: async () => {
       calls += 1;
       return 'completed';
@@ -264,5 +291,26 @@ test('modo desativado não executa nenhum mecanismo de áudio', async () => {
   });
 
   assert.equal(outcome, 'voice_disabled');
-  assert.equal(calls, 0);
+  assert.equal(calls, 1);
+});
+
+test('falha na campainha não impede a voz configurada', async () => {
+  const events: string[] = [];
+  const plan = createAudioCallPlan(
+    { id: 9, numero: 9, guiche: '2' },
+    { telao_tts_modo: 'sintetizador', tipo_som: 'bell' },
+    'http://localhost:3000',
+  );
+
+  const outcome = await executeAudioCall(plan, {
+    playChime: async () => { throw new Error('dispositivo sem campainha'); },
+    playMp3: async () => 'completed',
+    speak: async () => { events.push('synth'); return 'completed'; },
+    isCurrent: () => true,
+    onPhase: (phase) => events.push(phase),
+  });
+
+  assert.equal(outcome, 'synth_completed');
+  assert.equal(events.includes('chime_error'), true);
+  assert.equal(events.includes('synth'), true);
 });

@@ -358,6 +358,7 @@ export default function MediaIndoor() {
   const {
     initAudioContext,
     playDynamicUrl,
+    playSystemSound,
     stopAudio,
     isInitialized,
   } = useAudioPlayer();
@@ -746,6 +747,9 @@ export default function MediaIndoor() {
 
           await executeAudioCall(plan, {
             isCurrent,
+            playChime: (chime) => chime.kind === 'custom'
+              ? playDynamicUrl(chime.url, volume)
+              : playSystemSound(chime.type, volume),
             playMp3: (url) => playDynamicUrl(url, volume),
             speak: () => falarSenha(
               buildSpeechText(payload, config),

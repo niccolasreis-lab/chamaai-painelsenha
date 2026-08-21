@@ -24,5 +24,6 @@ export function isPublicDisplayReadRequest(method: string, requestPath: string):
 
   const normalizedPath = normalizeRequestPath(requestPath);
   return EXACT_PUBLIC_DISPLAY_READ_ROUTES.has(normalizedPath)
-    || normalizedPath.startsWith('/api/telao/profile/');
+    || normalizedPath.startsWith('/api/telao/profile/')
+    || normalizedPath.startsWith('/api/telao/assets/');
 }
